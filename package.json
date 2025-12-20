@@ -1,0 +1,54 @@
+{
+  "name": "tree-of-life-system",
+  "version": "1.0.0",
+  "description": "Multiplex AI Business Platform - Integrated ecosystem for unprecedented automation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "setup": "node scripts/setup.js",
+    "test": "jest",
+    "lint": "eslint src/",
+    "build": "npm run build:root && npm run build:trunk && npm run build:branch",
+    "build:root": "node scripts/build-root-systems.js",
+    "build:trunk": "node scripts/build-trunk-systems.js",
+    "build:branch": "node scripts/build-branch-systems.js",
+    "deploy": "npm run build && node scripts/deploy.js",
+    "monitor": "node scripts/monitor-systems.js"
+  },
+  "keywords": [
+    "ai",
+    "automation",
+    "github",
+    "linear",
+    "notion",
+    "perplexity",
+    "integration",
+    "business-intelligence"
+  ],
+  "author": "Garrett Wayne Carrol",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "@linear/sdk": "^27.0.0",
+    "@notionhq/client": "^2.2.14",
+    "@octokit/rest": "^20.0.2",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "pg": "^8.11.3",
+    "redis": "^4.6.11",
+    "openai": "^4.20.1",
+    "bullmq": "^5.0.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
