@@ -1,0 +1,96 @@
+# Environment Variables - NEVER COMMIT
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Secrets and Keys
+*.pem
+*.key
+*.cert
+*.p12
+secrets/
+credentials/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Dependencies
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.nuxt/
+
+# Cache directories
+.cache/
+.tmp/
+temp/
+*.log
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+*.dockerfile.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Local configuration overrides
+config.local.js
+config.local.json
+
+# AI and ML models (large files)
+models/
+*.h5
+*.pkl
+*.joblib
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# Private notes and documentation
+PRIVATE_NOTES.md
+TODO_PRIVATE.md
