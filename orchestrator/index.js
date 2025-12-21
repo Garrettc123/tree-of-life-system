@@ -1,11 +1,19 @@
 /**
  * Tree of Life System - Orchestrator
  * Master coordination service for GitHub, Linear, Notion, OpenAI
- * Runs on Railway without Docker
+ * Now with complete GitHub automation suite
  */
 
 const express = require('express');
 const githubHandler = require('./github-handler');
+
+// Import GitHub automation systems
+const prManager = require('../branch-systems/github-automation/pr-manager');
+const issueManager = require('../branch-systems/github-automation/issue-manager');
+const releaseManager = require('../branch-systems/github-automation/release-manager');
+const cicd = require('../branch-systems/github-automation/ci-cd');
+const codeQuality = require('../branch-systems/github-automation/code-quality');
+const revenueSystem = require('../branch-systems/revenue-generation/index');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,50 +35,156 @@ app.use((req, res, next) => {
   next();
 });
 
+// Mount GitHub automation systems
+app.use('/github', prManager);
+app.use('/github', issueManager);
+app.use('/github', releaseManager);
+app.use('/github', cicd);
+app.use('/github', codeQuality);
+app.use('/', revenueSystem);
+app.use('/', githubHandler);
+
 // Health Check
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'orchestrator',
     timestamp: new Date().toISOString(),
-    integrations: {
-      github: 'webhook-ready',
-      linear: 'authenticated',
-      notion: 'authenticated',
-      openai: process.env.OPENAI_API_KEY ? 'configured' : 'missing'
+    systems: {
+      github: {
+        webhooks: 'active',
+        prAutomation: 'active',
+        issueManagement: 'active',
+        releases: 'active',
+        cicd: 'active',
+        codeQuality: 'active'
+      },
+      integrations: {
+        linear: 'authenticated',
+        notion: 'authenticated',
+        openai: process.env.OPENAI_API_KEY ? 'configured' : 'missing'
+      },
+      revenue: {
+        saas: 'active',
+        api: 'active',
+        content: 'active',
+        consulting: 'active',
+        affiliates: 'active'
+      }
     },
     environment: process.env.NODE_ENV || 'development',
     uptime: process.uptime()
   });
 });
 
-// Status
+// Status Dashboard
 app.get('/status', (req, res) => {
   res.json({
     service: 'orchestrator',
     status: 'running',
     deployment: 'railway',
     timestamp: new Date().toISOString(),
+    githubAutomation: {
+      prManagement: {
+        status: 'active',
+        features: [
+          'Auto-create PRs',
+          'AI code reviews',
+          'Auto-merge',
+          'Conflict resolution'
+        ],
+        endpoints: [
+          '/github/pr/auto-create',
+          '/github/pr/ai-review',
+          '/github/pr/auto-merge',
+          '/github/pr/resolve-conflicts'
+        ]
+      },
+      issueManagement: {
+        status: 'active',
+        features: [
+          'Auto-labeling',
+          'Auto-assignment',
+          'Duplicate detection',
+          'Template validation'
+        ],
+        endpoints: [
+          '/github/issue/auto-label',
+          '/github/issue/auto-assign',
+          '/github/issue/detect-duplicate',
+          '/github/issue/validate-template'
+        ]
+      },
+      releaseManagement: {
+        status: 'active',
+        features: [
+          'Auto-generate changelogs',
+          'Version bumping',
+          'Release creation',
+          'Deploy automation'
+        ],
+        endpoints: [
+          '/github/release/changelog',
+          '/github/release/bump-version',
+          '/github/release/create',
+          '/github/release/deploy'
+        ]
+      },
+      cicd: {
+        status: 'active',
+        features: [
+          'Auto-testing',
+          'Build automation',
+          'Railway deployment',
+          'Rollback capability'
+        ],
+        endpoints: [
+          '/github/cicd/run',
+          '/github/cicd/deploy-railway',
+          '/github/cicd/rollback'
+        ]
+      },
+      codeQuality: {
+        status: 'active',
+        features: [
+          'Automated linting',
+          'Security scanning',
+          'Performance monitoring',
+          'Tech debt tracking'
+        ],
+        endpoints: [
+          '/github/quality/lint',
+          '/github/quality/security-scan',
+          '/github/quality/performance',
+          '/github/quality/tech-debt'
+        ]
+      }
+    },
+    revenueGeneration: {
+      status: 'active',
+      streams: ['SaaS', 'API', 'Content', 'Consulting', 'Affiliates'],
+      endpoints: [
+        '/revenue/pricing',
+        '/revenue/api/pricing',
+        '/revenue/dashboard'
+      ]
+    },
     integrations: {
       github: {
         status: 'webhook-ready',
-        url: `/webhooks/github`,
         authenticated: true
       },
       linear: {
         status: 'authenticated',
-        teamId: process.env.LINEAR_TEAM_ID,
-        authenticated: !!process.env.LINEAR_API_KEY
+        teamId: process.env.LINEAR_TEAM_ID
       },
       notion: {
         status: 'authenticated',
-        workspaceId: process.env.NOTION_WORKSPACE_ID,
-        authenticated: !!process.env.NOTION_API_KEY
+        workspaceId: process.env.NOTION_WORKSPACE_ID
       },
       openai: {
         status: process.env.OPENAI_API_KEY ? 'configured' : 'missing',
-        model: process.env.OPENAI_MODEL || 'gpt-4',
-        authenticated: !!process.env.OPENAI_API_KEY
+        model: process.env.OPENAI_MODEL || 'gpt-4'
       }
     },
     database: {
@@ -81,88 +195,34 @@ app.get('/status', (req, res) => {
   });
 });
 
-// GitHub Webhook Handler
-app.use('/', githubHandler);
-
-// Orchestrator Start Endpoint
-app.post('/orchestrator/start', (req, res) => {
-  console.log('[Orchestrator] Starting autonomous loops...');
+// Root endpoint
+app.get('/', (req, res) => {
   res.json({
-    status: 'started',
-    loops: [
-      'code-to-knowledge',
-      'intelligence-feedback',
-      'marketing-automation'
-    ],
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Marketing Status
-app.get('/marketing/status', (req, res) => {
-  res.json({
-    service: 'marketing-automation',
-    status: 'ready',
-    features: [
-      'content-generation',
-      'seo-optimization',
-      'auto-publishing',
-      'analytics-tracking'
-    ],
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post('/marketing/activate', (req, res) => {
-  console.log('[Marketing] Activating automation...');
-  res.json({
-    status: 'activated',
-    service: 'marketing-automation',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// AI Engine Status
-app.get('/ai/status', (req, res) => {
-  res.json({
-    service: 'ai-engine',
-    status: 'ready',
-    model: process.env.OPENAI_MODEL || 'gpt-4',
-    features: [
-      'code-analysis',
-      'content-generation',
-      'predictive-analytics',
-      'lead-scoring'
-    ],
-    authenticated: !!process.env.OPENAI_API_KEY,
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post('/ai/start', (req, res) => {
-  console.log('[AI Engine] Starting monitoring...');
-  res.json({
-    status: 'started',
-    service: 'ai-engine',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.post('/ai/analyze', (req, res) => {
-  const { text } = req.body;
-  
-  if (!text) {
-    return res.status(400).json({ error: 'Missing text parameter' });
-  }
-
-  console.log('[AI] Analyzing text:', text.substring(0, 50));
-  res.json({
-    analysis: {
-      text: text.substring(0, 100),
-      length: text.length,
-      timestamp: new Date().toISOString()
+    service: 'Tree of Life System - Orchestrator',
+    version: '2.0.0',
+    status: 'running',
+    deployment: 'railway',
+    systems: {
+      github: {
+        prAutomation: '/github/pr/status',
+        issueManagement: '/github/issue/status',
+        releases: '/github/release/status',
+        cicd: '/github/cicd/status',
+        codeQuality: '/github/quality/dashboard'
+      },
+      revenue: {
+        dashboard: '/revenue/dashboard',
+        pricing: '/revenue/pricing'
+      }
     },
-    status: 'processed'
+    endpoints: {
+      health: '/health',
+      status: '/status',
+      dashboard: '/dashboard',
+      github_webhooks: '/webhooks/github'
+    },
+    documentation: 'https://github.com/Garrettc123/tree-of-life-system',
+    notion: 'https://notion.so/garrettwaynes/tree-of-life'
   });
 });
 
@@ -170,36 +230,37 @@ app.post('/ai/analyze', (req, res) => {
 app.get('/dashboard', (req, res) => {
   res.json({
     dashboard: 'tree-of-life-system',
+    version: '2.0.0',
     services: {
       orchestrator: 'running',
-      'ai-engine': 'ready',
-      'marketing-automation': 'ready',
-      'github-webhooks': 'listening',
-      'linear-sync': 'authenticated',
-      'notion-automation': 'authenticated'
+      githubAutomation: {
+        prManagement: 'active',
+        issueManagement: 'active',
+        releases: 'active',
+        cicd: 'active',
+        codeQuality: 'active'
+      },
+      revenueGeneration: 'active',
+      integrations: {
+        github: 'webhook-ready',
+        linear: 'authenticated',
+        notion: 'authenticated',
+        openai: 'configured'
+      }
     },
+    features: [
+      'Auto PR management & AI reviews',
+      'Automated issue labeling & assignment',
+      'Release automation & changelogs',
+      'CI/CD pipeline with Railway',
+      'Code quality monitoring',
+      'Revenue generation (5 streams)',
+      'Cross-platform sync',
+      'Real-time automation'
+    ],
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV
-  });
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    service: 'Tree of Life System - Orchestrator',
-    status: 'running',
-    deployment: 'railway',
-    endpoints: {
-      health: '/health',
-      status: '/status',
-      dashboard: '/dashboard',
-      github_webhooks: '/webhooks/github',
-      orchestrator_start: 'POST /orchestrator/start',
-      ai_start: 'POST /ai/start',
-      marketing_activate: 'POST /marketing/activate'
-    },
-    documentation: 'https://github.com/Garrettc123/tree-of-life-system'
   });
 });
 
@@ -216,12 +277,23 @@ app.use((err, req, res, next) => {
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`\n🌳 Tree of Life System - Orchestrator`);
+  console.log(`\n🌳 Tree of Life System - Orchestrator v2.0`);
   console.log(`✅ Running on port ${PORT}`);
-  console.log(`📊 Dashboard: http://localhost:${PORT}/dashboard`);
-  console.log(`🔗 GitHub Webhooks: http://localhost:${PORT}/webhooks/github`);
-  console.log(`❤️  Health Check: http://localhost:${PORT}/health`);
-  console.log(`\n✨ System ready for deployment!\n`);
+  console.log(`\n🤖 GitHub Automation Systems:`);
+  console.log(`  - PR Management: /github/pr/*`);
+  console.log(`  - Issue Management: /github/issue/*`);
+  console.log(`  - Releases: /github/release/*`);
+  console.log(`  - CI/CD: /github/cicd/*`);
+  console.log(`  - Code Quality: /github/quality/*`);
+  console.log(`\n💰 Revenue Systems:`);
+  console.log(`  - Pricing: /revenue/pricing`);
+  console.log(`  - Dashboard: /revenue/dashboard`);
+  console.log(`\n📊 Dashboards:`);
+  console.log(`  - Main: http://localhost:${PORT}/dashboard`);
+  console.log(`  - Health: http://localhost:${PORT}/health`);
+  console.log(`  - Status: http://localhost:${PORT}/status`);
+  console.log(`\n🔗 GitHub Webhooks: http://localhost:${PORT}/webhooks/github`);
+  console.log(`\n✨ All systems operational!\n`);
 });
 
 // Graceful shutdown
