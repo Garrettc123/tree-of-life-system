@@ -1,0 +1,13 @@
+[build]
+builder = "NIXPACKS"
+builder_command = "npm install"
+
+[deploy]
+start_command = "node orchestrator/index.js"
+restart_policy_type = "ON_FAILURE"
+restart_policy_max_retries = 10
+
+[healthcheck]
+path = "/health"
+interval = 60
+timeout = 10
