@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ai-verifier-agent:
+    build: .
+    container_name: ai-verifier-agent
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    networks:
+      - nwu-network
+
+networks:
+  nwu-network:
+    external: true
