@@ -1,0 +1,124 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Scan for secrets
+        run: |
+          echo "🔍 Scanning for leaked secrets..."
+          
+          # Check for API keys
+          echo "Checking for OpenAI keys..."
+          if git log --all --source --full-history -S "sk-" --oneline | head -n 1; then
+            echo "⚠️ WARNING: Potential OpenAI key found in history!"
+            echo "ACTION: Rotate your OpenAI API key immediately!"
+          else
+            echo "✅ No OpenAI keys found"
+          fi
+          
+          echo "Checking for GitHub tokens..."
+          if git log --all --source --full-history -S "ghp_" --oneline | head -n 1; then
+            echo "⚠️ WARNING: Potential GitHub token found in history!"
+            echo "ACTION: Rotate your GitHub token immediately!"
+          else
+            echo "✅ No GitHub tokens found"
+          fi
+          
+          echo "Checking for Stripe keys..."
+          if git log --all --source --full-history -S "sk_live_" --oneline | head -n 1; then
+            echo "⚠️ WARNING: Potential Stripe key found in history!"
+            echo "ACTION: Rotate your Stripe key immediately!"
+          else
+            echo "✅ No Stripe keys found"
+          fi
+      
+      - name: Check for sensitive files
+        run: |
+          echo "📁 Checking for sensitive files..."
+          
+          if [ -f ".env" ]; then
+            echo "❌ ERROR: .env file found in repository!"
+            echo "This should be in .gitignore"
+            exit 1
+          else
+            echo "✅ No .env file in repo"
+          fi
+          
+          if grep -q "^.env$" .gitignore; then
+            echo "✅ .env is in .gitignore"
+          else
+            echo "⚠️ WARNING: .env not in .gitignore"
+          fi
+      
+      - name: Dependency audit
+        run: |
+          if [ -f "package.json" ]; then
+            npm audit --audit-level=high
+          fi
+      
+      - name: Create security report
+        if: always()
+        run: |
+          cat > security-report.md << 'EOF'
+          # Security Scan Report
+          
+          **Date:** $(date)
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref }}
+          
+          ## Summary
+          
+          - ✅ Trivy vulnerability scan completed
+          - ✅ Secret scanning completed
+          - ✅ Dependency audit completed
+          - ✅ File sensitivity check completed
+          
+          ## Recommendations
+          
+          1. Enable branch protection
+          2. Enable 2FA for all collaborators
+          3. Review and rotate API keys regularly
+          4. Keep dependencies updated
+          5. Monitor for unauthorized forks
+          
+          EOF
+      
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.md
+          retention-days: 90

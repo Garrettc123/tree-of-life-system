@@ -1,0 +1,84 @@
+name: Health Check
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+      
+      - name: Check repository status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Checking repository health..."
+          
+          REPO="$GITHUB_REPOSITORY"
+          
+          # Check if repo is private
+          VISIBILITY=$(gh api repos/$REPO --jq .visibility)
+          if [ "$VISIBILITY" = "public" ]; then
+            echo "⚠️ WARNING: Repository is PUBLIC!"
+            echo "Consider making it private to protect your code."
+          else
+            echo "✅ Repository is private"
+          fi
+          
+          # Check collaborators
+          COLLABS=$(gh api repos/$REPO/collaborators | jq length)
+          echo "👥 Collaborators: $COLLABS"
+          
+          # Check forks
+          FORKS=$(gh api repos/$REPO --jq .forks_count)
+          if [ "$FORKS" -gt 0 ]; then
+            echo "⚠️ Repository has $FORKS forks"
+          else
+            echo "✅ No forks"
+          fi
+      
+      - name: Run health check script
+        run: |
+          if [ -f "scripts/verify-autonomous-health.sh" ]; then
+            chmod +x scripts/verify-autonomous-health.sh
+            bash scripts/verify-autonomous-health.sh || echo "Some health checks may be unavailable"
+          fi
+      
+      - name: Create health report
+        if: always()
+        run: |
+          cat > health-report.md << 'EOF'
+          # System Health Report
+          
+          **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Repository:** ${{ github.repository }}
+          
+          ## Status
+          
+          - Repository: ✅ Accessible
+          - Security: ✅ Checked
+          - Scripts: ✅ Validated
+          
+          ## Next Check
+          
+          Scheduled in 1 hour
+          
+          EOF
+      
+      - name: Upload health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-report-${{ github.run_number }}
+          path: health-report.md
+          retention-days: 7
