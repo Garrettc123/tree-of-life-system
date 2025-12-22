@@ -1,121 +1,136 @@
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
-  console.log("\n🌳 Deploying NWU Protocol - Tree of Life System\n");
-
-  const [deployer] = await hre.ethers.getSigners();
-  console.log("Deploying contracts with account:", deployer.address);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
-
-  // Deploy NWUToken
-  console.log("\n📍 Deploying NWUToken...");
-  const NWUToken = await hre.ethers.getContractFactory("NWUToken");
-  const nwuToken = await NWUToken.deploy();
-  await nwuToken.deployed();
-  console.log("✅ NWUToken deployed to:", nwuToken.address);
-
-  // Deploy TimelockController for governance
-  console.log("\n📍 Deploying TimelockController...");
-  const minDelay = 2 * 24 * 60 * 60; // 2 days
-  const TimelockController = await hre.ethers.getContractFactory(
-    "@openzeppelin/contracts/governance/TimelockController.sol:TimelockController"
-  );
-  const timelock = await TimelockController.deploy(
-    minDelay,
-    [], // proposers (will be set to governance contract)
-    [], // executors (will be set to governance contract)
-    deployer.address // admin
-  );
-  await timelock.deployed();
-  console.log("✅ TimelockController deployed to:", timelock.address);
-
-  // Deploy Governance
-  console.log("\n📍 Deploying NWUGovernance...");
-  const Governance = await hre.ethers.getContractFactory("NWUGovernance");
-  const governance = await Governance.deploy(nwuToken.address, timelock.address);
-  await governance.deployed();
-  console.log("✅ NWUGovernance deployed to:", governance.address);
-
-  // Setup timelock roles
-  console.log("\n📍 Setting up Timelock roles...");
-  const PROPOSER_ROLE = await timelock.PROPOSER_ROLE();
-  const EXECUTOR_ROLE = await timelock.EXECUTOR_ROLE();
-  const TIMELOCK_ADMIN_ROLE = await timelock.TIMELOCK_ADMIN_ROLE();
-
-  await timelock.grantRole(PROPOSER_ROLE, governance.address);
-  await timelock.grantRole(EXECUTOR_ROLE, governance.address);
-  console.log("✅ Timelock roles configured");
-
-  // Deploy Treasury
-  console.log("\n📍 Deploying Treasury...");
-  const Treasury = await hre.ethers.getContractFactory("Treasury");
-  const treasury = await Treasury.deploy();
-  await treasury.deployed();
-  console.log("✅ Treasury deployed to:", treasury.address);
-
-  // Deploy NWUProtocol
-  console.log("\n📍 Deploying NWUProtocol...");
-  const NWUProtocol = await hre.ethers.getContractFactory("NWUProtocol");
-  const protocol = await NWUProtocol.deploy(nwuToken.address);
-  await protocol.deployed();
-  console.log("✅ NWUProtocol deployed to:", protocol.address);
-
-  // Grant minter role to protocol
-  console.log("\n📍 Configuring token permissions...");
-  const MINTER_ROLE = await nwuToken.MINTER_ROLE();
-  await nwuToken.grantRole(MINTER_ROLE, protocol.address);
-  console.log("✅ Protocol granted minter role");
-
-  // Grant treasury roles
-  console.log("\n📍 Configuring treasury permissions...");
-  const ALLOCATOR_ROLE = await treasury.ALLOCATOR_ROLE();
-  await treasury.grantRole(ALLOCATOR_ROLE, governance.address);
-  console.log("✅ Governance granted allocator role");
-
-  // Summary
-  console.log("\n" + "=".repeat(60));
-  console.log("🌳 NWU PROTOCOL DEPLOYMENT SUMMARY");
-  console.log("=".repeat(60));
+  console.log("🚀 Starting NWU Protocol Deployment...");
   console.log("Network:", hre.network.name);
-  console.log("Deployer:", deployer.address);
-  console.log("\nContract Addresses:");
-  console.log("-------------------");
-  console.log("NWUToken:", nwuToken.address);
-  console.log("TimelockController:", timelock.address);
-  console.log("NWUGovernance:", governance.address);
-  console.log("Treasury:", treasury.address);
-  console.log("NWUProtocol:", protocol.address);
-  console.log("\n" + "=".repeat(60));
-
-  // Save deployment addresses
-  const fs = require("fs");
+  
+  const [deployer] = await hre.ethers.getSigners();
+  console.log("Deployer address:", deployer.address);
+  console.log("Account balance:", (await deployer.provider.getBalance(deployer.address)).toString());
+  
+  const deployedContracts = {};
+  
+  // Deploy NWUToken
+  console.log("\n📝 Deploying NWUToken...");
+  const NWUToken = await hre.ethers.getContractFactory("NWUToken");
+  const token = await NWUToken.deploy("NWU Token", "NWU");
+  await token.waitForDeployment();
+  const tokenAddress = await token.getAddress();
+  console.log("✅ NWUToken deployed to:", tokenAddress);
+  deployedContracts.NWUToken = tokenAddress;
+  
+  // Deploy Treasury
+  console.log("\n💰 Deploying Treasury...");
+  const Treasury = await hre.ethers.getContractFactory("Treasury");
+  const approvalThreshold = 2; // Require 2 approvals
+  const treasury = await Treasury.deploy(approvalThreshold);
+  await treasury.waitForDeployment();
+  const treasuryAddress = await treasury.getAddress();
+  console.log("✅ Treasury deployed to:", treasuryAddress);
+  deployedContracts.Treasury = treasuryAddress;
+  
+  // Deploy QuantumResistant
+  console.log("\n🔐 Deploying QuantumResistant...");
+  const QuantumResistant = await hre.ethers.getContractFactory("QuantumResistant");
+  const quantumResistant = await QuantumResistant.deploy();
+  await quantumResistant.waitForDeployment();
+  const quantumAddress = await quantumResistant.getAddress();
+  console.log("✅ QuantumResistant deployed to:", quantumAddress);
+  deployedContracts.QuantumResistant = quantumAddress;
+  
+  // Deploy Governance (Timelock)
+  console.log("\n⏱️ Deploying TimelockController...");
+  const minDelay = 2 * 24 * 60 * 60; // 2 days
+  const proposers = [deployer.address];
+  const executors = [deployer.address];
+  const admin = deployer.address;
+  
+  const TimelockController = await hre.ethers.getContractFactory("TimelockController");
+  const timelock = await TimelockController.deploy(minDelay, proposers, executors, admin);
+  await timelock.waitForDeployment();
+  const timelockAddress = await timelock.getAddress();
+  console.log("✅ TimelockController deployed to:", timelockAddress);
+  deployedContracts.TimelockController = timelockAddress;
+  
+  // Deploy Governance
+  console.log("\n🗳️ Deploying Governance...");
+  const Governance = await hre.ethers.getContractFactory("Governance");
+  const governance = await Governance.deploy(
+    tokenAddress,
+    timelockAddress,
+    "NWU Governor"
+  );
+  await governance.waitForDeployment();
+  const governanceAddress = await governance.getAddress();
+  console.log("✅ Governance deployed to:", governanceAddress);
+  deployedContracts.Governance = governanceAddress;
+  
+  // Deploy NWUProtocol
+  console.log("\n🌱 Deploying NWUProtocol...");
+  const NWUProtocol = await hre.ethers.getContractFactory("NWUProtocol");
+  const verificationThreshold = 3; // Require 3 verifications
+  const protocol = await NWUProtocol.deploy(
+    tokenAddress,
+    verificationThreshold
+  );
+  await protocol.waitForDeployment();
+  const protocolAddress = await protocol.getAddress();
+  console.log("✅ NWUProtocol deployed to:", protocolAddress);
+  deployedContracts.NWUProtocol = protocolAddress;
+  
+  // Grant minter role to protocol
+  console.log("\n🔧 Configuring roles...");
+  const MINTER_ROLE = await token.MINTER_ROLE();
+  await token.grantRole(MINTER_ROLE, protocolAddress);
+  console.log("✅ Granted MINTER_ROLE to NWUProtocol");
+  
+  // Save deployment info
   const deploymentInfo = {
     network: hre.network.name,
+    chainId: (await hre.ethers.provider.getNetwork()).chainId.toString(),
     deployer: deployer.address,
     timestamp: new Date().toISOString(),
-    contracts: {
-      NWUToken: nwuToken.address,
-      TimelockController: timelock.address,
-      NWUGovernance: governance.address,
-      Treasury: treasury.address,
-      NWUProtocol: protocol.address,
+    contracts: deployedContracts,
+    config: {
+      approvalThreshold,
+      verificationThreshold,
+      timelockDelay: minDelay,
     },
   };
-
-  fs.writeFileSync(
-    `./deployments/${hre.network.name}-deployment.json`,
-    JSON.stringify(deploymentInfo, null, 2)
-  );
-  console.log(`\n✅ Deployment info saved to deployments/${hre.network.name}-deployment.json`);
-
-  // Verification instructions
+  
+  const deploymentsDir = path.join(__dirname, "..", "deployments");
+  if (!fs.existsSync(deploymentsDir)) {
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+  }
+  
+  const filename = `${hre.network.name}-${Date.now()}.json`;
+  const filepath = path.join(deploymentsDir, filename);
+  fs.writeFileSync(filepath, JSON.stringify(deploymentInfo, null, 2));
+  
+  console.log("\n📄 Deployment info saved to:", filepath);
+  console.log("\n✨ Deployment completed successfully!");
+  console.log("\n📋 Contract Addresses:");
+  Object.entries(deployedContracts).forEach(([name, address]) => {
+    console.log(`   ${name}: ${address}`);
+  });
+  
+  // Verify contracts if on testnet/mainnet
   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    console.log("\n📝 To verify contracts on Etherscan:");
-    console.log(`npx hardhat verify --network ${hre.network.name} ${nwuToken.address}`);
-    console.log(`npx hardhat verify --network ${hre.network.name} ${timelock.address} ${minDelay} "[]" "[]" ${deployer.address}`);
-    console.log(`npx hardhat verify --network ${hre.network.name} ${governance.address} ${nwuToken.address} ${timelock.address}`);
-    console.log(`npx hardhat verify --network ${hre.network.name} ${treasury.address}`);
-    console.log(`npx hardhat verify --network ${hre.network.name} ${protocol.address} ${nwuToken.address}`);
+    console.log("\n⏳ Waiting for block confirmations before verification...");
+    await token.deploymentTransaction().wait(6);
+    
+    console.log("\n🔍 Starting contract verification...");
+    try {
+      await hre.run("verify:verify", {
+        address: tokenAddress,
+        constructorArguments: ["NWU Token", "NWU"],
+      });
+      console.log("✅ NWUToken verified");
+    } catch (error) {
+      console.log("❌ Error verifying NWUToken:", error.message);
+    }
   }
 }
 

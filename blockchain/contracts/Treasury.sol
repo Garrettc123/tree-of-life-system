@@ -5,248 +5,226 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Treasury
- * @dev Manages protocol treasury funds and allocations
+ * @dev Manages protocol funds with multi-sig approval and budget allocation
  */
 contract Treasury is AccessControl, ReentrancyGuard, Pausable {
-    using SafeERC20 for IERC20;
-
-    bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
-    bytes32 public constant ALLOCATOR_ROLE = keccak256("ALLOCATOR_ROLE");
-    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
-
-    struct Allocation {
-        address recipient;
-        uint256 amount;
-        address token;
-        uint256 releaseTime;
-        bool executed;
-        string purpose;
-    }
-
+    bytes32 public constant TREASURY_ADMIN = keccak256("TREASURY_ADMIN");
+    bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
+    
     struct Budget {
         string category;
         uint256 allocated;
         uint256 spent;
-        uint256 period; // timestamp for budget period end
+        uint256 startTime;
+        uint256 endTime;
+        bool active;
     }
-
-    uint256 public allocationCounter;
-    mapping(uint256 => Allocation) public allocations;
-    mapping(string => Budget) public budgets;
-    mapping(address => uint256) public totalAllocated;
-
-    event AllocationCreated(
-        uint256 indexed allocationId,
-        address indexed recipient,
-        uint256 amount,
-        address token
-    );
-    event AllocationExecuted(uint256 indexed allocationId);
-    event BudgetCreated(string category, uint256 amount, uint256 period);
-    event BudgetUpdated(string category, uint256 newAmount);
-    event FundsDeposited(address indexed from, uint256 amount, address token);
-    event EmergencyWithdraw(address indexed to, uint256 amount, address token);
-
-    constructor() {
+    
+    struct Withdrawal {
+        address recipient;
+        uint256 amount;
+        string purpose;
+        uint256 approvalCount;
+        mapping(address => bool) approvals;
+        bool executed;
+        uint256 requestedAt;
+    }
+    
+    // State variables
+    uint256 public approvalThreshold;
+    uint256 public withdrawalCount;
+    mapping(uint256 => Withdrawal) public withdrawals;
+    mapping(uint256 => Budget) public budgets;
+    uint256 public budgetCount;
+    
+    // Events
+    event WithdrawalRequested(uint256 indexed withdrawalId, address recipient, uint256 amount, string purpose);
+    event WithdrawalApproved(uint256 indexed withdrawalId, address approver);
+    event WithdrawalExecuted(uint256 indexed withdrawalId, address recipient, uint256 amount);
+    event BudgetAllocated(uint256 indexed budgetId, string category, uint256 amount, uint256 startTime, uint256 endTime);
+    event BudgetUpdated(uint256 indexed budgetId, uint256 newAmount);
+    event FundsReceived(address indexed sender, uint256 amount);
+    event ApprovalThresholdUpdated(uint256 newThreshold);
+    
+    constructor(uint256 _approvalThreshold) {
+        require(_approvalThreshold > 0, "Invalid threshold");
+        approvalThreshold = _approvalThreshold;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(GOVERNANCE_ROLE, msg.sender);
-        _grantRole(TREASURER_ROLE, msg.sender);
+        _grantRole(TREASURY_ADMIN, msg.sender);
+        _grantRole(APPROVER_ROLE, msg.sender);
     }
-
+    
     /**
-     * @dev Create a new allocation
+     * @dev Request a withdrawal from treasury
      */
-    function createAllocation(
+    function requestWithdrawal(
         address _recipient,
         uint256 _amount,
-        address _token,
-        uint256 _releaseTime,
         string memory _purpose
-    ) external onlyRole(ALLOCATOR_ROLE) returns (uint256) {
+    ) external onlyRole(TREASURY_ADMIN) returns (uint256) {
         require(_recipient != address(0), "Invalid recipient");
-        require(_amount > 0, "Amount must be > 0");
-        require(_releaseTime > block.timestamp, "Release time must be future");
-
-        allocationCounter++;
-        uint256 allocationId = allocationCounter;
-
-        allocations[allocationId] = Allocation({
-            recipient: _recipient,
-            amount: _amount,
-            token: _token,
-            releaseTime: _releaseTime,
-            executed: false,
-            purpose: _purpose
-        });
-
-        totalAllocated[_token] += _amount;
-
-        emit AllocationCreated(allocationId, _recipient, _amount, _token);
-        return allocationId;
+        require(_amount > 0, "Invalid amount");
+        require(address(this).balance >= _amount, "Insufficient balance");
+        
+        uint256 withdrawalId = withdrawalCount++;
+        Withdrawal storage withdrawal = withdrawals[withdrawalId];
+        withdrawal.recipient = _recipient;
+        withdrawal.amount = _amount;
+        withdrawal.purpose = _purpose;
+        withdrawal.requestedAt = block.timestamp;
+        
+        emit WithdrawalRequested(withdrawalId, _recipient, _amount, _purpose);
+        return withdrawalId;
     }
-
+    
     /**
-     * @dev Execute an allocation
+     * @dev Approve a withdrawal request
      */
-    function executeAllocation(uint256 _allocationId) 
-        external 
-        nonReentrant 
-        whenNotPaused 
-    {
-        Allocation storage allocation = allocations[_allocationId];
-        require(!allocation.executed, "Already executed");
-        require(block.timestamp >= allocation.releaseTime, "Not yet releasable");
-        require(
-            msg.sender == allocation.recipient || hasRole(TREASURER_ROLE, msg.sender),
-            "Not authorized"
-        );
-
-        allocation.executed = true;
-        totalAllocated[allocation.token] -= allocation.amount;
-
-        if (allocation.token == address(0)) {
-            // Native token (ETH)
-            payable(allocation.recipient).transfer(allocation.amount);
-        } else {
-            // ERC20 token
-            IERC20(allocation.token).safeTransfer(
-                allocation.recipient,
-                allocation.amount
-            );
+    function approveWithdrawal(uint256 _withdrawalId) external onlyRole(APPROVER_ROLE) {
+        Withdrawal storage withdrawal = withdrawals[_withdrawalId];
+        require(!withdrawal.executed, "Already executed");
+        require(!withdrawal.approvals[msg.sender], "Already approved");
+        
+        withdrawal.approvals[msg.sender] = true;
+        withdrawal.approvalCount++;
+        
+        emit WithdrawalApproved(_withdrawalId, msg.sender);
+        
+        // Auto-execute if threshold reached
+        if (withdrawal.approvalCount >= approvalThreshold) {
+            _executeWithdrawal(_withdrawalId);
         }
-
-        emit AllocationExecuted(_allocationId);
     }
-
+    
     /**
-     * @dev Create budget for a category
+     * @dev Execute approved withdrawal
      */
-    function createBudget(
+    function _executeWithdrawal(uint256 _withdrawalId) internal nonReentrant {
+        Withdrawal storage withdrawal = withdrawals[_withdrawalId];
+        require(!withdrawal.executed, "Already executed");
+        require(withdrawal.approvalCount >= approvalThreshold, "Insufficient approvals");
+        
+        withdrawal.executed = true;
+        
+        (bool success, ) = withdrawal.recipient.call{value: withdrawal.amount}("");
+        require(success, "Transfer failed");
+        
+        emit WithdrawalExecuted(_withdrawalId, withdrawal.recipient, withdrawal.amount);
+    }
+    
+    /**
+     * @dev Allocate budget for a category
+     */
+    function allocateBudget(
         string memory _category,
         uint256 _amount,
-        uint256 _period
-    ) external onlyRole(GOVERNANCE_ROLE) {
-        require(_amount > 0, "Amount must be > 0");
-        require(_period > block.timestamp, "Period must be future");
-        require(budgets[_category].allocated == 0, "Budget exists");
-
-        budgets[_category] = Budget({
-            category: _category,
-            allocated: _amount,
-            spent: 0,
-            period: _period
-        });
-
-        emit BudgetCreated(_category, _amount, _period);
+        uint256 _duration
+    ) external onlyRole(TREASURY_ADMIN) returns (uint256) {
+        require(_amount > 0, "Invalid amount");
+        require(_duration > 0, "Invalid duration");
+        
+        uint256 budgetId = budgetCount++;
+        Budget storage budget = budgets[budgetId];
+        budget.category = _category;
+        budget.allocated = _amount;
+        budget.startTime = block.timestamp;
+        budget.endTime = block.timestamp + _duration;
+        budget.active = true;
+        
+        emit BudgetAllocated(budgetId, _category, _amount, budget.startTime, budget.endTime);
+        return budgetId;
     }
-
+    
     /**
      * @dev Update budget allocation
      */
-    function updateBudget(string memory _category, uint256 _newAmount) 
+    function updateBudget(uint256 _budgetId, uint256 _newAmount) 
         external 
-        onlyRole(GOVERNANCE_ROLE) 
+        onlyRole(TREASURY_ADMIN) 
     {
-        require(budgets[_category].allocated > 0, "Budget doesn't exist");
-        budgets[_category].allocated = _newAmount;
-        emit BudgetUpdated(_category, _newAmount);
+        Budget storage budget = budgets[_budgetId];
+        require(budget.active, "Budget not active");
+        require(block.timestamp < budget.endTime, "Budget expired");
+        
+        budget.allocated = _newAmount;
+        emit BudgetUpdated(_budgetId, _newAmount);
     }
-
+    
     /**
      * @dev Record spending against budget
      */
-    function recordSpending(string memory _category, uint256 _amount) 
+    function recordSpending(uint256 _budgetId, uint256 _amount) 
         external 
-        onlyRole(TREASURER_ROLE) 
+        onlyRole(TREASURY_ADMIN) 
     {
-        Budget storage budget = budgets[_category];
-        require(budget.allocated > 0, "Budget doesn't exist");
+        Budget storage budget = budgets[_budgetId];
+        require(budget.active, "Budget not active");
         require(budget.spent + _amount <= budget.allocated, "Exceeds budget");
-        require(block.timestamp <= budget.period, "Budget period ended");
-
+        
         budget.spent += _amount;
     }
-
+    
     /**
-     * @dev Deposit funds to treasury
+     * @dev Update approval threshold
      */
-    function deposit(address _token, uint256 _amount) external payable {
-        if (_token == address(0)) {
-            require(msg.value == _amount, "Incorrect ETH amount");
-        } else {
-            IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
-        }
-
-        emit FundsDeposited(msg.sender, _amount, _token);
+    function updateApprovalThreshold(uint256 _newThreshold) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
+        require(_newThreshold > 0, "Invalid threshold");
+        approvalThreshold = _newThreshold;
+        emit ApprovalThresholdUpdated(_newThreshold);
     }
-
+    
     /**
-     * @dev Emergency withdraw (governance only)
+     * @dev Get budget details
      */
-    function emergencyWithdraw(
-        address _token,
-        address _to,
-        uint256 _amount
-    ) external onlyRole(GOVERNANCE_ROLE) nonReentrant {
-        require(_to != address(0), "Invalid recipient");
-
-        if (_token == address(0)) {
-            payable(_to).transfer(_amount);
-        } else {
-            IERC20(_token).safeTransfer(_to, _amount);
-        }
-
-        emit EmergencyWithdraw(_to, _amount, _token);
-    }
-
-    /**
-     * @dev Get treasury balance
-     */
-    function getBalance(address _token) external view returns (uint256) {
-        if (_token == address(0)) {
-            return address(this).balance;
-        }
-        return IERC20(_token).balanceOf(address(this));
-    }
-
-    /**
-     * @dev Get available balance (total - allocated)
-     */
-    function getAvailableBalance(address _token) 
+    function getBudget(uint256 _budgetId) 
         external 
         view 
-        returns (uint256) 
+        returns (
+            string memory category,
+            uint256 allocated,
+            uint256 spent,
+            uint256 remaining,
+            bool active
+        ) 
     {
-        uint256 total;
-        if (_token == address(0)) {
-            total = address(this).balance;
-        } else {
-            total = IERC20(_token).balanceOf(address(this));
-        }
-        
-        return total > totalAllocated[_token] ? 
-            total - totalAllocated[_token] : 0;
+        Budget storage budget = budgets[_budgetId];
+        return (
+            budget.category,
+            budget.allocated,
+            budget.spent,
+            budget.allocated - budget.spent,
+            budget.active
+        );
     }
-
+    
     /**
-     * @dev Pause treasury operations
+     * @dev Emergency pause
      */
-    function pause() external onlyRole(GOVERNANCE_ROLE) {
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
-
-    /**
-     * @dev Unpause treasury operations
-     */
-    function unpause() external onlyRole(GOVERNANCE_ROLE) {
+    
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
-
+    
+    /**
+     * @dev Receive ETH
+     */
     receive() external payable {
-        emit FundsDeposited(msg.sender, msg.value, address(0));
+        emit FundsReceived(msg.sender, msg.value);
+    }
+    
+    /**
+     * @dev Get contract balance
+     */
+    function getBalance() external view returns (uint256) {
+        return address(this).balance;
     }
 }
