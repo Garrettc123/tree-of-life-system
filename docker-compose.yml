@@ -3,197 +3,115 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
-    container_name: tol-postgres
+    image: postgres:15-alpine
+    container_name: nwu-postgres
     environment:
-      POSTGRES_DB: tree_of_life
-      POSTGRES_USER: treeoflife
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./root-systems/data-architecture/schemas/postgres:/docker-entrypoint-initdb.d
+      POSTGRES_DB: nwu_protocol
+      POSTGRES_USER: nwu_user
+      POSTGRES_PASSWORD: nwu_password
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U treeoflife"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - tol-network
-
-  # MongoDB
-  mongodb:
-    image: mongo:7-jammy
-    container_name: tol-mongodb
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: treeoflife
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-changeme}
-      MONGO_INITDB_DATABASE: tree_of_life
     volumes:
-      - mongodb_data:/data/db
-    ports:
-      - "27017:27017"
+      - postgres_data:/var/lib/postgresql/data
+      - ./trunk/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "pg_isready -U nwu_user"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - tol-network
 
-  # Redis Cache
+  # Redis Cache & Queue
   redis:
     image: redis:7-alpine
-    container_name: tol-redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
+    container_name: nwu-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - tol-network
 
-  # Authentication Service
-  auth-service:
-    build:
-      context: ./root-systems/authentication
-      dockerfile: Dockerfile
-    container_name: tol-auth
+  # IPFS Node
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: nwu-ipfs
+    ports:
+      - "4001:4001"  # P2P
+      - "5001:5001"  # API
+      - "8080:8080"  # Gateway
+    volumes:
+      - ipfs_data:/data/ipfs
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3001
-      - JWT_SECRET=${JWT_SECRET}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - LINEAR_API_KEY=${LINEAR_API_KEY}
-      - NOTION_API_KEY=${NOTION_API_KEY}
-      - DATABASE_URL=postgresql://treeoflife:${DB_PASSWORD:-changeme}@postgres:5432/tree_of_life
-      - REDIS_URL=redis://redis:6379
+      IPFS_PROFILE: server
+
+  # Contribution Manager Service
+  contribution-manager:
+    build:
+      context: ./trunk/contribution-manager
+    container_name: nwu-contribution-manager
     ports:
       - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://nwu_user:nwu_password@postgres:5432/nwu_protocol
+      REDIS_URL: redis://redis:6379
+      IPFS_URL: http://ipfs:5001
+      RPC_URL: ${RPC_URL}
+      PROTOCOL_CONTRACT_ADDRESS: ${PROTOCOL_CONTRACT_ADDRESS}
+      PORT: 3001
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - tol-network
+      ipfs:
+        condition: service_started
     restart: unless-stopped
 
-  # AI Engine
-  ai-engine:
+  # Verification Engine Service
+  verification-engine:
     build:
-      context: ./root-systems/ai-engine
-      dockerfile: Dockerfile
-    container_name: tol-ai-engine
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3002
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
-      - PERPLEXITY_MODEL=${PERPLEXITY_MODEL:-sonar-pro}
-      - MONGO_URL=mongodb://treeoflife:${MONGO_PASSWORD:-changeme}@mongodb:27017/tree_of_life
-      - REDIS_URL=redis://redis:6379
+      context: ./trunk/verification-engine
+    container_name: nwu-verification-engine
     ports:
       - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://nwu_user:nwu_password@postgres:5432/nwu_protocol
+      REDIS_URL: redis://redis:6379
+      RPC_URL: ${RPC_URL}
+      PROTOCOL_CONTRACT_ADDRESS: ${PROTOCOL_CONTRACT_ADDRESS}
+      VERIFIER_PRIVATE_KEY: ${VERIFIER_PRIVATE_KEY}
+      PORT: 3002
     depends_on:
-      mongodb:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - tol-network
     restart: unless-stopped
 
-  # Cross-Pollination Orchestrator
-  orchestrator:
+  # AI Data Quality Agent
+  ai-data-quality:
     build:
-      context: ./orchestrator
-      dockerfile: Dockerfile
-    container_name: tol-orchestrator
+      context: ./nervous-system/ai-agents/data-quality-agent
+    container_name: nwu-ai-quality
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - LINEAR_API_KEY=${LINEAR_API_KEY}
-      - LINEAR_TEAM_ID=${LINEAR_TEAM_ID}
-      - NOTION_API_KEY=${NOTION_API_KEY}
-      - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
-      - AUTH_SERVICE_URL=http://auth-service:3001
-      - AI_ENGINE_URL=http://ai-engine:3002
-      - DATABASE_URL=postgresql://treeoflife:${DB_PASSWORD:-changeme}@postgres:5432/tree_of_life
-      - MONGO_URL=mongodb://treeoflife:${MONGO_PASSWORD:-changeme}@mongodb:27017/tree_of_life
-      - REDIS_URL=redis://redis:6379
-      - ENABLE_AUTO_MARKETING=${ENABLE_AUTO_MARKETING:-true}
-      - ENABLE_SELF_HEALING=${ENABLE_SELF_HEALING:-true}
-      - ENABLE_PREDICTIVE_INTEL=${ENABLE_PREDICTIVE_INTEL:-true}
-    ports:
-      - "3000:3000"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      IPFS_GATEWAY: http://ipfs:8080
     depends_on:
-      - auth-service
-      - ai-engine
-      - postgres
-      - mongodb
-      - redis
-    networks:
-      - tol-network
-    restart: unless-stopped
-
-  # Marketing Automation Branch
-  marketing-service:
-    build:
-      context: ./branch-systems/marketing-automation
-      dockerfile: Dockerfile
-    container_name: tol-marketing
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3003
-      - ORCHESTRATOR_URL=http://orchestrator:3000
-      - AI_ENGINE_URL=http://ai-engine:3002
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - NOTION_API_KEY=${NOTION_API_KEY}
-    ports:
-      - "3003:3003"
-    depends_on:
-      - orchestrator
-    networks:
-      - tol-network
-    restart: unless-stopped
-
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: tol-nginx
-    volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-    depends_on:
-      - orchestrator
-      - auth-service
-      - ai-engine
-      - marketing-service
-    networks:
-      - tol-network
+      redis:
+        condition: service_healthy
+      ipfs:
+        condition: service_started
     restart: unless-stopped
 
 volumes:
   postgres_data:
-    driver: local
-  mongodb_data:
-    driver: local
   redis_data:
-    driver: local
+  ipfs_data:
 
 networks:
-  tol-network:
-    driver: bridge
+  default:
+    name: nwu-network
