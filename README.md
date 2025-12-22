@@ -1,289 +1,406 @@
-# 🌳 Tree of Life - Autonomous Business Infrastructure
+# 🌳 NWU Protocol - Tree of Life System
 
-> **Deploy a $10M+/year autonomous business with one command**
+> A comprehensive blockchain-based protocol for contribution management, verification, and reward distribution using the Tree of Life architectural metaphor.
 
-Complete business infrastructure with 17 autonomous systems that run without human intervention.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue)](https://soliditylang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
+[![Hardhat](https://img.shields.io/badge/Hardhat-2.19-orange)](https://hardhat.org/)
 
-## 🚀 One-Command Deploy
+## 🌍 Overview
+
+The NWU Protocol implements a "Tree of Life" architecture where each component represents a vital part of a living, breathing ecosystem:
+
+- **🌱 ROOT LAYER**: Blockchain foundation with quantum-resistant security
+- **🪵 TRUNK**: Core business logic for contribution and verification management
+- **🌿 BRANCHES**: Domain-specific modules (Research, Medical, Financial, Environmental)
+- **🍃 LEAVES**: User-facing applications and interfaces
+- **💨 ATMOSPHERE**: Integration layer connecting all components
+- **🧠 NERVOUS SYSTEM**: AI agent network for intelligent automation
+- **🌍 ECOSYSTEM**: External partnerships and integrations
+- **🌤️ GOVERNANCE**: DAO-based community governance
+
+## ✨ Key Features
+
+### Blockchain Layer (🌱 ROOT)
+- ✅ Quantum-resistant cryptography
+- ✅ Proof of Stake consensus
+- ✅ Smart contract governance (DAO)
+- ✅ Multi-signature treasury management
+- ✅ ERC20 governance token with voting
+- ✅ Role-based access control
+
+### Core Business Logic (🪵 TRUNK)
+- ✅ Contribution management system
+- ✅ Multi-verifier verification engine
+- ✅ Automated reward distribution
+- ✅ Quality scoring mechanisms
+- ✅ Treasury and budget management
+- ✅ Real-time event processing
+
+### Domain Modules (🌿 BRANCHES)
+- 🔬 Research data management
+- 🏥 Medical records verification
+- 📊 Financial data validation
+- 🌍 Environmental impact tracking
+- 🛠️ Custom category support
+
+### User Applications (🍃 LEAVES)
+- 📝 Contributor portal
+- ✅ Verifier dashboard
+- 🏪 NFT marketplace
+- 🗳️ Governance interface
+- 📊 Analytics platform
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+- Git
+- Ethereum wallet (MetaMask recommended)
+
+### Installation
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/Garrettc123/tree-of-life-system/main/DEPLOY.sh)
-```
-
-Or clone and run:
-
-```bash
+# Clone the repository
 git clone https://github.com/Garrettc123/tree-of-life-system.git
 cd tree-of-life-system
-bash DEPLOY.sh
+
+# Install blockchain dependencies
+cd blockchain
+npm install
+
+# Compile smart contracts
+npm run compile
+
+# Run tests
+npm test
+
+# Deploy to local network
+npm run node  # In one terminal
+npm run deploy:localhost  # In another terminal
 ```
 
-**That's it!** The script will:
-- ✅ Deploy all 17 autonomous systems
-- ✅ Configure environment variables
-- ✅ Set up revenue generation
-- ✅ Enable full automation
-- ✅ Start earning immediately
+### Environment Setup
 
-**Time:** 5-10 minutes
-**Cost:** $85-170/month
-**Target Revenue:** $10M+/year
+```bash
+# Copy environment template
+cp blockchain/.env.example blockchain/.env
 
----
+# Edit .env with your credentials:
+# - PRIVATE_KEY: Your wallet private key
+# - INFURA_KEY: Your Infura project ID
+# - ETHERSCAN_API_KEY: For contract verification
+```
 
-## 📦 What Gets Deployed
+## 🏛️ Architecture
 
-### 17 Autonomous Systems
-
-**TIER 1: Core Orchestration** (3 systems)
-- `tree-of-life-system` - Master orchestrator
-- `APEX-Universal-AI-Operating-System` - AI decision engine
-- `TITAN-Autonomous-Business-Empire` - Business management
-
-**TIER 2: Revenue & Customers** (3 systems)
-- `revenue-agent-system` - Revenue generation ($10M+ target)
-- `customer-intelligence-branch` - Customer analytics
-- `intelligent-customer-data-platform` - Customer data
-
-**TIER 3: Product & Development** (3 systems)
-- `product-development-branch` - Product development
-- `intelligent-ci-cd-orchestrator` - Deployment automation
-- `enterprise-feature-flag-system` - Feature flags
-
-**TIER 4: Marketing & Sales** (2 systems)
-- `marketing-automation-branch` - Marketing automation
-- `conversational-ai-engine` - Customer support bots
-
-**TIER 5: Operations** (3 systems)
-- `distributed-job-orchestration-engine` - Job scheduling
-- `real-time-streaming-analytics` - Data processing
-- `enterprise-mlops-platform` - ML operations
-
-**TIER 6: Security** (1 system)
-- `security-sentinel-framework` - Security & compliance
-
-**TIER 7: Advanced AI** (2 systems)
-- `NEXUS-Quantum-Intelligence-Framework` - Quantum computing
-- `SINGULARITY-AGI-Research-Platform` - AGI research
-
----
-
-## 💰 Economics
-
-**Monthly Operating Cost:** $85-170
-**Target Monthly Revenue:** $833,333 ($10M/year)
-**Profit Margin:** 99.97%
-
-**Timeline:**
-- Week 1: $1K-$10K revenue
-- Month 1: $50K-$100K revenue
-- Month 6: $500K-$1M revenue
-- Year 1: $10M+ ARR
-
----
-
-## 🔑 Required API Keys
-
-You'll need these before deploying:
-
-1. **GitHub Token** (required)
-   - Get: https://github.com/settings/tokens
-   - Permissions: `repo`, `read:org`
-
-2. **OpenAI API Key** (required)
-   - Get: https://platform.openai.com/api-keys
-   - For AI decision making
-
-3. **Stripe API Key** (optional, for revenue)
-   - Get: https://dashboard.stripe.com/apikeys
-   - For payment processing
-
-4. **Anthropic API Key** (optional)
-   - Get: https://console.anthropic.com/
-   - For Claude AI
-
----
-
-## 🎯 Features
-
-### Fully Autonomous Operation
-- ✅ **Revenue Generation** - Automatically earns money
-- ✅ **Customer Management** - Handles all customer interactions
-- ✅ **Product Development** - Builds features autonomously
-- ✅ **Marketing** - Creates and distributes content
-- ✅ **Operations** - Manages infrastructure
-- ✅ **Security** - Protects against threats
-- ✅ **Scaling** - Auto-scales based on demand
-
-### Zero Human Intervention Required
-- No manual deployments
-- No customer support needed
-- No marketing work required
-- No infrastructure management
-- No security updates needed
-- No product decisions required
-
----
-
-## 📊 Architecture
+### System Layers
 
 ```
-tree-of-life-system (HUB)
+                    🌤️ GOVERNANCE
+                (DAO & Token Holders)
+                         |
+        ┌────────┴─────────┐
+        |                     |
+   🌍 ECOSYSTEM        💨 ATMOSPHERE
+   (Partnerships)      (Integration Layer)
+        |                     |
+   ┌────┼─────────────────┼────┐
+   |    |                   |    |
+🍃 LEAVES              🧠 NERVOUS SYSTEM
+(User Apps)            (AI Agents)
+   |                        |
+   └────┬──────────────────────┘
         |
-    ┌───┴───┬───────┬───────┐
-    |       |       |       |
- Revenue Customer Product Ops
- Systems Systems Systems Systems
-    |       |       |       |
-    └───┬───┴───┬───┴───┬───┘
-        |       |       |
-    Marketing Security Advanced AI
+   🌿 BRANCHES
+   (Domain Modules)
+        |
+   🪵 TRUNK
+   (Core Business Logic)
+        |
+   🌱 ROOT
+   (Blockchain Layer)
 ```
 
-**Hub-and-Spoke Model:**
-- Central orchestrator coordinates all systems
-- Each system operates autonomously
-- Systems communicate via APIs
-- Automatic failover and redundancy
+### Data Flow
 
----
+1. **Contribution Submission** (🍃 → 🪵 → 🌱)
+   - User submits via portal
+   - Core logic validates and processes
+   - Blockchain records immutably
 
-## 🛠️ Prerequisites
+2. **Verification** (🧠 → 🪵 → 🌱)
+   - AI agents or human verifiers review
+   - Verification engine coordinates
+   - Results recorded on-chain
 
-**On your system:**
+3. **Reward Distribution** (🌱 → 🪵 → 🍃)
+   - Smart contract calculates rewards
+   - Treasury distributes tokens
+   - User receives notification
+
+## 📂 Project Structure
+
+```
+tree-of-life-system/
+├── blockchain/              # 🌱 ROOT: Smart contracts
+│   ├── contracts/
+│   │   ├── NWUProtocol.sol
+│   │   ├── NWUToken.sol
+│   │   ├── Governance.sol
+│   │   ├── Treasury.sol
+│   │   └── QuantumResistant.sol
+│   ├── scripts/
+│   ├── test/
+│   └── hardhat.config.js
+│
+├── trunk/                  # 🪵 TRUNK: Core logic
+│   ├── contribution-manager/
+│   ├── verification-engine/
+│   ├── reward-distributor/
+│   └── treasury-manager/
+│
+├── branches/               # 🌿 BRANCHES: Domains
+│   ├── research-module/
+│   ├── medical-module/
+│   ├── financial-module/
+│   ├── environmental-module/
+│   └── custom-categories/
+│
+├── leaves/                 # 🍃 LEAVES: User apps
+│   ├── contributor-portal/
+│   ├── verifier-dashboard/
+│   ├── nft-marketplace/
+│   ├── governance-ui/
+│   └── analytics-platform/
+│
+├── atmosphere/             # 💨 ATMOSPHERE: Integration
+│   ├── api-gateway/
+│   ├── event-bus/
+│   ├── service-mesh/
+│   └── cross-chain-bridges/
+│
+├── nervous-system/        # 🧠 AI Agents
+│   ├── verification-agents/
+│   ├── risk-assessment-agents/
+│   ├── orchestration-agents/
+│   └── optimization-agents/
+│
+├── ecosystem/              # 🌍 ECOSYSTEM: Partnerships
+│   ├── blockchain-integrations/
+│   ├── defi-protocols/
+│   ├── enterprise-apis/
+│   └── research-partnerships/
+│
+├── docs/                   # Documentation
+├── scripts/                # Utilities
+└── README.md
+```
+
+## 🔑 Smart Contracts
+
+### NWUProtocol
+Main protocol contract managing contributions and verifications.
+
+```solidity
+function submitContribution(string memory dataHash, string memory category)
+function verifyContribution(uint256 contributionId, uint256 qualityScore)
+function getContribution(uint256 contributionId)
+```
+
+### NWUToken
+ERC20 governance token with voting capabilities.
+
+```solidity
+function mint(address to, uint256 amount)
+function createVestingSchedule(address beneficiary, uint256 amount, uint256 duration)
+function delegate(address delegatee)
+```
+
+### Governance
+DAO governance for protocol decisions.
+
+```solidity
+function propose(address[] targets, uint256[] values, bytes[] calldatas, string description)
+function castVote(uint256 proposalId, uint8 support)
+function execute(uint256 proposalId)
+```
+
+### Treasury
+Manages protocol funds and allocations.
+
+```solidity
+function createAllocation(address recipient, uint256 amount, address token, uint256 releaseTime)
+function executeAllocation(uint256 allocationId)
+function createBudget(string category, uint256 amount, uint256 period)
+```
+
+## 📊 Token Economics
+
+### NWU Token
+- **Total Supply**: 1,000,000,000 NWU
+- **Initial Supply**: 100,000,000 NWU
+- **Distribution**:
+  - 40% - Contributors & Verifiers Rewards
+  - 20% - Treasury Reserve
+  - 15% - Team & Advisors (4-year vesting)
+  - 15% - Ecosystem Development
+  - 10% - Initial Liquidity
+
+### Reward Mechanism
+- Base reward: 100 NWU per verified contribution
+- Quality multiplier: 0-1x based on verification scores
+- Verifier rewards: 10% of contributor rewards
+- Staking bonuses for long-term holders
+
+## 🔒 Security
+
+### Implemented
+- ✅ Quantum-resistant cryptography
+- ✅ Multi-signature wallets
+- ✅ Timelock for critical operations
+- ✅ Reentrancy guards
+- ✅ Pausable contracts
+- ✅ Role-based access control
+- ✅ Comprehensive testing
+
+### Audits
+- [ ] Internal security review
+- [ ] External audit by certified firm
+- [ ] Bug bounty program
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](docs/CONTRIBUTING.md).
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+### Code Standards
+
+- Solidity: Follow [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html)
+- TypeScript: Use ESLint and Prettier
+- Tests: Maintain >90% coverage
+- Documentation: Update relevant docs
+
+## 📝 Documentation
+
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Smart Contract Docs](docs/CONTRACTS.md)
+- [API Reference](docs/API.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Governance Guide](docs/GOVERNANCE.md)
+
+## 🧪 Testing
+
 ```bash
-# Install Node.js (for Railway CLI)
-pkg install nodejs     # Termux/Android
-brew install node      # Mac
-apt install nodejs     # Linux
+# Run all tests
+cd blockchain
+npm test
 
-# Install Railway CLI
-npm install -g @railway/cli
+# Run with coverage
+npm run coverage
 
-# Login to Railway
-railway login
+# Run specific test file
+npx hardhat test test/NWUProtocol.test.js
 ```
 
-**Railway Account:**
-- Sign up: https://railway.app
-- Free: $5 credit/month
-- Hobby: $5/month per project
+## 🌐 Deployment
 
----
-
-## 🚦 Quick Start
-
-**Fastest deployment:**
+### Testnet (Sepolia)
 
 ```bash
-# One command - that's all!
-bash <(curl -s https://raw.githubusercontent.com/Garrettc123/tree-of-life-system/main/DEPLOY.sh)
+cd blockchain
+npm run deploy:sepolia
 ```
 
-**Or manual:**
+### Mainnet
 
 ```bash
-# Clone
-git clone https://github.com/Garrettc123/tree-of-life-system.git
-cd tree-of-life-system
-
-# Deploy
-bash DEPLOY.sh
+# Ensure proper configuration and testing
+npm run deploy:mainnet
 ```
 
-**Then follow prompts:**
-1. Enter GitHub token
-2. Enter OpenAI API key
-3. Enter optional keys
-4. Wait 5-10 minutes
-5. Done!
+### Deployed Contracts
 
----
+See [deployments/](deployments/) directory for addresses.
 
-## 📈 Monitoring
+## 📦 Packages
 
-**Check system health:**
-```bash
-bash scripts/verify-autonomous-health.sh
-```
+- `@nwu-protocol/contracts` - Smart contracts
+- `@nwu-protocol/contribution-manager` - Contribution management
+- `@nwu-protocol/verification-engine` - Verification logic
+- `@nwu-protocol/sdk` - JavaScript SDK
 
-**View deployment logs:**
-```bash
-railway logs
-```
+## 💬 Community
 
-**Monitor costs:**
-- Dashboard: https://railway.app/account/usage
-- Expected: $5-10 per system
-- Total: $85-170/month
-
----
-
-## 🔧 Advanced Usage
-
-**Deploy specific tier only:**
-```bash
-bash scripts/deploy-autonomous-business.sh
-# Select Option 5 (Deploy single tier)
-# Choose tier 1-7
-```
-
-**Custom deployment:**
-```bash
-bash scripts/deploy-autonomous-business.sh
-# Select Option 4 (Custom)
-# Choose specific systems
-```
-
-**Health monitoring:**
-```bash
-# Continuous monitoring
-watch -n 60 bash scripts/verify-autonomous-health.sh
-```
-
----
-
-## 🤝 Support
-
-**Issues?**
-- GitHub Issues: https://github.com/Garrettc123/tree-of-life-system/issues
-- Check Railway logs: `railway logs`
-- Verify health: `bash scripts/verify-autonomous-health.sh`
-
-**Documentation:**
-- Architecture: `deployment/AUTONOMOUS-BUSINESS-ARCHITECTURE.md`
-- Deployment Guide: `deployment/MULTI-REPO-DEPLOYMENT.md`
-
----
+- [Discord](https://discord.gg/nwu-protocol)
+- [Twitter](https://twitter.com/nwu_protocol)
+- [Forum](https://forum.nwuprotocol.io)
+- [Documentation](https://docs.nwuprotocol.io)
 
 ## 📜 License
 
-MIT License - Use freely for your autonomous business empire
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🚀 Roadmap
+
+### Phase 1: Foundation (Q1 2024)
+- ✅ Smart contract development
+- ✅ Core business logic
+- ✅ Basic testing
+- ✅ Documentation
+
+### Phase 2: Integration (Q2 2024)
+- [ ] AI agent network
+- [ ] User applications
+- [ ] External integrations
+- [ ] Security audits
+
+### Phase 3: Launch (Q3 2024)
+- [ ] Testnet deployment
+- [ ] Community building
+- [ ] Partnership onboarding
+- [ ] Bug bounty program
+
+### Phase 4: Growth (Q4 2024)
+- [ ] Mainnet launch
+- [ ] DAO activation
+- [ ] Cross-chain expansion
+- [ ] Enterprise adoption
+
+## 🐛 Known Issues
+
+See [Issues](https://github.com/Garrettc123/tree-of-life-system/issues) for current bugs and feature requests.
+
+## ❓ FAQ
+
+**Q: What makes NWU Protocol unique?**
+A: Our Tree of Life architecture provides unprecedented modularity, security, and scalability.
+
+**Q: How do I become a verifier?**
+A: Call `registerVerifier()` on the NWUProtocol contract and stake minimum NWU tokens.
+
+**Q: What are the gas costs?**
+A: Optimized for minimal gas usage. Average costs: Submit ~150k gas, Verify ~100k gas.
+
+## 🚀 Quick Links
+
+- [GitHub](https://github.com/Garrettc123/tree-of-life-system)
+- [Issue Tracker](https://github.com/Garrettc123/tree-of-life-system/issues/1)
+- [Smart Contracts](blockchain/contracts/)
+- [Documentation](docs/)
 
 ---
 
-## 🎉 Success Stories
+**Built with ❤️ by the NWU Protocol Team**
 
-**After deploying:**
-- ✅ All 17 systems operational
-- ✅ Revenue generation active
-- ✅ Customer management automated
-- ✅ Product development autonomous
-- ✅ Marketing running 24/7
-- ✅ Security monitoring active
-- ✅ Zero human intervention needed
-
-**Your autonomous $10M+/year business starts NOW!** 🚀
-
----
-
-## 🔗 Links
-
-- **Repository:** https://github.com/Garrettc123/tree-of-life-system
-- **Railway:** https://railway.app
-- **Documentation:** See `/deployment` folder
-- **Health Check:** `bash scripts/verify-autonomous-health.sh`
-
----
-
-**Deploy your autonomous business empire in 5 minutes.** ⚡
+*Empowering contributions, verifying quality, rewarding excellence.*

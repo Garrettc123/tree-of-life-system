@@ -1,27 +1,5 @@
-# Environment Variables - NEVER COMMIT
-.env
-.env.local
-.env.*.local
-.env.production
-.env.development
-
-# Secrets and Keys
-*.pem
-*.key
-*.cert
-*.p12
-secrets/
-credentials/
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
 # Dependencies
+node_modules/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
@@ -29,17 +7,21 @@ pnpm-lock.yaml
 # Build outputs
 dist/
 build/
-.next/
 out/
-.nuxt/
+*.tsbuildinfo
 
-# Cache directories
-.cache/
-.tmp/
-temp/
-*.log
+# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
 
-# IDE and Editor files
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -47,50 +29,48 @@ temp/
 *~
 .DS_Store
 
-# Docker
-docker-compose.override.yml
-*.dockerfile.local
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-*.db-journal
-
 # Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-
-# OS files
-Thumbs.db
-.DS_Store
+yarn-error.log*
+lerna-debug.log*
 
 # Testing
 coverage/
 .nyc_output/
+*.lcov
 
-# Backup files
-*.backup
-*.bak
-*.old
+# Misc
+.cache/
+temp/
+tmp/
+*.pid
+*.seed
+*.pid.lock
 
-# Local configuration overrides
-config.local.js
-config.local.json
+# Deployment
+deployments/*.json
+!deployments/README.md
 
-# AI and ML models (large files)
-models/
-*.h5
-*.pkl
-*.joblib
+# Compiled contracts
+*.abi
+*.bin
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.backup
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
 
-# Private notes and documentation
-PRIVATE_NOTES.md
-TODO_PRIVATE.md
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
