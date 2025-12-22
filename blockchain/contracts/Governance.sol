@@ -7,14 +7,13 @@ import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol
 import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
-import "./NWUToken.sol";
 
 /**
  * @title NWUGovernance
- * @dev DAO governance contract for the NWU Protocol
- * Allows token holders to propose and vote on protocol changes
+ * @dev DAO governance contract for Network of Wisdom United
+ * Implements proposal creation, voting, and execution
  */
-contract NWUGovernance is 
+contract NWUGovernance is
     Governor,
     GovernorSettings,
     GovernorCountingSimple,
@@ -22,30 +21,6 @@ contract NWUGovernance is
     GovernorVotesQuorumFraction,
     GovernorTimelockControl
 {
-    // Proposal types
-    enum ProposalType {
-        ParameterChange,
-        TreasuryAllocation,
-        ProtocolUpgrade,
-        PartnershipApproval,
-        EmergencyAction
-    }
-
-    struct ProposalMetadata {
-        ProposalType proposalType;
-        string description;
-        uint256 createdAt;
-        address proposer;
-    }
-
-    mapping(uint256 => ProposalMetadata) public proposalMetadata;
-
-    event ProposalCreatedWithMetadata(
-        uint256 indexed proposalId,
-        ProposalType proposalType,
-        address proposer
-    );
-
     constructor(
         IVotes _token,
         TimelockController _timelock
@@ -54,48 +29,14 @@ contract NWUGovernance is
         GovernorSettings(
             1, /* 1 block voting delay */
             50400, /* 1 week voting period (assuming 12s blocks) */
-            1000e18 /* 1000 tokens proposal threshold */
+            100e18 /* 100 token proposal threshold */
         )
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4) /* 4% quorum */
         GovernorTimelockControl(_timelock)
     {}
 
-    /**
-     * @dev Create a proposal with metadata
-     */
-    function proposeWithMetadata(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description,
-        ProposalType proposalType
-    ) public returns (uint256) {
-        uint256 proposalId = propose(targets, values, calldatas, description);
-        
-        proposalMetadata[proposalId] = ProposalMetadata({
-            proposalType: proposalType,
-            description: description,
-            createdAt: block.timestamp,
-            proposer: msg.sender
-        });
-
-        emit ProposalCreatedWithMetadata(proposalId, proposalType, msg.sender);
-        return proposalId;
-    }
-
-    /**
-     * @dev Get proposal metadata
-     */
-    function getProposalMetadata(uint256 proposalId) 
-        external 
-        view 
-        returns (ProposalMetadata memory) 
-    {
-        return proposalMetadata[proposalId];
-    }
-
-    // Override functions required by Solidity
+    // Override required functions
     function votingDelay()
         public
         view
@@ -137,11 +78,7 @@ contract NWUGovernance is
         uint256[] memory values,
         bytes[] memory calldatas,
         string memory description
-    )
-        public
-        override(Governor, IGovernor)
-        returns (uint256)
-    {
+    ) public override(Governor, IGovernor) returns (uint256) {
         return super.propose(targets, values, calldatas, description);
     }
 
@@ -160,10 +97,7 @@ contract NWUGovernance is
         uint256[] memory values,
         bytes[] memory calldatas,
         bytes32 descriptionHash
-    )
-        internal
-        override(Governor, GovernorTimelockControl)
-    {
+    ) internal override(Governor, GovernorTimelockControl) {
         super._execute(proposalId, targets, values, calldatas, descriptionHash);
     }
 
@@ -172,11 +106,7 @@ contract NWUGovernance is
         uint256[] memory values,
         bytes[] memory calldatas,
         bytes32 descriptionHash
-    )
-        internal
-        override(Governor, GovernorTimelockControl)
-        returns (uint256)
-    {
+    ) internal override(Governor, GovernorTimelockControl) returns (uint256) {
         return super._cancel(targets, values, calldatas, descriptionHash);
     }
 

@@ -9,155 +9,113 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 
 /**
  * @title NWUToken
- * @dev NWU Protocol governance and utility token
- * Features: ERC20, Burnable, Votes (for governance), Access Control
+ * @dev Network of Wisdom United governance and utility token
+ * Features: Voting, Staking, Burning, Minting controls
  */
 contract NWUToken is ERC20, ERC20Burnable, ERC20Votes, AccessControl, Pausable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**18; // 1 billion tokens
     uint256 public constant INITIAL_SUPPLY = 100_000_000 * 10**18; // 100 million initial
 
-    // Vesting schedules
-    struct VestingSchedule {
-        uint256 totalAmount;
-        uint256 released;
-        uint256 startTime;
-        uint256 duration;
-        bool revoked;
+    struct StakeInfo {
+        uint256 amount;
+        uint256 timestamp;
+        uint256 lockPeriod;
     }
 
-    mapping(address => VestingSchedule) public vestingSchedules;
+    mapping(address => StakeInfo) public stakes;
+    uint256 public totalStaked;
+    uint256 public constant MIN_STAKE_PERIOD = 30 days;
 
-    event VestingScheduleCreated(address indexed beneficiary, uint256 amount, uint256 duration);
-    event TokensReleased(address indexed beneficiary, uint256 amount);
-    event VestingRevoked(address indexed beneficiary);
+    event Staked(address indexed user, uint256 amount, uint256 lockPeriod);
+    event Unstaked(address indexed user, uint256 amount, uint256 reward);
+    event RewardDistributed(address indexed user, uint256 amount);
 
-    constructor() 
-        ERC20("NWU Protocol Token", "NWU") 
-        ERC20Permit("NWU Protocol Token") 
-    {
+    constructor() ERC20("Network of Wisdom United", "NWU") ERC20Permit("Network of Wisdom United") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(GOVERNANCE_ROLE, msg.sender);
-
-        // Mint initial supply to deployer
+        
         _mint(msg.sender, INITIAL_SUPPLY);
     }
 
     /**
-     * @dev Mint new tokens (only MINTER_ROLE)
+     * @dev Stake tokens for governance voting power
+     * @param amount Amount of tokens to stake
+     * @param lockPeriod Lock period in seconds
      */
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Exceeds max supply");
-        _mint(to, amount);
-    }
-
-    /**
-     * @dev Create a vesting schedule for a beneficiary
-     */
-    function createVestingSchedule(
-        address beneficiary,
-        uint256 amount,
-        uint256 duration
-    ) external onlyRole(GOVERNANCE_ROLE) {
-        require(beneficiary != address(0), "Invalid beneficiary");
-        require(amount > 0, "Amount must be > 0");
-        require(duration > 0, "Duration must be > 0");
-        require(vestingSchedules[beneficiary].totalAmount == 0, "Schedule exists");
-
-        vestingSchedules[beneficiary] = VestingSchedule({
-            totalAmount: amount,
-            released: 0,
-            startTime: block.timestamp,
-            duration: duration,
-            revoked: false
-        });
+    function stake(uint256 amount, uint256 lockPeriod) external whenNotPaused {
+        require(amount > 0, "Cannot stake 0");
+        require(lockPeriod >= MIN_STAKE_PERIOD, "Lock period too short");
+        require(stakes[msg.sender].amount == 0, "Already staking");
 
         _transfer(msg.sender, address(this), amount);
-        emit VestingScheduleCreated(beneficiary, amount, duration);
+        
+        stakes[msg.sender] = StakeInfo({
+            amount: amount,
+            timestamp: block.timestamp,
+            lockPeriod: lockPeriod
+        });
+
+        totalStaked += amount;
+        emit Staked(msg.sender, amount, lockPeriod);
     }
 
     /**
-     * @dev Release vested tokens
+     * @dev Unstake tokens after lock period
      */
-    function releaseVestedTokens() external {
-        VestingSchedule storage schedule = vestingSchedules[msg.sender];
-        require(schedule.totalAmount > 0, "No vesting schedule");
-        require(!schedule.revoked, "Schedule revoked");
+    function unstake() external whenNotPaused {
+        StakeInfo memory stakeInfo = stakes[msg.sender];
+        require(stakeInfo.amount > 0, "No active stake");
+        require(
+            block.timestamp >= stakeInfo.timestamp + stakeInfo.lockPeriod,
+            "Lock period not ended"
+        );
 
-        uint256 releasable = _computeReleasableAmount(schedule);
-        require(releasable > 0, "No tokens to release");
+        uint256 reward = calculateStakingReward(msg.sender);
+        uint256 totalAmount = stakeInfo.amount + reward;
 
-        schedule.released += releasable;
-        _transfer(address(this), msg.sender, releasable);
+        delete stakes[msg.sender];
+        totalStaked -= stakeInfo.amount;
 
-        emit TokensReleased(msg.sender, releasable);
+        if (reward > 0 && totalSupply() + reward <= MAX_SUPPLY) {
+            _mint(msg.sender, reward);
+        }
+        
+        _transfer(address(this), msg.sender, stakeInfo.amount);
+        emit Unstaked(msg.sender, stakeInfo.amount, reward);
     }
 
     /**
-     * @dev Compute releasable amount based on vesting schedule
+     * @dev Calculate staking reward based on amount and duration
+     * @param staker Address of the staker
+     * @return Reward amount
      */
-    function _computeReleasableAmount(VestingSchedule memory schedule) 
-        private 
-        view 
-        returns (uint256) 
-    {
-        if (block.timestamp < schedule.startTime) {
-            return 0;
-        }
+    function calculateStakingReward(address staker) public view returns (uint256) {
+        StakeInfo memory stakeInfo = stakes[staker];
+        if (stakeInfo.amount == 0) return 0;
 
-        uint256 elapsedTime = block.timestamp - schedule.startTime;
-        if (elapsedTime >= schedule.duration) {
-            return schedule.totalAmount - schedule.released;
-        }
+        uint256 stakeDuration = block.timestamp - stakeInfo.timestamp;
+        if (stakeDuration < stakeInfo.lockPeriod) return 0;
 
-        uint256 vestedAmount = (schedule.totalAmount * elapsedTime) / schedule.duration;
-        return vestedAmount - schedule.released;
+        // 5% APY base rate, bonus for longer locks
+        uint256 baseRate = 5;
+        uint256 lockBonus = (stakeInfo.lockPeriod / 30 days) - 1; // Extra 1% per month
+        uint256 totalRate = baseRate + lockBonus;
+
+        return (stakeInfo.amount * totalRate * stakeDuration) / (365 days * 100);
     }
 
     /**
-     * @dev Get releasable amount for an address
+     * @dev Mint new tokens (minter role only)
+     * @param to Recipient address
+     * @param amount Amount to mint
      */
-    function getReleasableAmount(address beneficiary) 
-        external 
-        view 
-        returns (uint256) 
-    {
-        VestingSchedule memory schedule = vestingSchedules[beneficiary];
-        if (schedule.totalAmount == 0 || schedule.revoked) {
-            return 0;
-        }
-        return _computeReleasableAmount(schedule);
-    }
-
-    /**
-     * @dev Revoke vesting schedule
-     */
-    function revokeVesting(address beneficiary) 
-        external 
-        onlyRole(GOVERNANCE_ROLE) 
-    {
-        VestingSchedule storage schedule = vestingSchedules[beneficiary];
-        require(schedule.totalAmount > 0, "No vesting schedule");
-        require(!schedule.revoked, "Already revoked");
-
-        uint256 releasable = _computeReleasableAmount(schedule);
-        if (releasable > 0) {
-            schedule.released += releasable;
-            _transfer(address(this), beneficiary, releasable);
-        }
-
-        uint256 remaining = schedule.totalAmount - schedule.released;
-        if (remaining > 0) {
-            _transfer(address(this), msg.sender, remaining);
-        }
-
-        schedule.revoked = true;
-        emit VestingRevoked(beneficiary);
+    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
+        require(totalSupply() + amount <= MAX_SUPPLY, "Max supply exceeded");
+        _mint(to, amount);
     }
 
     /**
@@ -175,6 +133,14 @@ contract NWUToken is ERC20, ERC20Burnable, ERC20Votes, AccessControl, Pausable {
     }
 
     // Override required functions
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override whenNotPaused {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
     function _afterTokenTransfer(
         address from,
         address to,
@@ -183,25 +149,11 @@ contract NWUToken is ERC20, ERC20Burnable, ERC20Votes, AccessControl, Pausable {
         super._afterTokenTransfer(from, to, amount);
     }
 
-    function _mint(address to, uint256 amount) 
-        internal 
-        override(ERC20, ERC20Votes) 
-    {
+    function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes) {
         super._mint(to, amount);
     }
 
-    function _burn(address account, uint256 amount) 
-        internal 
-        override(ERC20, ERC20Votes) 
-    {
+    function _burn(address account, uint256 amount) internal override(ERC20, ERC20Votes) {
         super._burn(account, amount);
-    }
-
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, amount);
     }
 }
