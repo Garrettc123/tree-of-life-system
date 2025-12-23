@@ -62,6 +62,32 @@
             border-radius: 10px;
             border: 2px solid rgba(0,255,0,0.5);
         }
+        .btn {
+            display: inline-block;
+            margin: 1rem 0.5rem;
+            padding: 1rem 2rem;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .btn.primary {
+            background: rgba(0,255,0,0.3);
+            border-color: rgba(0,255,0,0.5);
+        }
+        .btn.primary:hover {
+            background: rgba(0,255,0,0.4);
+        }
         a {
             color: #fff;
             text-decoration: none;
@@ -78,6 +104,11 @@
         <div class="status">
             <strong>✅ System Online</strong><br>
             Deployed via Vercel | Zero-Cost Architecture
+        </div>
+        
+        <div>
+            <a href="/dashboard.html" class="btn primary">🧠 View TITAN Dashboard</a>
+            <a href="https://github.com/Garrettc123/tree-of-life-system" class="btn" target="_blank">👁️ View on GitHub</a>
         </div>
         
         <div class="features">
@@ -98,10 +129,6 @@
                 <p>System health tracking</p>
             </div>
         </div>
-        
-        <p style="margin-top: 3rem; font-size: 1rem; opacity: 0.8;">
-            View on <a href="https://github.com/Garrettc123/tree-of-life-system" target="_blank">GitHub</a>
-        </p>
     </div>
 </body>
 </html>
