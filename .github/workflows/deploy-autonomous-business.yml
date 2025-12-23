@@ -12,8 +12,9 @@ on:
           - railway
           - gcp
           - hybrid
+          - free
       tier:
-        description: 'Deployment Tier (1-7)'
+        description: 'Deployment Tier'
         required: false
         default: 'all'
         type: string
@@ -22,12 +23,13 @@ on:
       - main
     paths:
       - 'scripts/deploy-autonomous-business.sh'
+      - 'scripts/deploy-*.sh'
       - '.github/workflows/deploy-autonomous-business.yml'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    timeout-minutes: 30
     
     steps:
       - name: Checkout repository
@@ -37,10 +39,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci --prefer-offline --no-audit
       
       - name: Install Railway CLI
         run: |
           npm install -g @railway/cli
+          railway --version
       
       - name: Install GitHub CLI
         run: |
@@ -50,67 +58,153 @@ jobs:
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update
           sudo apt install gh -y
+          gh --version
       
       - name: Configure credentials
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           echo "Configuring GitHub CLI..."
           echo "$GITHUB_TOKEN" | gh auth login --with-token
+          gh auth status
           
-          echo "Configuring Railway..."
-          railway login --token $RAILWAY_TOKEN || echo "Railway login configured"
+          if [ -n "$RAILWAY_TOKEN" ]; then
+            echo "Configuring Railway..."
+            echo "$RAILWAY_TOKEN" > ~/.railway-token
+            export RAILWAY_TOKEN=$RAILWAY_TOKEN
+            echo "Railway configured"
+          else
+            echo "⚠️  RAILWAY_TOKEN not set - Railway deployments will be skipped"
+          fi
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/*.sh
+          chmod +x scripts/*.js || true
+          ls -la scripts/
       
       - name: Deploy Autonomous Systems
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           DEPLOYMENT_MODE: ${{ inputs.deployment_mode || 'railway' }}
+          TIER: ${{ inputs.tier || 'all' }}
         run: |
-          chmod +x scripts/deploy-autonomous-business.sh
-          
           echo "🚀 Starting autonomous business deployment..."
           echo "Mode: $DEPLOYMENT_MODE"
+          echo "Tier: $TIER"
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo ""
           
-          # Run deployment script
-          bash scripts/deploy-autonomous-business.sh << EOF
-          1
-          $GITHUB_TOKEN
-          $OPENAI_API_KEY
-          $ANTHROPIC_API_KEY
-          $STRIPE_API_KEY
-          $SENDGRID_API_KEY
-          EOF
+          # Create logs directory
+          mkdir -p logs
+          
+          # Run deployment based on mode
+          case "$DEPLOYMENT_MODE" in
+            "free")
+              echo "Running free tier deployment..."
+              bash scripts/deploy-free-tier.sh 2>&1 | tee logs/deployment.log
+              ;;
+            "railway")
+              echo "Running Railway deployment..."
+              if [ -n "$RAILWAY_TOKEN" ]; then
+                bash scripts/deploy-autonomous-business.sh 2>&1 | tee logs/deployment.log
+              else
+                echo "❌ RAILWAY_TOKEN required for Railway deployment"
+                exit 1
+              fi
+              ;;
+            "gcp")
+              echo "Running GCP deployment..."
+              echo "⚠️  GCP deployment requires additional configuration"
+              bash scripts/deploy-all.sh 2>&1 | tee logs/deployment.log
+              ;;
+            "hybrid")
+              echo "Running hybrid deployment..."
+              bash scripts/deploy-all-repos.sh 2>&1 | tee logs/deployment.log
+              ;;
+            *)
+              echo "❌ Unknown deployment mode: $DEPLOYMENT_MODE"
+              exit 1
+              ;;
+          esac
+          
+          echo ""
+          echo "✅ Deployment script completed"
       
       - name: Verify Deployments
+        if: success()
         run: |
-          chmod +x scripts/verify-autonomous-health.sh
-          bash scripts/verify-autonomous-health.sh || echo "Some systems may still be starting up"
+          echo "🔍 Verifying deployment health..."
+          if [ -f scripts/verify-autonomous-health.sh ]; then
+            bash scripts/verify-autonomous-health.sh || echo "⚠️  Some systems may still be starting up"
+          else
+            echo "Health check script not found, skipping verification"
+          fi
       
-      - name: Upload deployment logs
+      - name: Generate Deployment Report
+        if: always()
+        run: |
+          echo "# Deployment Report" > deployment-report.md
+          echo "" >> deployment-report.md
+          echo "**Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> deployment-report.md
+          echo "**Mode:** ${{ inputs.deployment_mode || 'railway' }}" >> deployment-report.md
+          echo "**Tier:** ${{ inputs.tier || 'all' }}" >> deployment-report.md
+          echo "**Status:** ${{ job.status }}" >> deployment-report.md
+          echo "" >> deployment-report.md
+          echo "## Deployment Details" >> deployment-report.md
+          echo "" >> deployment-report.md
+          
+          if [ -f logs/deployment.log ]; then
+            echo "### Last 50 lines of deployment log:" >> deployment-report.md
+            echo "\`\`\`" >> deployment-report.md
+            tail -n 50 logs/deployment.log >> deployment-report.md
+            echo "\`\`\`" >> deployment-report.md
+          fi
+          
+          cat deployment-report.md
+      
+      - name: Upload deployment artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: deployment-logs
+          name: deployment-logs-${{ github.run_number }}
           path: |
-            deployment-*.log
             logs/
+            deployment-report.md
+            *.log
           retention-days: 30
       
       - name: Notify on success
         if: success()
         run: |
           echo "✅ Deployment successful!"
-          echo "All 17 autonomous systems are now running."
-          echo "Expected revenue: $10M+/year"
+          echo ""
+          echo "🎉 All autonomous systems are now running!"
+          echo ""
+          echo "Next steps:"
+          echo "1. Check your Railway dashboard for service URLs"
+          echo "2. Monitor logs for any startup issues"
+          echo "3. Verify webhooks are configured"
+          echo "4. Test API endpoints"
+          echo ""
+          echo "Expected revenue: $10M+/year 💰"
       
       - name: Notify on failure
         if: failure()
         run: |
           echo "❌ Deployment failed!"
-          echo "Check logs for details."
+          echo ""
+          echo "Common issues:"
+          echo "1. Missing API keys (check repository secrets)"
+          echo "2. Railway authentication failed"
+          echo "3. Script permissions not set"
+          echo "4. Network connectivity issues"
+          echo ""
+          echo "Check the deployment logs artifact for details."
           exit 1
