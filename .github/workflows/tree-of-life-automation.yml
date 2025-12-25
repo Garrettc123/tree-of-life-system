@@ -1,0 +1,131 @@
+name: Tree of Life System Automation
+
+on:
+  push:
+    branches: ['main', 'layer/*']
+  pull_request:
+    branches: ['main']
+  issues:
+    types: [opened, closed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # CI/CD Pipeline
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: |
+          if [ -f package.json ]; then npm install; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          
+      - name: Run tests
+        run: |
+          echo "Running automated tests..."
+          # Add your test commands here
+          
+      - name: Build application
+        run: |
+          echo "Building application..."
+          # Add your build commands here
+
+  # Auto-label PRs based on changed files
+  auto-label-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Label by file path
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Sync to Linear when issues are created/updated
+  sync-to-linear:
+    if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Linear issue
+        if: github.event.action == 'opened'
+        run: |
+          echo "Creating Linear issue for GitHub issue #${{ github.event.issue.number }}"
+          # Add Linear API integration here
+          # curl -X POST https://api.linear.app/graphql \
+          #   -H "Authorization: ${{ secrets.LINEAR_API_KEY }}" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"query": "mutation { issueCreate(...) }"}'
+
+  # Update Notion documentation on release
+  update-notion-docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Update Notion documentation
+        run: |
+          echo "Updating Notion documentation..."
+          echo "Latest commit: ${{ github.sha }}"
+          echo "Commit message: ${{ github.event.head_commit.message }}"
+          # Add Notion API integration here
+          # curl -X PATCH https://api.notion.com/v1/pages/{page_id} \
+          #   -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"properties": {...}}'
+
+  # AI Code Review
+  ai-code-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Get changed files
+        id: changed-files
+        run: |
+          echo "files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          
+      - name: AI Review
+        run: |
+          echo "Running AI code review on changed files..."
+          echo "Changed files: ${{ steps.changed-files.outputs.files }}"
+          # Add AI review integration (Perplexity/OpenAI)
+          # This would analyze code quality, security, and suggest improvements
+
+  # Deploy to production (Railway)
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test-and-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Railway
+        run: |
+          echo "Deploying to Railway production..."
+          echo "Deployment URL: https://tree-of-life-system-prod.up.railway.app"
+          # Add Railway deployment commands
+          # railway up --service production
+
+  # Track metrics and analytics
+  track-metrics:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send metrics
+        run: |
+          echo "Tracking deployment metrics..."
+          echo "Commits: ${{ github.event.commits.length }}"
+          echo "Author: ${{ github.event.pusher.name }}"
+          # Send to analytics platform
