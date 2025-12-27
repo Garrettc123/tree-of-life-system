@@ -61,11 +61,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Deploy ${{ github.event.inputs.service }} to ${{ github.event.inputs.environment }}
+      - name: Deploy ${{ github.event.inputs.service || 'all' }} to ${{ github.event.inputs.environment || 'staging' }}
         run: |
-          echo "🚀 Deploying service: ${{ github.event.inputs.service }}"
-          echo "🎯 Target environment: ${{ github.event.inputs.environment }}"
-          echo "📦 Using npm deploy script"
+          echo "🚀 Deploying service: ${{ github.event.inputs.service || 'all' }}"
+          echo "🎯 Target environment: ${{ github.event.inputs.environment || 'staging' }}"
+          echo "📦 Using npm deploy script (Railway)"
+          echo "⚠️  Note: Service and environment selection not yet implemented"
           npm run deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,6 +78,6 @@ jobs:
         if: success()
         run: |
           echo "🚀 Deployment successful!"
-          echo "Service: ${{ github.event.inputs.service }}"
-          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Service: ${{ github.event.inputs.service || 'all' }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'staging' }}"
           echo "Time: $(date)"
