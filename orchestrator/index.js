@@ -101,8 +101,8 @@ app.get('/', (req, res) => {
       'Cross-platform sync',
       'Real-time automation'
     ],
-    endpoints: 75+,
-    features: 60+,
+    endpoints: 75,
+    features: 60,
     uptime: process.uptime()
   });
 });
@@ -193,8 +193,8 @@ app.get('/status', (req, res) => {
     },
     totals: {
       systems: 22,
-      endpoints: 75+,
-      features: 60+,
+      endpoints: 75,
+      features: 60,
       integrations: 4
     },
     timestamp: new Date().toISOString()
@@ -269,8 +269,8 @@ app.get('/dashboard', (req, res) => {
     status: 'SUPER-INTELLIGENT & OPERATIONAL',
     summary: {
       systems: 22,
-      endpoints: 75+,
-      features: 60+,
+      endpoints: 75,
+      features: 60,
       intelligence_level: 'SUPER-INTELLIGENT',
       autonomy: 0.95,
       revenue_potential: '$38K-$103K/mo'
