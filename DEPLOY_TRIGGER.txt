@@ -1,6 +1,6 @@
-Deployment triggered at: 2025-12-22 22:33 CST
-Target: GitHub Pages (FREE, Zero Tokens)
+Deployment triggered at: 2025-12-27 08:11 UTC
+Target: Railway/Production
 Status: Deploying...
 
-This file triggers the zero-token deployment workflow.
-Your site will be live at: https://garrettc123.github.io/tree-of-life-system
+This file triggers the deployment workflow.
+Deploy requested via: GitHub Copilot Agent
