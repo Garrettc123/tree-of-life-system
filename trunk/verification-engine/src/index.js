@@ -25,6 +25,7 @@ const protocol = new ethers.Contract(protocolAddress, protocolABI, wallet);
 async function processVerificationQueue() {
   console.log('Starting verification queue processor...');
   
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       // Pop from queue (blocking)
@@ -33,7 +34,7 @@ async function processVerificationQueue() {
       if (!item) continue;
       
       const data = JSON.parse(item[1]);
-      const { contributionId, ipfsHash } = data;
+      const { contributionId } = data;
       
       console.log(`Processing verification for contribution ${contributionId}`);
       
