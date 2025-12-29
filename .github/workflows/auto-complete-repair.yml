@@ -28,7 +28,7 @@ jobs:
       - run: |
           npm test 2>&1 || true
       - name: Create Pull Request
-        if: ${{ github.ref != 'refs/heads/main' }}
+        if: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
         run: |
           git config user.name "AI Repair"
           git config user.email "repair@bot.local"
