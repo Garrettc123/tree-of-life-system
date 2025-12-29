@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: db
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: example
   mongodb:
     image: mongo:5.0
     ports: ["27017:27017"]
