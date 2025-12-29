@@ -6,6 +6,7 @@ Total Autonomous Intelligence Network
 
 import os
 import sys
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -297,8 +298,7 @@ if __name__ == "__main__":
     if is_dev:
         # Development mode: use import string for reload support
         # Add parent directory to path so 'src.main' can be imported
-        import sys
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        sys.path.insert(0, str(Path(__file__).parent.parent))
         uvicorn.run(
             "src.main:app",
             host="0.0.0.0",
