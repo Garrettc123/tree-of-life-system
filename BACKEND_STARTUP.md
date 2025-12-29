@@ -31,7 +31,7 @@ The Tree of Life System backend is a Node.js Express server that provides API en
    You should see:
    ```
    Tree of Life System API listening on port 3000
-   Health check at http://0.0.0.0:3000/health
+   Health check at http://localhost:3000/health
    ```
 
 ### Testing the API
@@ -58,7 +58,6 @@ Expected responses:
 
 Environment variables are configured in `.env` file:
 - `PORT`: Server port (default: 3000)
-- Note: The server reads `process.env.PORT` for the port configuration
 - See `.env` file for full configuration options
 
 ### Available Scripts
