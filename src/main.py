@@ -290,10 +290,28 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     logger.info(f"Starting TITAN v4.0 on port {port}")
     
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=os.getenv("ENVIRONMENT") != "production",
-        log_level="info"
-    )
+    # When running directly, we pass the app object for production
+    # In development with reload, uvicorn needs an import string
+    is_dev = os.getenv("ENVIRONMENT") != "production"
+    
+    if is_dev:
+        # Development mode: use import string for reload support
+        # Add parent directory to path so 'src.main' can be imported
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        uvicorn.run(
+            "src.main:app",
+            host="0.0.0.0",
+            port=port,
+            reload=True,
+            log_level="info"
+        )
+    else:
+        # Production mode: use app object directly
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            reload=False,
+            log_level="info"
+        )
