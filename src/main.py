@@ -6,6 +6,7 @@ Total Autonomous Intelligence Network
 
 import os
 import sys
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -290,10 +291,28 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     logger.info(f"Starting TITAN v4.0 on port {port}")
     
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=os.getenv("ENVIRONMENT") != "production",
-        log_level="info"
-    )
+    # When running directly, we pass the app object for production
+    # In development with reload, uvicorn needs an import string
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment == "development"
+    
+    if is_dev:
+        # Development mode: use import string for reload support
+        # Add parent directory to path so 'src.main' can be imported
+        sys.path.append(str(Path(__file__).parent.parent))
+        uvicorn.run(
+            "src.main:app",
+            host="0.0.0.0",
+            port=port,
+            reload=True,
+            log_level="info"
+        )
+    else:
+        # Production mode: use app object directly
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            reload=False,
+            log_level="info"
+        )

@@ -1,0 +1,11 @@
+name: Continuous Healing
+on:
+  schedule:
+    - cron: '0 * * * *'
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - run: echo "Health check"

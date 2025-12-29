@@ -1,117 +1,15 @@
 version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
-    container_name: nwu-postgres
+    image: postgres:15
+    ports: ["5432:5432"]
     environment:
-      POSTGRES_DB: nwu_protocol
-      POSTGRES_USER: nwu_user
-      POSTGRES_PASSWORD: nwu_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./trunk/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nwu_user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis Cache & Queue
+      POSTGRES_DB: db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  mongodb:
+    image: mongo:5.0
+    ports: ["27017:27017"]
   redis:
-    image: redis:7-alpine
-    container_name: nwu-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # IPFS Node
-  ipfs:
-    image: ipfs/kubo:latest
-    container_name: nwu-ipfs
-    ports:
-      - "4001:4001"  # P2P
-      - "5001:5001"  # API
-      - "8080:8080"  # Gateway
-    volumes:
-      - ipfs_data:/data/ipfs
-    environment:
-      IPFS_PROFILE: server
-
-  # Contribution Manager Service
-  contribution-manager:
-    build:
-      context: ./trunk/contribution-manager
-    container_name: nwu-contribution-manager
-    ports:
-      - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://nwu_user:nwu_password@postgres:5432/nwu_protocol
-      REDIS_URL: redis://redis:6379
-      IPFS_URL: http://ipfs:5001
-      RPC_URL: ${RPC_URL}
-      PROTOCOL_CONTRACT_ADDRESS: ${PROTOCOL_CONTRACT_ADDRESS}
-      PORT: 3001
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ipfs:
-        condition: service_started
-    restart: unless-stopped
-
-  # Verification Engine Service
-  verification-engine:
-    build:
-      context: ./trunk/verification-engine
-    container_name: nwu-verification-engine
-    ports:
-      - "3002:3002"
-    environment:
-      DATABASE_URL: postgresql://nwu_user:nwu_password@postgres:5432/nwu_protocol
-      REDIS_URL: redis://redis:6379
-      RPC_URL: ${RPC_URL}
-      PROTOCOL_CONTRACT_ADDRESS: ${PROTOCOL_CONTRACT_ADDRESS}
-      VERIFIER_PRIVATE_KEY: ${VERIFIER_PRIVATE_KEY}
-      PORT: 3002
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # AI Data Quality Agent
-  ai-data-quality:
-    build:
-      context: ./nervous-system/ai-agents/data-quality-agent
-    container_name: nwu-ai-quality
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      IPFS_GATEWAY: http://ipfs:8080
-    depends_on:
-      redis:
-        condition: service_healthy
-      ipfs:
-        condition: service_started
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
-  ipfs_data:
-
-networks:
-  default:
-    name: nwu-network
+    image: redis:7
+    ports: ["6379:6379"]

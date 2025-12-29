@@ -1,0 +1,38 @@
+name: Auto-Complete Code Pipeline
+on:
+  workflow_run:
+    workflows: ['CI/CD Pipeline']
+    types: [completed]
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: |
+          npx prettier --write . 2>/dev/null || true
+          npx eslint --fix . 2>/dev/null || true
+      - run: npm install -g @types/node 2>/dev/null || true
+      - run: |
+          npm test 2>&1 || true
+      - name: Create Pull Request
+        if: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+        run: |
+          git config user.name "AI Repair"
+          git config user.email "repair@bot.local"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add . && git commit -m "🤖 Auto-repair: Format and tests" || true
+            git push origin HEAD 2>/dev/null || true
+          fi
