@@ -58,7 +58,8 @@ Expected responses:
 
 Environment variables are configured in `.env` file:
 - `PORT`: Server port (default: 3000)
-- See `.env.example` for full configuration options
+- Note: The server reads `process.env.PORT` for the port configuration
+- See `.env` file for full configuration options
 
 ### Available Scripts
 
