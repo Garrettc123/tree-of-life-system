@@ -293,12 +293,13 @@ if __name__ == "__main__":
     
     # When running directly, we pass the app object for production
     # In development with reload, uvicorn needs an import string
-    is_dev = os.getenv("ENVIRONMENT") != "production"
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment == "development"
     
     if is_dev:
         # Development mode: use import string for reload support
         # Add parent directory to path so 'src.main' can be imported
-        sys.path.insert(0, str(Path(__file__).parent.parent))
+        sys.path.append(str(Path(__file__).parent.parent))
         uvicorn.run(
             "src.main:app",
             host="0.0.0.0",
