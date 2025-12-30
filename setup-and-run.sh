@@ -192,9 +192,28 @@ echo ""
 
 echo -e "${BLUE}[5/7] Testing API connectivity...${NC}"
 
-# Load environment variables
+# Load environment variables (properly)
+GITHUB_TOKEN=""
+LINEAR_API_KEY=""
+
 if [ -f ".env" ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ $key =~ ^#.*$ ]] && continue
+        [[ -z $key ]] && continue
+        
+        # Remove quotes if present
+        value=$(echo "$value" | sed -e 's/^["\'"']//;s/["\'"']$//')
+        
+        case $key in
+            GITHUB_TOKEN)
+                GITHUB_TOKEN="$value"
+                ;;
+            LINEAR_API_KEY)
+                LINEAR_API_KEY="$value"
+                ;;
+        esac
+    done < .env
 fi
 
 # Test GitHub API
@@ -308,61 +327,111 @@ case $choice in
         echo -e "${YELLOW}Running API connectivity tests...${NC}"
         echo ""
         
-        # Create test script
-        cat > test-apis.js << 'TESTEOF'
+        # Use Node.js for proper API testing
+        node -e "
 require('dotenv').config();
-const { Octokit } = require('@octokit/rest');
+const https = require('https');
 
-async function testAPIs() {
-  console.log('Testing API Connections...\n');
-  
-  // Test GitHub
-  if (process.env.GITHUB_TOKEN) {
-    try {
-      const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-      const { data } = await octokit.users.getAuthenticated();
-      console.log('✅ GitHub API: Connected as', data.login);
-    } catch (error) {
-      console.log('❌ GitHub API: Failed -', error.message);
+function testGitHub() {
+  return new Promise((resolve) => {
+    if (!process.env.GITHUB_TOKEN || process.env.GITHUB_TOKEN === 'your_github_token_here') {
+      console.log('⏭️  GitHub API: Not configured');
+      resolve();
+      return;
     }
-  } else {
-    console.log('⏭️  GitHub API: Not configured');
-  }
-  
-  // Test Linear
-  if (process.env.LINEAR_API_KEY) {
-    try {
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': process.env.LINEAR_API_KEY
-        },
-        body: JSON.stringify({
-          query: '{ viewer { id name email } }'
-        })
-      });
-      const data = await response.json();
-      if (data.data?.viewer) {
-        console.log('✅ Linear API: Connected as', data.data.viewer.name);
-      } else {
-        console.log('❌ Linear API: Failed -', data.errors?.[0]?.message || 'Unknown error');
+    
+    const options = {
+      hostname: 'api.github.com',
+      path: '/user',
+      headers: {
+        'Authorization': 'token ' + process.env.GITHUB_TOKEN,
+        'User-Agent': 'Tree-of-Life-Agent'
       }
-    } catch (error) {
-      console.log('❌ Linear API: Failed -', error.message);
-    }
-  } else {
-    console.log('⏭️  Linear API: Not configured');
-  }
-  
-  console.log('\n✅ API tests complete\n');
+    };
+    
+    https.get(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const user = JSON.parse(data);
+          if (user.login) {
+            console.log('✅ GitHub API: Connected as', user.login);
+          } else {
+            console.log('❌ GitHub API: Failed');
+          }
+        } catch (e) {
+          console.log('❌ GitHub API: Error parsing response');
+        }
+        resolve();
+      });
+    }).on('error', () => {
+      console.log('❌ GitHub API: Connection failed');
+      resolve();
+    });
+  });
 }
 
-testAPIs().catch(console.error);
-TESTEOF
-        
-        node test-apis.js
-        rm test-apis.js
+function testLinear() {
+  return new Promise((resolve) => {
+    if (!process.env.LINEAR_API_KEY || process.env.LINEAR_API_KEY === 'your_linear_api_key_here') {
+      console.log('⏭️  Linear API: Not configured');
+      resolve();
+      return;
+    }
+    
+    const postData = JSON.stringify({
+      query: '{ viewer { id name email } }'
+    });
+    
+    const options = {
+      hostname: 'api.linear.app',
+      path: '/graphql',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.LINEAR_API_KEY,
+        'Content-Length': postData.length
+      }
+    };
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.data?.viewer) {
+            console.log('✅ Linear API: Connected as', result.data.viewer.name);
+          } else {
+            console.log('❌ Linear API: Failed');
+          }
+        } catch (e) {
+          console.log('❌ Linear API: Error parsing response');
+        }
+        resolve();
+      });
+    });
+    
+    req.on('error', () => {
+      console.log('❌ Linear API: Connection failed');
+      resolve();
+    });
+    
+    req.write(postData);
+    req.end();
+  });
+}
+
+async function runTests() {
+  console.log('Testing API Connections...\n');
+  await testGitHub();
+  await testLinear();
+  console.log('\n✅ API tests complete');
+}
+
+runTests();
+"
         ;;
     5)
         echo ""
