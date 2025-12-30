@@ -1,0 +1,32 @@
+{
+  "name": "tree-of-life-agents",
+  "version": "1.0.0",
+  "description": "Autonomous multi-agent orchestration system",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "agent:planning": "node planning/index.js",
+    "agent:development": "node development/index.js",
+    "agent:pm": "node project-management/index.js",
+    "agent:documentation": "node documentation/index.js",
+    "test": "jest",
+    "status": "node scripts/status.js"
+  },
+  "keywords": ["agents", "automation", "mcp", "autonomous"],
+  "author": "Garrett Carrol",
+  "license": "MIT",
+  "dependencies": {
+    "@octokit/rest": "^20.0.2",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
