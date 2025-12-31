@@ -17,13 +17,12 @@ describe('Tree of Life System - Basic Tests', function() {
     it('should have required environment variables defined', function() {
       // These should be set in GitHub Secrets for deployment
       const requiredVars = ['NODE_ENV'];
-      const optionalVars = ['GITHUB_TOKEN', 'OPENAI_API_KEY', 'RAILWAY_TOKEN'];
       
       // Only NODE_ENV is required for tests
       process.env.NODE_ENV = process.env.NODE_ENV || 'test';
       
       requiredVars.forEach(varName => {
-        assert(process.env.hasOwnProperty(varName), `Missing required env var: ${varName}`);
+        assert(Object.prototype.hasOwnProperty.call(process.env, varName), `Missing required env var: ${varName}`);
       });
     });
   });
