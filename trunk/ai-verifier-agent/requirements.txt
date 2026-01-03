@@ -11,7 +11,7 @@ langchain-anthropic==0.1.1
 
 # Storage
 ipfshttpclient==0.8.0a2
-aiohttp==3.9.1
+aiohttp==3.12.14
 aiofiles==23.2.1
 
 # Configuration
