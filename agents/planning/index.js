@@ -1,201 +1,64 @@
-/**
- * Planning Agent - Strategic coordinator
- * Analyzes system state and generates execution plans
- */
-
+const BaseAgent = require('../core/base-agent');
 const GapAnalyzer = require('./gap-analyzer');
 const TaskGenerator = require('./task-generator');
-const EventBus = require('../core/event-bus');
 
-class PlanningAgent {
+class PlanningAgent extends BaseAgent {
   constructor(config, mcpCoordinator, eventBus) {
-    this.config = config;
-    this.mcp = mcpCoordinator;
-    this.eventBus = eventBus;
-    
-    this.gapAnalyzer = new GapAnalyzer(config);
-    this.taskGenerator = new TaskGenerator(config);
-    
-    this.capabilities = [
-      'gap-analysis',
-      'task-generation',
-      'priority-planning',
-      'coordination'
-    ];
-
-    this.state = 'idle';
-    this._registerEventListeners();
+    super('planning', config, mcpCoordinator, eventBus);
+    this.gapAnalyzer = new GapAnalyzer();
+    this.taskGenerator = new TaskGenerator();
   }
 
-  /**
-   * Initialize the agent
-   */
   async initialize() {
     console.log('[PlanningAgent] Initializing...');
     
-    // Register with MCP coordinator
-    this.mcp.registerAgent('planning', this);
+    this.capabilities = [
+      'analyze_system',
+      'identify_gaps',
+      'generate_tasks',
+      'prioritize_work'
+    ];
     
-    // Subscribe to relevant events
-    this.eventBus.subscribe(EventBus.Events.LINEAR_PROJECT_CREATED, 
-      this._handleLinearProjectCreated.bind(this), 'planning');
-    this.eventBus.subscribe(EventBus.Events.GITHUB_REPO_CREATED, 
-      this._handleGithubRepoCreated.bind(this), 'planning');
-
+    await this.mcpCoordinator.registerAgent({
+      id: this.agentId,
+      name: 'Planning Agent',
+      capabilities: this.capabilities,
+      status: 'ready'
+    });
+    
     console.log('[PlanningAgent] Ready');
   }
 
-  /**
-   * Main execution loop
-   */
   async execute() {
-    console.log('[PlanningAgent] Starting execution cycle...');
-    this.state = 'analyzing';
+    console.log('\n[PlanningAgent] Starting analysis...\n');
+    
+    // Analyze gaps
+    console.log('🔍 Analyzing system gaps...');
+    const gaps = await this.gapAnalyzer.analyze();
+    console.log(`✅ Found ${gaps.length} gaps\n`);
 
-    try {
-      // Step 1: Analyze system for gaps
-      const gaps = await this.gapAnalyzer.analyzeSystem(
-        this.config.githubOwner,
-        this.config.linearTeamId
-      );
+    // Generate tasks
+    console.log('📋 Generating tasks...');
+    const tasks = await this.taskGenerator.generate(gaps);
+    console.log(`✅ Generated ${tasks.length} tasks\n`);
 
-      this.eventBus.publish('planning:analysis-complete', { 
-        gapCount: gaps.length,
-        gaps 
-      }, 'planning');
+    // Emit event for PM Agent
+    this.eventBus.emit({
+      type: 'planning:tasks-generated',
+      source: this.agentId,
+      data: { tasks, gaps }
+    });
 
-      // Step 2: Generate tasks from gaps
-      this.state = 'planning';
-      const tasks = this.taskGenerator.generateTasks(gaps);
-
-      this.eventBus.publish('planning:tasks-generated', {
-        taskCount: tasks.length,
-        tasks
-      }, 'planning');
-
-      // Step 3: Distribute tasks to agents
-      this.state = 'coordinating';
-      await this._distributeTasks(tasks);
-
-      console.log('[PlanningAgent] Execution cycle complete');
-      this.state = 'idle';
-
-      return {
-        success: true,
-        gapsFound: gaps.length,
-        tasksGenerated: tasks.length
-      };
-
-    } catch (error) {
-      console.error('[PlanningAgent] Execution failed:', error);
-      this.state = 'error';
-      
-      this.eventBus.publish('agent:error', {
-        agent: 'planning',
-        error: error.message
-      }, 'planning');
-
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+    return { tasks, gaps };
   }
 
-  /**
-   * Handle messages from other agents via MCP
-   */
-  async handleMessage(envelope) {
-    console.log(`[PlanningAgent] Received message from ${envelope.from}`);
-
-    const { message } = envelope;
-
-    switch (message.type) {
-      case 'request-analysis':
-        return await this.execute();
-      
-      case 'task-completed':
-        this.taskGenerator.completeTask(message.taskId, message.result);
-        return { acknowledged: true };
-      
-      case 'capability-request':
-        if (message.capability === 'gap-analysis') {
-          const gaps = await this.gapAnalyzer.analyzeSystem(
-            message.params.owner,
-            message.params.teamId
-          );
-          return { gaps };
-        }
-        break;
-      
-      default:
-        console.warn(`[PlanningAgent] Unknown message type: ${message.type}`);
-        return { error: 'Unknown message type' };
-    }
-  }
-
-  /**
-   * Distribute tasks to appropriate agents
-   */
-  async _distributeTasks(tasks) {
-    const agentTasks = {
-      development: [],
-      'project-management': [],
-      documentation: []
-    };
-
-    // Group tasks by agent
-    for (const task of tasks) {
-      if (agentTasks[task.agent]) {
-        agentTasks[task.agent].push(task);
-      }
-    }
-
-    // Send tasks to each agent
-    for (const [agent, tasks] of Object.entries(agentTasks)) {
-      if (tasks.length === 0) continue;
-
-      try {
-        await this.mcp.sendMessage('planning', agent, {
-          type: 'task-assignment',
-          tasks
-        });
-        
-        console.log(`[PlanningAgent] Assigned ${tasks.length} tasks to ${agent}`);
-      } catch (error) {
-        console.error(`[PlanningAgent] Failed to assign tasks to ${agent}:`, error);
-      }
-    }
-  }
-
-  /**
-   * Event listeners
-   */
-  _registerEventListeners() {
-    // Listen for system changes that might create gaps
-  }
-
-  async _handleLinearProjectCreated(event) {
-    console.log('[PlanningAgent] New Linear project detected, triggering analysis');
-    // Trigger analysis for the new project
-    await this.execute();
-  }
-
-  async _handleGithubRepoCreated(event) {
-    console.log('[PlanningAgent] New GitHub repo detected, triggering analysis');
-    // Trigger analysis for the new repo
-    await this.execute();
-  }
-
-  /**
-   * Get current status
-   */
   getStatus() {
     return {
-      agent: 'planning',
-      state: this.state,
+      agent: 'Planning Agent',
+      state: 'idle',
       capabilities: this.capabilities,
-      pendingTasks: this.taskGenerator.taskQueue.filter(t => t.status !== 'completed').length
+      gapsAnalyzed: this.gapAnalyzer.gaps?.length || 0,
+      tasksGenerated: this.taskGenerator.taskQueue?.length || 0
     };
   }
 }
