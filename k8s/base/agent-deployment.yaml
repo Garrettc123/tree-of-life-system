@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-alpha
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agent-alpha
+  template:
+    metadata:
+      labels:
+        app: agent-alpha
+    spec:
+      containers:
+      - name: agent
+        image: ghcr.io/garrettc123/nwu-agent:latest
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: openai-api-key
+        - name: RABBITMQ_HOST
+          value: "rabbitmq"
