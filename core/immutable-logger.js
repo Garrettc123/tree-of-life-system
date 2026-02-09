@@ -21,6 +21,13 @@ class ImmutableLogger {
         this.encryptionKey = options.encryptionKey || this.generateKey();
         this.rotateSize = options.rotateSize || 100 * 1024 * 1024; // 100MB default
         
+        // Multi-tenant support
+        this.tenantId = options.tenantId || 'default';
+        this.logDir = path.join(logDir, this.tenantId);
+        this.logFile = path.join(this.logDir, 'immutable.log');
+        this.indexFile = path.join(this.logDir, 'log-index.json');
+        this.hashFile = path.join(this.logDir, 'log-hashes.json');
+        
         // Initialize
         this.initialize();
         
@@ -116,7 +123,8 @@ class ImmutableLogger {
             metadata: metadata,
             source: this.getSource(),
             hostname: require('os').hostname(),
-            pid: process.pid
+            pid: process.pid,
+            tenantId: this.tenantId
         };
     }
     
@@ -244,6 +252,35 @@ class ImmutableLogger {
     }
     
     /**
+     * Advanced query with filters
+     */
+    query(filters) {
+        const logs = this.read({ limit: 10000 });
+        
+        return logs.filter(log => {
+            for (const [key, value] of Object.entries(filters)) {
+                if (key.includes('.')) {
+                    // Nested property (e.g., 'metadata.user')
+                    const parts = key.split('.');
+                    let obj = log;
+                    for (const part of parts) {
+                        obj = obj[part];
+                        if (obj === undefined) return false;
+                    }
+                    if (obj !== value) return false;
+                } else if (typeof value === 'object' && value.$gte) {
+                    // Range query
+                    if (log[key] < value.$gte) return false;
+                } else {
+                    // Direct comparison
+                    if (log[key] !== value) return false;
+                }
+            }
+            return true;
+        });
+    }
+    
+    /**
      * Get statistics
      */
     stats() {
@@ -261,7 +298,8 @@ class ImmutableLogger {
             levels: levels,
             verified: this.verify(),
             oldestEntry: index.entries[0]?.timestamp,
-            newestEntry: index.entries[index.entries.length - 1]?.timestamp
+            newestEntry: index.entries[index.entries.length - 1]?.timestamp,
+            tenantId: this.tenantId
         };
     }
     
@@ -316,23 +354,72 @@ class ImmutableLogger {
     }
     
     /**
-     * Encrypt data
+     * Encrypt data (SECURE - Node 17+ compatible)
      */
     encrypt(data) {
-        const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+        // Generate random IV (initialization vector)
+        const iv = crypto.randomBytes(16);
+        
+        // Ensure key is 32 bytes for AES-256
+        const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+        
+        // Create cipher with IV
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+        
+        // Encrypt data
         let encrypted = cipher.update(data, 'utf8', 'hex');
         encrypted += cipher.final('hex');
-        return encrypted;
+        
+        // Get auth tag for GCM mode
+        const authTag = cipher.getAuthTag();
+        
+        // Return IV + authTag + encrypted data (all hex encoded)
+        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
     }
     
     /**
-     * Decrypt data
+     * Decrypt data (SECURE - Node 17+ compatible)
      */
     decrypt(data) {
-        const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
-        let decrypted = decipher.update(data, 'hex', 'utf8');
+        // Split IV, authTag, and encrypted data
+        const parts = data.split(':');
+        
+        if (parts.length !== 3) {
+            // Backward compatibility: try old method
+            return this.decryptLegacy(data);
+        }
+        
+        const iv = Buffer.from(parts[0], 'hex');
+        const authTag = Buffer.from(parts[1], 'hex');
+        const encrypted = parts[2];
+        
+        // Ensure key is 32 bytes
+        const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+        
+        // Create decipher with IV
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(authTag);
+        
+        // Decrypt data
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
+        
         return decrypted;
+    }
+    
+    /**
+     * Legacy decrypt (backward compatibility)
+     */
+    decryptLegacy(data) {
+        try {
+            const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
+            let decrypted = decipher.update(data, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        } catch (e) {
+            console.error('Legacy decryption failed:', e.message);
+            throw e;
+        }
     }
     
     /**
@@ -400,14 +487,24 @@ module.exports = ImmutableLogger;
 if (require.main === module) {
     const logger = new ImmutableLogger('./logs', {
         enableBlockchain: true,
-        enableEncryption: false
+        enableEncryption: false,
+        tenantId: 'default'
     });
     
     // Test logging
-    logger.info('System started', { version: '1.0.0' });
+    logger.info('System started', { version: '2.0.0' });
     logger.audit('User login', { userId: 'user123', ip: '192.168.1.1' });
     logger.revenue('Payment received', { amount: 1000, currency: 'USD' });
     logger.error('System error', { error: 'Connection timeout' });
+    
+    // Test advanced query
+    console.log('\n' + '='.repeat(80));
+    console.log('🔍 Query results for revenue > 500:');
+    const results = logger.query({
+        level: 'REVENUE',
+        'metadata.amount': { $gte: 500 }
+    });
+    console.log(results);
     
     // Verify integrity
     console.log('\n' + '='.repeat(80));
