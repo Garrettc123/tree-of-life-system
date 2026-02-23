@@ -41,10 +41,13 @@ class GapAnalyzer {
     try {
       const { data: repos } = await this.github.repos.listForUser({ username: owner });
 
-      for (const repo of repos) {
+      // Parallelize API calls instead of sequential loop
+      const repoAnalysisPromises = repos.map(async (repo) => {
+        const repoGaps = [];
+
         // Check for missing README
         if (!repo.has_readme) {
-          gaps.push({
+          repoGaps.push({
             type: 'missing_readme',
             severity: 'medium',
             repo: repo.name,
@@ -53,36 +56,49 @@ class GapAnalyzer {
           });
         }
 
-        // Check for missing LICENSE
-        const { data: contents } = await this.github.repos.getContent({
-          owner,
-          repo: repo.name,
-          path: ''
-        });
-
-        const hasLicense = contents.some(file => file.name.toLowerCase().includes('license'));
-        if (!hasLicense) {
-          gaps.push({
-            type: 'missing_license',
-            severity: 'low',
+        try {
+          // Check for missing LICENSE and CI/CD
+          const { data: contents } = await this.github.repos.getContent({
+            owner,
             repo: repo.name,
-            description: `Repository ${repo.name} is missing LICENSE file`,
-            action: 'create_license'
+            path: ''
           });
+
+          const hasLicense = contents.some(file => file.name.toLowerCase().includes('license'));
+          if (!hasLicense) {
+            repoGaps.push({
+              type: 'missing_license',
+              severity: 'low',
+              repo: repo.name,
+              description: `Repository ${repo.name} is missing LICENSE file`,
+              action: 'create_license'
+            });
+          }
+
+          // Check for missing CI/CD
+          const hasGithubActions = contents.some(file => file.name === '.github');
+          if (!hasGithubActions && !repo.archived) {
+            repoGaps.push({
+              type: 'missing_cicd',
+              severity: 'high',
+              repo: repo.name,
+              description: `Repository ${repo.name} lacks CI/CD automation`,
+              action: 'create_github_actions'
+            });
+          }
+        } catch (error) {
+          // Log individual repo errors but don't fail entire analysis
+          console.error(`[GapAnalyzer] Error analyzing repo ${repo.name}:`, error.message);
         }
 
-        // Check for missing CI/CD
-        const hasGithubActions = contents.some(file => file.name === '.github');
-        if (!hasGithubActions && !repo.archived) {
-          gaps.push({
-            type: 'missing_cicd',
-            severity: 'high',
-            repo: repo.name,
-            description: `Repository ${repo.name} lacks CI/CD automation`,
-            action: 'create_github_actions'
-          });
-        }
-      }
+        return repoGaps;
+      });
+
+      // Wait for all parallel API calls to complete
+      const allRepoGaps = await Promise.all(repoAnalysisPromises);
+
+      // Flatten the array of arrays into a single gaps array
+      gaps.push(...allRepoGaps.flat());
     } catch (error) {
       console.error('[GapAnalyzer] Error analyzing repositories:', error);
     }

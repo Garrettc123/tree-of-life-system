@@ -20,17 +20,67 @@ const uuid = require('uuid');
 class ReWOOExecutor extends EventEmitter {
   constructor(config = {}) {
     super();
-    
+
     this.config = {
       maxIterations: config.maxIterations || 3,
       planningTimeout: config.planningTimeout || 30000,
       executionTimeout: config.executionTimeout || 60000,
       synthesisTimeout: config.synthesisTimeout || 30000,
+      executionTTL: config.executionTTL || 3600000, // 1 hour default TTL
+      maxExecutions: config.maxExecutions || 1000, // Max executions to keep in memory
       ...config,
     };
 
     this.executions = new Map();
     this.agents = new Map();
+
+    // Periodically clean up old executions to prevent memory leak
+    this.cleanupInterval = setInterval(() => this.cleanupOldExecutions(), 300000); // Every 5 minutes
+  }
+
+  /**
+   * Clean up old executions to prevent unbounded memory growth
+   */
+  cleanupOldExecutions() {
+    const now = Date.now();
+    const executions = Array.from(this.executions.entries());
+
+    // Remove executions older than TTL
+    let removedCount = 0;
+    for (const [id, execution] of executions) {
+      const age = now - new Date(execution.timestamp).getTime();
+      if (age > this.config.executionTTL) {
+        this.executions.delete(id);
+        removedCount++;
+      }
+    }
+
+    // If still over limit, remove oldest executions
+    if (this.executions.size > this.config.maxExecutions) {
+      const sortedExecutions = Array.from(this.executions.entries())
+        .sort((a, b) => new Date(a[1].timestamp) - new Date(b[1].timestamp));
+
+      const toRemove = this.executions.size - this.config.maxExecutions;
+      for (let i = 0; i < toRemove; i++) {
+        this.executions.delete(sortedExecutions[i][0]);
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[ReWOOExecutor] Cleaned up ${removedCount} old executions. Current size: ${this.executions.size}`);
+    }
+  }
+
+  /**
+   * Clean up resources on shutdown
+   */
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    this.executions.clear();
+    console.log('[ReWOOExecutor] Resources cleaned up');
   }
 
   registerAgent(agentId, agent) {
