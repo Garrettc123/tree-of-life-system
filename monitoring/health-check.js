@@ -28,16 +28,24 @@ class HealthMonitor {
       lastCheck: null,
       uptime: 100
     };
+
+    // Reuse axios instance with connection pooling for better performance
+    this.axiosInstance = axios.create({
+      timeout: 5000,
+      maxRedirects: 5,
+      // Enable keep-alive for connection reuse
+      httpAgent: new (require('http').Agent)({ keepAlive: true }),
+      httpsAgent: new (require('https').Agent)({ keepAlive: true })
+    });
   }
   
   async checkEndpoint(endpoint) {
     try {
       const start = Date.now();
-      const response = await axios.get(`${this.baseUrl}${endpoint}`, {
-        timeout: 5000
-      });
+      // Use reusable axios instance with connection pooling
+      const response = await this.axiosInstance.get(`${this.baseUrl}${endpoint}`);
       const duration = Date.now() - start;
-      
+
       return {
         endpoint,
         status: 'healthy',
