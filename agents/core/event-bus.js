@@ -106,9 +106,11 @@ class EventBus extends EventEmitter {
   _logEvent(event) {
     this.eventLog.push(event);
 
-    // Trim log if it exceeds max size
+    // Trim log if it exceeds max size (more efficiently)
+    // Instead of slice which copies the entire array, just remove old entries
     if (this.eventLog.length > this.maxLogSize) {
-      this.eventLog = this.eventLog.slice(-this.maxLogSize);
+      const excessCount = this.eventLog.length - this.maxLogSize;
+      this.eventLog.splice(0, excessCount); // Remove old entries from the beginning
     }
   }
 

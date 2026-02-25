@@ -147,35 +147,42 @@ app.get('/api/contributions', async (req, res) => {
   try {
     const { page = 1, limit = 20, status, category } = req.query;
     const offset = (page - 1) * limit;
-    
-    let query = 'SELECT * FROM contributions WHERE 1=1';
+
+    let baseQuery = 'FROM contributions WHERE 1=1';
     const params = [];
     let paramCount = 1;
-    
+
     if (status) {
-      query += ` AND status = $${paramCount}`;
+      baseQuery += ` AND status = $${paramCount}`;
       params.push(status);
       paramCount++;
     }
-    
+
     if (category) {
-      query += ` AND category = $${paramCount}`;
+      baseQuery += ` AND category = $${paramCount}`;
       params.push(category);
       paramCount++;
     }
-    
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+
+    // Use window function to get count and data in single query (eliminates N+1)
+    const query = `
+      SELECT *, COUNT(*) OVER() as total_count
+      ${baseQuery}
+      ORDER BY created_at DESC
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}
+    `;
     params.push(limit, offset);
-    
+
     const result = await pool.query(query, params);
-    
-    // Get total count
-    const countQuery = 'SELECT COUNT(*) FROM contributions';
-    const countResult = await pool.query(countQuery);
-    const total = parseInt(countResult.rows[0].count);
-    
+
+    // Extract total from first row (all rows have same total_count)
+    const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+
+    // Remove total_count from response rows
+    const contributions = result.rows.map(({ total_count, ...row }) => row);
+
     res.json({
-      contributions: result.rows,
+      contributions,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -183,7 +190,7 @@ app.get('/api/contributions', async (req, res) => {
         pages: Math.ceil(total / limit),
       },
     });
-    
+
   } catch (error) {
     console.error('Error listing contributions:', error);
     res.status(500).json({ error: 'Internal server error' });
