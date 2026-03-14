@@ -226,26 +226,22 @@
         </div>
 
         <div class="card">
-            <h2><span class="emoji">🔗</span> Integration Layer</h2>
+            <h2><span class="emoji">🔗</span> Integration Status</h2>
             <div class="metric">
-                <span class="name">GitHub Actions</span>
-                <span class="value">Integrated</span>
+                <span class="name">GitHub API</span>
+                <span class="value" id="githubStatus">Checking...</span>
             </div>
             <div class="metric">
-                <span class="name">GitHub Projects</span>
-                <span class="value">Integrated</span>
+                <span class="name">Linear API</span>
+                <span class="value" id="linearStatus">Checking...</span>
             </div>
             <div class="metric">
-                <span class="name">Security Scanning</span>
-                <span class="value">Integrated</span>
+                <span class="name">Notion API</span>
+                <span class="value" id="notionStatus">Checking...</span>
             </div>
             <div class="metric">
-                <span class="name">Wiki & Docs</span>
-                <span class="value">Integrated</span>
-            </div>
-            <div class="metric">
-                <span class="name">Team Management</span>
-                <span class="value">Integrated</span>
+                <span class="name">Perplexity AI</span>
+                <span class="value" id="perplexityStatus">Checking...</span>
             </div>
         </div>
 
@@ -296,33 +292,44 @@
     </div>
 
     <script>
-        // Simulated backend check - replace with actual API URL when backend is deployed
-        const API_URL = 'YOUR_RAILWAY_API_URL_HERE'; // Update this after deploying backend
-        
+        // Use relative URL so it works both locally and on Railway
+        const API_URL = '';
+
         async function checkBackend() {
             try {
                 const response = await fetch(`${API_URL}/health`);
                 if (response.ok) {
                     document.getElementById('apiStatus').textContent = '✅ Backend Online';
                     document.getElementById('apiStatus').className = 'api-status online';
-                    
-                    // Fetch live data
-                    const data = await response.json();
-                    if (data.intelligence) {
-                        // Update with real data
-                        console.log('Live data:', data);
-                    }
                 }
             } catch (error) {
-                console.log('Backend not connected yet - showing static data');
+                document.getElementById('apiStatus').textContent = '⚡ Backend Offline';
+                document.getElementById('apiStatus').className = 'api-status offline';
             }
         }
-        
-        // Check backend status
+
+        async function checkIntegrations() {
+            const integrations = ['github', 'linear', 'notion', 'perplexity'];
+            try {
+                const response = await fetch(`${API_URL}/api/v1/status`);
+                if (!response.ok) return;
+                const data = await response.json();
+                integrations.forEach(name => {
+                    const info = data.integrations && data.integrations[name];
+                    const el = document.getElementById(`${name}Status`);
+                    if (el && info) {
+                        el.textContent = info.configured ? '🟢 Connected' : '🔴 Not Configured';
+                    }
+                });
+            } catch (e) {
+                console.log('Could not fetch integration status');
+            }
+        }
+
+        // Check backend status on load and every 30 seconds
         checkBackend();
-        
-        // Refresh every 30 seconds
-        setInterval(checkBackend, 30000);
+        checkIntegrations();
+        setInterval(() => { checkBackend(); checkIntegrations(); }, 30000);
     </script>
 </body>
 </html>
