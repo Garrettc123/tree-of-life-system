@@ -3,7 +3,7 @@ builder = "NIXPACKS"
 builder_command = "npm install"
 
 [deploy]
-start_command = "node orchestrator/index.js"
+start_command = "node server.js"
 restart_policy_type = "ON_FAILURE"
 restart_policy_max_retries = 10
 
