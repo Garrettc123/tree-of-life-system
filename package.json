@@ -4,7 +4,7 @@
   "description": "Enterprise autonomous multi-agent orchestration system with Kafka, gRPC, and ReWOO",
   "main": "agents/bootstrap.js",
   "scripts": {
-    "start": "node agents/bootstrap.js",
+    "start": "node server.js",
     "startup": "node agents/startup.js",
     "startup:verbose": "DEBUG=* node agents/startup.js",
     "dev": "nodemon agents/bootstrap.js",
@@ -42,8 +42,10 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.9.14",
     "@grpc/proto-loader": "^0.8.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "events": "^3.3.0",
+    "express": "^5.2.1",
     "kafkajs": "^2.2.4",
     "uuid": "^13.0.0"
   },
