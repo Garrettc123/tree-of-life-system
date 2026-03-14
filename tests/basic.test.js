@@ -51,7 +51,7 @@ describe('Tree of Life System - Basic Tests', function() {
   
   describe('Core Modules', function() {
     it('should be able to require core dependencies', function() {
-      const dependencies = ['express', 'axios', 'dotenv'];
+      const dependencies = ['express', 'dotenv', 'cors'];
       
       dependencies.forEach(dep => {
         try {
