@@ -132,14 +132,9 @@ class ImmutableLogger {
      * Append to log file (atomic, append-only)
      */
     appendToLog(data) {
-        // Change permissions temporarily to append
-        fs.chmodSync(this.logFile, 0o644);
-        
-        // Append data
+        // Append data directly without changing permissions on every write
+        // Note: File permissions should be managed at initialization/rotation only
         fs.appendFileSync(this.logFile, data, { flag: 'a' });
-        
-        // Make read-only again
-        fs.chmodSync(this.logFile, 0o444);
     }
     
     /**

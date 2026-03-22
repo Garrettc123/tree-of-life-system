@@ -13,7 +13,8 @@ class Analytics {
       },
       performance: {
         avgResponseTime: 0,
-        responseTimes: []
+        responseTimes: [],
+        runningSum: 0  // Track running sum to avoid O(n) reduce
       },
       automation: {
         prReviews: 0,
@@ -36,28 +37,32 @@ class Analytics {
   
   trackRequest(endpoint, status, responseTime) {
     this.metrics.requests.total++;
-    
+
     // Track by endpoint
     if (!this.metrics.requests.byEndpoint[endpoint]) {
       this.metrics.requests.byEndpoint[endpoint] = 0;
     }
     this.metrics.requests.byEndpoint[endpoint]++;
-    
+
     // Track by status
     if (!this.metrics.requests.byStatus[status]) {
       this.metrics.requests.byStatus[status] = 0;
     }
     this.metrics.requests.byStatus[status]++;
-    
-    // Track response time
+
+    // Track response time efficiently with running sum
     this.metrics.performance.responseTimes.push(responseTime);
+    this.metrics.performance.runningSum += responseTime;
+
     if (this.metrics.performance.responseTimes.length > 1000) {
-      this.metrics.performance.responseTimes.shift();
+      // Remove oldest entry and subtract from running sum
+      const removed = this.metrics.performance.responseTimes.shift();
+      this.metrics.performance.runningSum -= removed;
     }
-    
-    // Calculate average
-    const sum = this.metrics.performance.responseTimes.reduce((a, b) => a + b, 0);
-    this.metrics.performance.avgResponseTime = sum / this.metrics.performance.responseTimes.length;
+
+    // Calculate average from running sum (O(1) instead of O(n))
+    this.metrics.performance.avgResponseTime =
+      this.metrics.performance.runningSum / this.metrics.performance.responseTimes.length;
   }
   
   trackAutomation(type) {
