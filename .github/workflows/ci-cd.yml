@@ -65,7 +65,7 @@ jobs:
           DATABASE_URL: postgresql://test_user:${{ secrets.POSTGRES_TEST_PASSWORD || 'testpass123' }}@localhost:5432/test_db
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: always()
 
   lint-and-type-check:
