@@ -25,7 +25,6 @@ COPY --from=builder /app/package*.json ./
 
 # Copy application code
 COPY agents ./agents
-COPY proto ./proto
 COPY .env.template ./.env.template
 
 # Create logs directory
