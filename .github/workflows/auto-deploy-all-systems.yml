@@ -20,7 +20,7 @@ jobs:
     name: Deploy Revenue Agent System
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Revenue Agent Health Check
         run: |
           echo "=== REVENUE AGENT SYSTEM ==="
@@ -38,9 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-revenue-agent
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
       - name: Install & Build
@@ -70,9 +70,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-tree-of-life
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Deploy Enterprise Platform
@@ -92,9 +92,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-enterprise-platform
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Deploy Deal Desk AI
@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-ai-saas-trio
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Deploy UARP-NWU Integration
         run: |
           echo "=== UARP-NWU INTEGRATION ==="
@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-uarp-orchestrator
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Autonomous Butler Core
         run: |
           echo "=== AUTONOMOUS BUTLER CORE ==="
@@ -174,7 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-autonomous-systems
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Automated Sales Outreach
         run: |
           echo "=== AUTOMATED SALES OUTREACH ==="
@@ -204,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-revenue-ops
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Write Stripe Config
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: configure-stripe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Create Daily Post Templates
         run: |
           mkdir -p templates/social templates/emails
@@ -261,7 +261,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: social-automation
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Generate Revenue Report
         run: |
           mkdir -p reports
