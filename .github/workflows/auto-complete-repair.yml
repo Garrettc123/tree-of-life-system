@@ -4,7 +4,7 @@ on:
     workflows: ['CI/CD Pipeline']
     types: [completed]
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '30 4 * * *'
   workflow_dispatch:
 jobs:
   repair:

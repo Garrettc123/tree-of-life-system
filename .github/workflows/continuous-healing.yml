@@ -1,7 +1,8 @@
 name: Continuous Healing
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '15 5 * * *'
+  workflow_dispatch:
 jobs:
   heal:
     runs-on: ubuntu-latest

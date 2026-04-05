@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-  schedule:
-    - cron: '0 9 * * *'
 
 env:
   GITHUB_USER: Garrettc123
@@ -209,6 +207,10 @@ jobs:
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: |
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            echo "⚠️ STRIPE_SECRET_KEY not set, skipping"
+            exit 0
+          fi
           echo "=== STRIPE BILLING CONFIGURATION ==="
           cat > stripe-config.json << 'EOF'
           {
