@@ -83,23 +83,28 @@ class MCPCoordinator extends EventEmitter {
   }
 
   /**
-   * Broadcast a message to all agents
+   * Broadcast a message to all agents (parallelized for efficiency)
    */
   async broadcast(fromAgentId, message, context = {}) {
-    const responses = [];
-    
+    // Build array of promises for parallel execution
+    const broadcastPromises = [];
+
     for (const [agentId, agent] of this.agents) {
       if (agentId === fromAgentId) continue; // Don't send to self
-      
-      try {
-        const response = await this.sendMessage(fromAgentId, agentId, message, context);
-        responses.push({ agentId, response });
-      } catch (error) {
-        console.error(`[MCP] Broadcast to ${agentId} failed:`, error);
-        responses.push({ agentId, error: error.message });
-      }
+
+      // Create promise that handles its own errors
+      const promise = this.sendMessage(fromAgentId, agentId, message, context)
+        .then(response => ({ agentId, response }))
+        .catch(error => {
+          console.error(`[MCP] Broadcast to ${agentId} failed:`, error);
+          return { agentId, error: error.message };
+        });
+
+      broadcastPromises.push(promise);
     }
 
+    // Execute all broadcasts in parallel
+    const responses = await Promise.all(broadcastPromises);
     return responses;
   }
 
