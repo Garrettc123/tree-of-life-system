@@ -35,17 +35,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            BRANCH="auto-repair/$(date +%Y%m%d-%H%M%S)"
-            git checkout -b "$BRANCH"
-            git add .
-            git commit -m "fix: auto-repair formatting and lint issues"
-            git push origin "$BRANCH"
-            gh pr create \
-              --title "fix: auto-repair formatting and lint issues" \
-              --body "Automated code repair: formatting and lint fixes applied by CI pipeline." \
-              --base main \
-              --head "$BRANCH" || true
-          else
-            echo "No changes to commit"
-          fi
+          git add -A
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          BRANCH="auto-repair/$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          git commit -m "fix: auto-repair formatting and lint issues"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "fix: auto-repair formatting and lint issues" \
+            --body "Automated code repair: formatting and lint fixes applied by CI pipeline." \
+            --base main \
+            --head "$BRANCH" || true
