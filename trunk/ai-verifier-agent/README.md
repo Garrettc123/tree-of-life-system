@@ -39,7 +39,7 @@ ETHEREUM_RPC_URL=https://polygon-mumbai.g.alchemy.com/v2/YOUR_API_KEY
 PROTOCOL_CONTRACT_ADDRESS=0x...
 VERIFIER_PRIVATE_KEY=0x...
 
-# AI Configuration  
+# AI Configuration
 ANTHROPIC_API_KEY=sk-ant-...
 MODEL_NAME=claude-3-5-sonnet-20241022
 
@@ -96,6 +96,7 @@ ai-verifier-agent/
 ## 🔧 Configuration Options
 
 ### Blockchain Settings
+
 - `ETHEREUM_RPC_URL`: RPC endpoint for blockchain interaction
 - `PROTOCOL_CONTRACT_ADDRESS`: Address of NWU Protocol contract
 - `VERIFIER_PRIVATE_KEY`: Private key for signing transactions
@@ -103,12 +104,14 @@ ai-verifier-agent/
 - `MAX_GAS_PRICE_GWEI`: Maximum gas price in Gwei
 
 ### AI Settings
+
 - `ANTHROPIC_API_KEY`: Claude API key
 - `MODEL_NAME`: Claude model version
 - `MAX_TOKENS`: Maximum response tokens
 - `TEMPERATURE`: AI temperature (0.0-1.0)
 
 ### Agent Behavior
+
 - `MIN_VERIFICATION_INTERVAL`: Seconds between verifications
 - `MAX_CONCURRENT_VERIFICATIONS`: Parallel verification limit
 - `QUALITY_THRESHOLD`: Minimum quality score to approve
@@ -117,6 +120,7 @@ ai-verifier-agent/
 ## 📊 Verification Categories
 
 ### Text Contributions
+
 - Factual accuracy
 - Grammar and coherence
 - Completeness
@@ -124,6 +128,7 @@ ai-verifier-agent/
 - Source credibility
 
 ### Code Contributions
+
 - Syntax correctness
 - Security vulnerabilities
 - Best practices
@@ -131,12 +136,14 @@ ai-verifier-agent/
 - Test coverage
 
 ### Image Contributions
+
 - Content appropriateness
 - Quality assessment
 - Metadata verification
 - Copyright compliance
 
 ### Structured Data
+
 - Schema validation
 - Data integrity
 - Completeness
@@ -208,6 +215,7 @@ pytest tests/test_agent.py -v
 ### Common Issues
 
 **Agent won't start**
+
 ```bash
 # Check configuration
 python -c "from src.config import settings; print(settings.dict())"
@@ -217,11 +225,13 @@ python -c "from web3 import Web3; print(Web3(Web3.HTTPProvider('YOUR_RPC')).is_c
 ```
 
 **Low verification rate**
+
 - Increase `MAX_CONCURRENT_VERIFICATIONS`
 - Check IPFS gateway performance
 - Verify RPC endpoint rate limits
 
 **Transaction failures**
+
 - Ensure sufficient gas budget
 - Check wallet balance
 - Verify contract ABI matches deployment
@@ -274,6 +284,7 @@ MIT License - see LICENSE file for details
 ## 💡 Support
 
 For issues and questions:
+
 - GitHub Issues: [tree-of-life-system/issues](https://github.com/Garrettc123/tree-of-life-system/issues)
 - Discord: [NWU Protocol Community](https://discord.gg/nwuprotocol)
 - Email: support@nwu.ai
