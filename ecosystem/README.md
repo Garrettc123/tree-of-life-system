@@ -5,12 +5,12 @@ The Ecosystem layer manages integrations with external platforms, protocols, and
 ## Integration Categories
 
 ### 1. Blockchain Network Integrations
+
 - **L1 Chains**:
   - Ethereum (mainnet)
   - Polygon PoS
   - Avalanche C-Chain
   - BNB Chain
-  
 - **L2 Solutions**:
   - Arbitrum One
   - Optimism
@@ -24,6 +24,7 @@ The Ecosystem layer manages integrations with external platforms, protocols, and
   - Gas fee management
 
 ### 2. DeFi Protocol Connections
+
 - **DEX Integrations**:
   - Uniswap V3
   - SushiSwap
@@ -40,6 +41,7 @@ The Ecosystem layer manages integrations with external platforms, protocols, and
   - Beefy Finance
 
 ### 3. Enterprise Client APIs
+
 - REST API for enterprise data contributions
 - SDK libraries (JavaScript, Python, Java)
 - Webhook notifications
@@ -47,6 +49,7 @@ The Ecosystem layer manages integrations with external platforms, protocols, and
 - White-label solutions
 
 ### 4. Research Institution Partnerships
+
 - Academic data sharing protocols
 - Research collaboration APIs
 - Data licensing agreements
@@ -91,4 +94,5 @@ pip install nwu-protocol
 ```
 
 ## Documentation
+
 Full integration guides available at `/ecosystem/docs/`
