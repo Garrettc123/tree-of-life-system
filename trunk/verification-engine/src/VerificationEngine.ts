@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events';
-import { ethers } from 'ethers';
+import { EventEmitter } from "events";
+import { ethers } from "ethers";
 
 interface VerificationRequest {
   contributionId: string;
@@ -41,7 +41,7 @@ export class VerificationEngine extends EventEmitter {
     provider: ethers.providers.Provider,
     protocolAddress: string,
     protocolABI: any[],
-    minVerifications: number = 3
+    minVerifications: number = 3,
   ) {
     super();
     this.verificationQueue = new Map();
@@ -52,7 +52,7 @@ export class VerificationEngine extends EventEmitter {
     this.protocolContract = new ethers.Contract(
       protocolAddress,
       protocolABI,
-      provider
+      provider,
     );
 
     this.initializeEventListeners();
@@ -63,18 +63,15 @@ export class VerificationEngine extends EventEmitter {
    */
   private initializeEventListeners(): void {
     this.protocolContract.on(
-      'ContributionSubmitted',
+      "ContributionSubmitted",
       (contributionId, contributor, category) => {
         this.addToVerificationQueue(contributionId, category);
-      }
+      },
     );
 
-    this.protocolContract.on(
-      'VerifierRegistered',
-      (verifierAddress) => {
-        this.onVerifierRegistered(verifierAddress);
-      }
-    );
+    this.protocolContract.on("VerifierRegistered", (verifierAddress) => {
+      this.onVerifierRegistered(verifierAddress);
+    });
   }
 
   /**
@@ -82,10 +79,11 @@ export class VerificationEngine extends EventEmitter {
    */
   async addToVerificationQueue(
     contributionId: string,
-    category: string
+    category: string,
   ): Promise<void> {
     try {
-      const onChainData = await this.protocolContract.getContribution(contributionId);
+      const onChainData =
+        await this.protocolContract.getContribution(contributionId);
 
       const request: VerificationRequest = {
         contributionId,
@@ -96,12 +94,12 @@ export class VerificationEngine extends EventEmitter {
       };
 
       this.verificationQueue.set(contributionId, request);
-      this.emit('verificationQueued', request);
+      this.emit("verificationQueued", request);
 
       // Assign to available verifiers
       await this.assignVerifiers(request);
     } catch (error) {
-      this.emit('error', { type: 'queueing', error });
+      this.emit("error", { type: "queueing", error });
     }
   }
 
@@ -132,7 +130,7 @@ export class VerificationEngine extends EventEmitter {
       .slice(0, this.minVerifications);
 
     for (const verifier of selectedVerifiers) {
-      this.emit('verificationAssigned', {
+      this.emit("verificationAssigned", {
         contributionId: request.contributionId,
         verifier: verifier.address,
       });
@@ -147,7 +145,7 @@ export class VerificationEngine extends EventEmitter {
       (v) =>
         v.active &&
         (v.specializations.includes(category) ||
-          v.specializations.includes('all'))
+          v.specializations.includes("all")),
     );
   }
 
@@ -158,12 +156,12 @@ export class VerificationEngine extends EventEmitter {
     contributionId: string,
     qualityScore: number,
     signer: ethers.Signer,
-    notes?: string
+    notes?: string,
   ): Promise<void> {
     try {
       // Validate quality score
       if (qualityScore < 0 || qualityScore > 100) {
-        throw new Error('Quality score must be between 0 and 100');
+        throw new Error("Quality score must be between 0 and 100");
       }
 
       const verifierAddress = await signer.getAddress();
@@ -171,12 +169,15 @@ export class VerificationEngine extends EventEmitter {
       // Check if verifier is registered
       const verifier = this.verifiers.get(verifierAddress);
       if (!verifier || !verifier.active) {
-        throw new Error('Verifier not registered or inactive');
+        throw new Error("Verifier not registered or inactive");
       }
 
       // Submit to blockchain
       const contract = this.protocolContract.connect(signer);
-      const tx = await contract.verifyContribution(contributionId, qualityScore);
+      const tx = await contract.verifyContribution(
+        contributionId,
+        qualityScore,
+      );
       await tx.wait();
 
       // Record verification result
@@ -190,12 +191,12 @@ export class VerificationEngine extends EventEmitter {
       };
 
       this.addVerificationResult(contributionId, result);
-      this.emit('verificationSubmitted', result);
+      this.emit("verificationSubmitted", result);
 
       // Check if contribution is fully verified
       await this.checkVerificationCompletion(contributionId);
     } catch (error) {
-      this.emit('error', { type: 'verification', error });
+      this.emit("error", { type: "verification", error });
       throw error;
     }
   }
@@ -212,7 +213,7 @@ export class VerificationEngine extends EventEmitter {
    */
   private addVerificationResult(
     contributionId: string,
-    result: VerificationResult
+    result: VerificationResult,
   ): void {
     if (!this.verificationResults.has(contributionId)) {
       this.verificationResults.set(contributionId, []);
@@ -223,7 +224,9 @@ export class VerificationEngine extends EventEmitter {
   /**
    * Check if contribution has received enough verifications
    */
-  private async checkVerificationCompletion(contributionId: string): Promise<void> {
+  private async checkVerificationCompletion(
+    contributionId: string,
+  ): Promise<void> {
     const results = this.verificationResults.get(contributionId);
     if (!results || results.length < this.minVerifications) {
       return;
@@ -233,8 +236,10 @@ export class VerificationEngine extends EventEmitter {
     const avgScore =
       results.reduce((sum, r) => sum + r.qualityScore, 0) / results.length;
     const variance =
-      results.reduce((sum, r) => sum + Math.pow(r.qualityScore - avgScore, 2), 0) /
-      results.length;
+      results.reduce(
+        (sum, r) => sum + Math.pow(r.qualityScore - avgScore, 2),
+        0,
+      ) / results.length;
     const standardDeviation = Math.sqrt(variance);
 
     const consensus = {
@@ -248,7 +253,7 @@ export class VerificationEngine extends EventEmitter {
     // Remove from queue
     this.verificationQueue.delete(contributionId);
 
-    this.emit('verificationCompleted', consensus);
+    this.emit("verificationCompleted", consensus);
   }
 
   /**
@@ -256,7 +261,7 @@ export class VerificationEngine extends EventEmitter {
    */
   async registerVerifier(
     address: string,
-    specializations: string[]
+    specializations: string[],
   ): Promise<void> {
     const verifier: Verifier = {
       address,
@@ -266,7 +271,7 @@ export class VerificationEngine extends EventEmitter {
     };
 
     this.verifiers.set(address, verifier);
-    this.emit('verifierAdded', verifier);
+    this.emit("verifierAdded", verifier);
   }
 
   /**
@@ -274,19 +279,20 @@ export class VerificationEngine extends EventEmitter {
    */
   private async onVerifierRegistered(verifierAddress: string): Promise<void> {
     try {
-      const onChainData = await this.protocolContract.verifiers(verifierAddress);
-      
+      const onChainData =
+        await this.protocolContract.verifiers(verifierAddress);
+
       const verifier: Verifier = {
         address: verifierAddress,
         reputation: onChainData.reputation.toNumber(),
-        specializations: ['all'], // Default to all categories
+        specializations: ["all"], // Default to all categories
         active: onChainData.active,
       };
 
       this.verifiers.set(verifierAddress, verifier);
-      this.emit('verifierRegistered', verifier);
+      this.emit("verifierRegistered", verifier);
     } catch (error) {
-      this.emit('error', { type: 'verifier_registration', error });
+      this.emit("error", { type: "verifier_registration", error });
     }
   }
 
@@ -300,7 +306,8 @@ export class VerificationEngine extends EventEmitter {
   } {
     return {
       inQueue: this.verificationQueue.has(contributionId),
-      verificationCount: this.verificationResults.get(contributionId)?.length || 0,
+      verificationCount:
+        this.verificationResults.get(contributionId)?.length || 0,
       results: this.verificationResults.get(contributionId) || [],
     };
   }
@@ -315,7 +322,7 @@ export class VerificationEngine extends EventEmitter {
   } {
     const now = Date.now();
     const waitTimes = Array.from(this.verificationQueue.values()).map(
-      (req) => now - req.requestedAt
+      (req) => now - req.requestedAt,
     );
 
     return {
@@ -324,8 +331,9 @@ export class VerificationEngine extends EventEmitter {
         waitTimes.length > 0
           ? waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length
           : 0,
-      activeVerifiers: Array.from(this.verifiers.values()).filter((v) => v.active)
-        .length,
+      activeVerifiers: Array.from(this.verifiers.values()).filter(
+        (v) => v.active,
+      ).length,
     };
   }
 }
