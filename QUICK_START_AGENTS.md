@@ -38,6 +38,7 @@ npm install
 ```
 
 If you see dependency conflicts, use:
+
 ```bash
 npm install --legacy-peer-deps
 ```
@@ -53,6 +54,7 @@ nano .env  # or use any text editor
 ```
 
 Required variables:
+
 ```env
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 GITHUB_OWNER=Garrettc123
@@ -63,6 +65,7 @@ LINEAR_TEAM_ID=0a42fa2d-5df2-45f5-a1c2-1dd78749fe93
 ## Step 5: Run the System
 
 ### Option A: Full System (Manual Mode)
+
 ```bash
 node index.js
 ```
@@ -70,6 +73,7 @@ node index.js
 This starts the agent system in manual mode. You can then trigger agents programmatically.
 
 ### Option B: Auto-Execute Planning Agent
+
 ```bash
 # Set auto-execute in .env
 AGENT_AUTO_EXECUTE=true
@@ -79,6 +83,7 @@ node index.js
 ```
 
 ### Option C: Run Specific Agent
+
 ```bash
 # Run Planning Agent directly
 npm run agent:planning
@@ -144,27 +149,35 @@ Event Bus: 15 events, 3 subscribers
 ## Troubleshooting
 
 ### "agents: No such file or directory"
+
 **Solution**: You're on the wrong branch. Run:
+
 ```bash
 git checkout feature/autonomous-agents
 cd agents
 ```
 
 ### "GITHUB_TOKEN not configured"
+
 **Solution**: Create .env file with your API keys:
+
 ```bash
 cp .env.example .env
 # Edit .env and add your tokens
 ```
 
 ### Dependency conflicts
+
 **Solution**: Use legacy peer deps:
+
 ```bash
 npm install --legacy-peer-deps
 ```
 
 ### "Module not found"
+
 **Solution**: Make sure you're in the agents directory:
+
 ```bash
 cd agents
 npm install
@@ -181,17 +194,20 @@ npm install
 ## Getting API Keys
 
 ### GitHub Token
+
 1. Go to https://github.com/settings/tokens
 2. Click "Generate new token (classic)"
 3. Select scopes: `repo`, `workflow`, `admin:org`
 4. Copy token to .env
 
 ### Linear API Key
+
 1. Go to https://linear.app/settings/api
 2. Create new API key
 3. Copy to .env
 
 ### Linear Team ID
+
 ```bash
 # Already configured for you:
 LINEAR_TEAM_ID=0a42fa2d-5df2-45f5-a1c2-1dd78749fe93
