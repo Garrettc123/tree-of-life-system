@@ -11,6 +11,7 @@ The **Immutable System** is a tamper-proof, append-only logging and data persist
 **Purpose**: Cryptographically-verified, append-only logging system
 
 **Features**:
+
 - SHA-256 hash chain verification
 - Blockchain-based integrity proof
 - Atomic append-only operations
@@ -26,11 +27,12 @@ The **Immutable System** is a tamper-proof, append-only logging and data persist
 **Purpose**: Cryptographic proof chain for all logged events
 
 **Mechanism**:
+
 ```
 Block Structure:
 {
   index: Sequential block number
-  timestamp: ISO 8601 UTC timestamp  
+  timestamp: ISO 8601 UTC timestamp
   data: JSON-serialized log entry
   hash: SHA-256(data)
   previousHash: hash of previous block
@@ -38,6 +40,7 @@ Block Structure:
 ```
 
 **Verification Algorithm**:
+
 1. Compute hash of current block data
 2. Verify hash matches stored hash
 3. Verify previousHash links to prior block
@@ -48,6 +51,7 @@ Block Structure:
 **Purpose**: Immutable record of all system operations
 
 **Tracked Events**:
+
 - User authentication and authorization
 - API requests and responses
 - Database transactions
@@ -60,12 +64,14 @@ Block Structure:
 ### 4. Data Integrity Guarantees
 
 **File System Protection**:
+
 - Log files set to read-only (chmod 444)
 - Atomic write operations
 - Copy-on-write for rotations
 - Cryptographic hash verification
 
 **Tamper Detection**:
+
 - Real-time hash chain validation
 - Blockchain integrity checks
 - Periodic verification jobs
@@ -104,6 +110,7 @@ Block Structure:
 ## Integration Points
 
 ### GitHub Integration
+
 ```python
 logger.audit('GitHub commit created', {
     'repo': 'tree-of-life-system',
@@ -114,6 +121,7 @@ logger.audit('GitHub commit created', {
 ```
 
 ### Linear Integration
+
 ```python
 logger.audit('Linear issue created', {
     'issueId': 'ISS-123',
@@ -124,6 +132,7 @@ logger.audit('Linear issue created', {
 ```
 
 ### Notion Integration
+
 ```python
 logger.audit('Notion page updated', {
     'pageId': 'page-uuid',
@@ -133,6 +142,7 @@ logger.audit('Notion page updated', {
 ```
 
 ### Revenue Tracking
+
 ```python
 logger.revenue('Subscription payment received', {
     'customerId': 'cust_123',
@@ -144,6 +154,7 @@ logger.revenue('Subscription payment received', {
 ```
 
 ### Security Events
+
 ```python
 logger.security('Failed login attempt', {
     'username': 'admin',
@@ -310,16 +321,19 @@ assert logger.verify() == True  # Tamper-proof
 ## Performance Characteristics
 
 ### Write Performance
+
 - **Throughput**: ~10,000 writes/second (Python)
 - **Latency**: <1ms per write (excluding disk I/O)
 - **Blockchain overhead**: ~0.5ms per block validation
 
 ### Read Performance
+
 - **Index lookup**: O(1) for recent entries
 - **Full scan**: O(n) with configurable limits
 - **Search**: O(n) full-text search with caching
 
 ### Storage
+
 - **Raw logs**: ~200 bytes per entry average
 - **Blockchain**: +100 bytes per entry overhead
 - **Compression**: ~70% size reduction on rotation
@@ -327,21 +341,25 @@ assert logger.verify() == True  # Tamper-proof
 ## Security Guarantees
 
 ### 1. Append-Only
+
 - File system permissions prevent deletion
 - All writes are atomic appends
 - No in-place modifications possible
 
 ### 2. Tamper Detection
+
 - SHA-256 hash chain detects any modification
 - Blockchain verification catches missing/altered blocks
 - Verification runs in O(n) time
 
 ### 3. Non-Repudiation
+
 - Cryptographic proof of log entry origin
 - Timestamp verification prevents backdating
 - Metadata includes hostname, PID for traceability
 
 ### 4. Availability
+
 - Logs persist across system failures
 - Automatic rotation prevents disk exhaustion
 - Compressed archives for long-term retention
@@ -417,16 +435,19 @@ log_write_duration_seconds = Histogram('immutable_log_write_duration_seconds', '
 ## Compliance Mappings
 
 ### SOC 2 Type II
+
 - **CC6.1**: Audit logging requirements → `logger.audit()`
 - **CC6.6**: Change management tracking → `logger.system()`
 - **CC7.2**: Security incident response → `logger.security()`
 
 ### GDPR
+
 - **Article 5(1)(f)**: Integrity and confidentiality → Blockchain verification
 - **Article 30**: Processing records → Audit trail
 - **Article 32**: Security measures → Tamper-proof logs
 
 ### PCI DSS
+
 - **Requirement 10**: Audit logging → All logger methods
 - **10.2**: Automated audit trails → Immutable blockchain
 - **10.3**: Log retention → Compressed archives
@@ -434,6 +455,7 @@ log_write_duration_seconds = Histogram('immutable_log_write_duration_seconds', '
 ## Roadmap
 
 ### Phase 1: Core (Complete ✅)
+
 - [x] Append-only logger
 - [x] SHA-256 hash chain
 - [x] Blockchain verification
@@ -441,6 +463,7 @@ log_write_duration_seconds = Histogram('immutable_log_write_duration_seconds', '
 - [x] Search & filtering
 
 ### Phase 2: Advanced (In Progress)
+
 - [ ] End-to-end encryption
 - [ ] Distributed blockchain replication
 - [ ] Real-time streaming interface
@@ -448,6 +471,7 @@ log_write_duration_seconds = Histogram('immutable_log_write_duration_seconds', '
 - [ ] Machine learning anomaly detection
 
 ### Phase 3: Enterprise (Planned)
+
 - [ ] Multi-tenant isolation
 - [ ] Compliance dashboard
 - [ ] Automated audit report generation
@@ -464,6 +488,7 @@ log_write_duration_seconds = Histogram('immutable_log_write_duration_seconds', '
 ## Support
 
 For questions or issues:
+
 - GitHub Issues: https://github.com/Garrettc123/tree-of-life-system/issues
 - Documentation: https://github.com/Garrettc123/tree-of-life-system/docs
 
