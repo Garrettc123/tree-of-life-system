@@ -7,18 +7,18 @@
 1. **Create Accounts** (if you don't have them):
    - Railway: https://railway.app (Sign in with GitHub)
    - Supabase: https://supabase.com (Sign in with GitHub)
-   
 2. **Get Your Tokens**:
+
    ```bash
    # Railway Token
    # 1. Go to railway.app/account/tokens
    # 2. Create new token
    # 3. Copy it
    export RAILWAY_TOKEN="your_token_here"
-   
+
    # GitHub Token (already have this)
    export GITHUB_TOKEN="your_github_token"
-   
+
    # Supabase Org ID
    # 1. Go to supabase.com/dashboard/organizations
    # 2. Copy organization ID from URL
@@ -49,6 +49,7 @@ export SUPABASE_ORG_ID="your_supabase_org_id"
 ```
 
 **What it does automatically:**
+
 1. ✅ Installs required CLIs (Railway, Supabase)
 2. ✅ Deploys backend to Railway
 3. ✅ Creates and configures Supabase database
@@ -71,6 +72,7 @@ export SUPABASE_ORG_ID="your_supabase_org_id"
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/Garrettc123/tree-of-life-system)
 
 **Then:**
+
 1. Login with GitHub
 2. Click "Deploy Now"
 3. Set environment variables:
@@ -86,6 +88,7 @@ export SUPABASE_ORG_ID="your_supabase_org_id"
 [![Deploy on Supabase](https://supabase.com/images/deploy-button.svg)](https://supabase.com/dashboard/new)
 
 **Then:**
+
 1. Login with GitHub
 2. Create project: "TITAN-DB"
 3. Copy connection string
@@ -119,6 +122,7 @@ git push
    - Click "Create codespace on main"
 
 2. **Run deployment**:
+
    ```bash
    # In the Codespace terminal
    chmod +x scripts/deploy.sh
@@ -145,6 +149,7 @@ git push
      - `SUPABASE_KEY`
 
 2. **Push any commit**:
+
    ```bash
    git commit --allow-empty -m "Deploy TITAN"
    git push
@@ -190,6 +195,7 @@ Should show: "✅ Backend Online" with all systems active!
 ## 💰 Cost Breakdown
 
 **Free Tier Usage:**
+
 - Railway: $5 credit/month (covers 500 hours)
 - Supabase: 500MB database free
 - Vercel: Unlimited deploys free
@@ -198,6 +204,7 @@ Should show: "✅ Backend Online" with all systems active!
 **Total Cost: $0 for first 3 months** 🎉
 
 **After free tier:**
+
 - Railway: ~$5/month
 - Supabase: ~$0-10/month (based on usage)
 - **Total: ~$5-15/month for entire TITAN system**
@@ -207,16 +214,19 @@ Should show: "✅ Backend Online" with all systems active!
 ## 🔧 Troubleshooting
 
 ### "Railway command not found"
+
 ```bash
 npm install -g @railway/cli
 ```
 
 ### "Permission denied: deploy.sh"
+
 ```bash
 chmod +x scripts/deploy.sh
 ```
 
 ### "Backend shows offline on dashboard"
+
 ```bash
 # Wait 2-3 minutes for Railway to finish deploying
 # Then check logs:
@@ -224,6 +234,7 @@ railway logs
 ```
 
 ### "Database connection failed"
+
 ```bash
 # Verify DATABASE_URL is set in Railway:
 railway variables
@@ -244,7 +255,7 @@ When deployment is complete, you'll have:
 ✅ **Automation**: PR/Issue management active  
 ✅ **Integrations**: GitHub webhooks configured  
 ✅ **Monitoring**: Real-time dashboard  
-✅ **Revenue**: Systems ready for monetization  
+✅ **Revenue**: Systems ready for monetization
 
 **All 22 TITAN systems deployed and operational!** 🚀
 
