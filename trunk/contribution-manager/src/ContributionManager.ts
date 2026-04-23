@@ -1,5 +1,5 @@
-import { EventEmitter } from 'events';
-import { ethers } from 'ethers';
+import { EventEmitter } from "events";
+import { ethers } from "ethers";
 
 interface Contribution {
   id: string;
@@ -7,7 +7,7 @@ interface Contribution {
   dataHash: string;
   category: string;
   timestamp: number;
-  verificationStatus: 'pending' | 'in-progress' | 'verified' | 'rejected';
+  verificationStatus: "pending" | "in-progress" | "verified" | "rejected";
   qualityScore?: number;
   metadata: Record<string, any>;
 }
@@ -33,7 +33,7 @@ export class ContributionManager extends EventEmitter {
   constructor(
     provider: ethers.providers.Provider,
     protocolAddress: string,
-    protocolABI: any[]
+    protocolABI: any[],
   ) {
     super();
     this.contributions = new Map();
@@ -43,7 +43,7 @@ export class ContributionManager extends EventEmitter {
     this.protocolContract = new ethers.Contract(
       protocolAddress,
       protocolABI,
-      provider
+      provider,
     );
 
     this.initializeEventListeners();
@@ -54,17 +54,27 @@ export class ContributionManager extends EventEmitter {
    */
   private initializeEventListeners(): void {
     this.protocolContract.on(
-      'ContributionSubmitted',
+      "ContributionSubmitted",
       (contributionId, contributor, category, event) => {
-        this.handleContributionSubmitted(contributionId, contributor, category, event);
-      }
+        this.handleContributionSubmitted(
+          contributionId,
+          contributor,
+          category,
+          event,
+        );
+      },
     );
 
     this.protocolContract.on(
-      'ContributionVerified',
+      "ContributionVerified",
       (contributionId, verifier, qualityScore, event) => {
-        this.handleContributionVerified(contributionId, verifier, qualityScore, event);
-      }
+        this.handleContributionVerified(
+          contributionId,
+          verifier,
+          qualityScore,
+          event,
+        );
+      },
     );
   }
 
@@ -73,7 +83,7 @@ export class ContributionManager extends EventEmitter {
    */
   async submitContribution(
     submission: ContributionSubmission,
-    signer: ethers.Signer
+    signer: ethers.Signer,
   ): Promise<string> {
     try {
       // Validate submission
@@ -83,12 +93,12 @@ export class ContributionManager extends EventEmitter {
       const contract = this.protocolContract.connect(signer);
       const tx = await contract.submitContribution(
         submission.dataHash,
-        submission.category
+        submission.category,
       );
 
       const receipt = await tx.wait();
       const event = receipt.events?.find(
-        (e: any) => e.event === 'ContributionSubmitted'
+        (e: any) => e.event === "ContributionSubmitted",
       );
 
       const contributionId = event?.args?.contributionId.toString();
@@ -100,16 +110,16 @@ export class ContributionManager extends EventEmitter {
         dataHash: submission.dataHash,
         category: submission.category,
         timestamp: Date.now(),
-        verificationStatus: 'pending',
+        verificationStatus: "pending",
         metadata: submission.metadata,
       };
 
       this.indexContribution(contribution);
-      this.emit('contributionSubmitted', contribution);
+      this.emit("contributionSubmitted", contribution);
 
       return contributionId;
     } catch (error) {
-      this.emit('error', { type: 'submission', error });
+      this.emit("error", { type: "submission", error });
       throw error;
     }
   }
@@ -119,23 +129,25 @@ export class ContributionManager extends EventEmitter {
    */
   private validateSubmission(submission: ContributionSubmission): void {
     if (!submission.dataHash || submission.dataHash.length < 32) {
-      throw new Error('Invalid data hash');
+      throw new Error("Invalid data hash");
     }
 
     if (!submission.category || submission.category.trim().length === 0) {
-      throw new Error('Invalid category');
+      throw new Error("Invalid category");
     }
 
     const validCategories = [
-      'research',
-      'medical',
-      'financial',
-      'environmental',
-      'custom',
+      "research",
+      "medical",
+      "financial",
+      "environmental",
+      "custom",
     ];
 
     if (!validCategories.includes(submission.category.toLowerCase())) {
-      throw new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
+      throw new Error(
+        `Invalid category. Must be one of: ${validCategories.join(", ")}`,
+      );
     }
   }
 
@@ -176,7 +188,7 @@ export class ContributionManager extends EventEmitter {
         dataHash: onChainData.dataHash,
         category: onChainData.category,
         timestamp: onChainData.timestamp.toNumber() * 1000,
-        verificationStatus: onChainData.verified ? 'verified' : 'pending',
+        verificationStatus: onChainData.verified ? "verified" : "pending",
         qualityScore: onChainData.qualityScore.toNumber(),
         metadata: {},
       };
@@ -217,7 +229,9 @@ export class ContributionManager extends EventEmitter {
    */
   getPendingContributions(): Contribution[] {
     return Array.from(this.contributions.values()).filter(
-      (c) => c.verificationStatus === 'pending' || c.verificationStatus === 'in-progress'
+      (c) =>
+        c.verificationStatus === "pending" ||
+        c.verificationStatus === "in-progress",
     );
   }
 
@@ -228,20 +242,20 @@ export class ContributionManager extends EventEmitter {
     contributionId: any,
     contributor: string,
     category: string,
-    event: any
+    event: any,
   ): void {
     const contribution: Contribution = {
       id: contributionId.toString(),
       contributor,
       category,
-      dataHash: '',
+      dataHash: "",
       timestamp: Date.now(),
-      verificationStatus: 'pending',
+      verificationStatus: "pending",
       metadata: {},
     };
 
     this.indexContribution(contribution);
-    this.emit('contributionIndexed', contribution);
+    this.emit("contributionIndexed", contribution);
   }
 
   /**
@@ -251,15 +265,15 @@ export class ContributionManager extends EventEmitter {
     contributionId: any,
     verifier: string,
     qualityScore: any,
-    event: any
+    event: any,
   ): void {
     const id = contributionId.toString();
     const contribution = this.contributions.get(id);
 
     if (contribution) {
-      contribution.verificationStatus = 'in-progress';
+      contribution.verificationStatus = "in-progress";
       contribution.qualityScore = qualityScore.toNumber();
-      this.emit('contributionVerified', { contribution, verifier });
+      this.emit("contributionVerified", { contribution, verifier });
     }
   }
 
