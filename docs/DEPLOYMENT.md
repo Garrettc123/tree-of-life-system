@@ -3,6 +3,7 @@
 ## 🚀 Quick Deploy to Railway
 
 ### Step 1: Prepare Repository
+
 ```bash
 git clone https://github.com/Garrettc123/tree-of-life-system.git
 cd tree-of-life-system
@@ -58,6 +59,7 @@ RAILWAY_URL=https://your-app.railway.app node scripts/setup-webhooks.js
 ## 🔧 Environment Variables
 
 ### Required
+
 ```bash
 GITHUB_TOKEN=ghp_xxx          # GitHub personal access token
 GITHUB_USERNAME=Garrettc123   # Your GitHub username
@@ -65,6 +67,7 @@ OPENAI_API_KEY=sk-proj-xxx    # OpenAI API key for AI features
 ```
 
 ### Recommended
+
 ```bash
 LINEAR_API_KEY=lin_api_xxx    # Linear integration
 NOTION_API_KEY=secret_xxx     # Notion integration
@@ -72,6 +75,7 @@ GITHUB_WEBHOOK_SECRET=xxx     # Webhook security
 ```
 
 ### Optional (Revenue)
+
 ```bash
 STRIPE_SECRET_KEY=sk_live_xxx # For subscription billing
 STRIPE_PUBLISHABLE_KEY=pk_xxx # For checkout
@@ -82,21 +86,26 @@ STRIPE_PUBLISHABLE_KEY=pk_xxx # For checkout
 ## ⚙️ Railway Configuration
 
 ### Auto-Deploy
+
 Railway automatically deploys when you push to `main` branch.
 
 ### Custom Domain
+
 1. Go to project settings
 2. Click "Add Domain"
 3. Enter your domain
 4. Update DNS records
 
 ### Scaling
+
 Railway auto-scales based on traffic:
+
 - **Memory**: Up to 8GB
 - **CPU**: Up to 8 vCPUs
 - **Replicas**: Auto-scaling
 
 ### Monitoring
+
 - View logs: `railway logs`
 - View metrics: Railway dashboard
 - Health checks: `/health` endpoint
@@ -106,6 +115,7 @@ Railway auto-scales based on traffic:
 ## 🛡️ Security
 
 ### Webhook Security
+
 ```bash
 # Generate secure webhook secret
 openssl rand -hex 32
@@ -115,11 +125,13 @@ GITHUB_WEBHOOK_SECRET=your_generated_secret
 ```
 
 ### API Keys
+
 - Store all keys in Railway variables
 - Never commit keys to repository
 - Rotate keys regularly
 
 ### HTTPS
+
 - Railway provides SSL automatically
 - All traffic encrypted
 
@@ -128,6 +140,7 @@ GITHUB_WEBHOOK_SECRET=your_generated_secret
 ## 📊 Monitoring
 
 ### Built-in Health Checks
+
 ```bash
 # Check all systems
 curl https://your-app.railway.app/health
@@ -140,12 +153,14 @@ curl https://your-app.railway.app/dashboard
 ```
 
 ### Continuous Monitoring
+
 ```bash
 # Run health monitor
 node monitoring/health-check.js
 ```
 
 ### Logging
+
 ```bash
 # View live logs
 railway logs --tail
@@ -159,6 +174,7 @@ railway logs orchestrator
 ## 🔄 Updates
 
 ### Deploy Updates
+
 ```bash
 # Make changes
 git add .
@@ -169,6 +185,7 @@ git push origin main
 ```
 
 ### Rollback
+
 ```bash
 # Via Railway dashboard
 # Go to deployments → Select previous version → Redeploy
@@ -194,6 +211,7 @@ git push origin main
 ## 🐛 Troubleshooting
 
 ### Deployment Fails
+
 ```bash
 # Check build logs
 railway logs --build
@@ -203,6 +221,7 @@ railway status
 ```
 
 ### Health Check Fails
+
 ```bash
 # Run activation script
 node scripts/titan-activate.js
@@ -212,6 +231,7 @@ curl https://your-app.railway.app/github/pr/status
 ```
 
 ### Webhooks Not Working
+
 ```bash
 # Verify webhook configuration
 # GitHub repo → Settings → Webhooks
