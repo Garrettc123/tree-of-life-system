@@ -1,6 +1,7 @@
 # Performance Improvements - Tree of Life System
 
 ## Overview
+
 This document details the performance optimizations implemented to address slow and inefficient code patterns identified throughout the codebase. These improvements significantly enhance system throughput, reduce latency, and prevent memory leaks.
 
 ---
@@ -8,14 +9,17 @@ This document details the performance optimizations implemented to address slow 
 ## Critical Issues Fixed
 
 ### 1. **Immutable Logger - Redundant File Permission Changes**
+
 **File**: `core/immutable-logger.js:134-142`
 
 **Problem**:
+
 - Every log entry triggered 3 filesystem syscalls (chmod → append → chmod)
 - Changed permissions from 0o444 (read-only) to 0o644 (writable) and back on every write
 - Severe overhead for high-frequency logging scenarios
 
 **Before**:
+
 ```javascript
 appendToLog(data) {
     fs.chmodSync(this.logFile, 0o644);  // syscall 1
@@ -25,6 +29,7 @@ appendToLog(data) {
 ```
 
 **After**:
+
 ```javascript
 appendToLog(data) {
     // Append directly - manage permissions at initialization/rotation only
@@ -33,6 +38,7 @@ appendToLog(data) {
 ```
 
 **Impact**:
+
 - 66% reduction in filesystem operations per log entry
 - Estimated 3-5x throughput improvement for high-frequency logging
 - Reduced event loop blocking
@@ -40,29 +46,34 @@ appendToLog(data) {
 ---
 
 ### 2. **Event Bus - O(n) Array Slicing**
+
 **File**: `agents/core/event-bus.js:111`
 
 **Problem**:
+
 - Used `slice()` to trim event log when exceeding max size
 - Creates entire new array copy (O(n) memory operation)
 - Triggered every time log exceeded 10,000 entries
 
 **Before**:
+
 ```javascript
 if (this.eventLog.length > this.maxLogSize) {
-    this.eventLog = this.eventLog.slice(-this.maxLogSize);  // O(n) copy
+  this.eventLog = this.eventLog.slice(-this.maxLogSize); // O(n) copy
 }
 ```
 
 **After**:
+
 ```javascript
 if (this.eventLog.length > this.maxLogSize) {
-    const excessCount = this.eventLog.length - this.maxLogSize;
-    this.eventLog.splice(0, excessCount);  // Remove in-place
+  const excessCount = this.eventLog.length - this.maxLogSize;
+  this.eventLog.splice(0, excessCount); // Remove in-place
 }
 ```
 
 **Impact**:
+
 - O(1) space complexity instead of O(n)
 - No unnecessary array allocations
 - Better memory efficiency under high event load
@@ -70,39 +81,46 @@ if (this.eventLog.length > this.maxLogSize) {
 ---
 
 ### 3. **Analytics - O(n) Average Calculation on Every Request**
+
 **File**: `monitoring/analytics.js:53-60`
 
 **Problem**:
+
 - Recalculated average response time using `reduce()` on every request
 - O(n) operation repeated thousands of times
 - Array `shift()` is also O(n) when removing old entries
 
 **Before**:
+
 ```javascript
 this.metrics.performance.responseTimes.push(responseTime);
 if (this.metrics.performance.responseTimes.length > 1000) {
-    this.metrics.performance.responseTimes.shift();  // O(n)
+  this.metrics.performance.responseTimes.shift(); // O(n)
 }
-const sum = this.metrics.performance.responseTimes.reduce((a, b) => a + b, 0);  // O(n)
-this.metrics.performance.avgResponseTime = sum / this.metrics.performance.responseTimes.length;
+const sum = this.metrics.performance.responseTimes.reduce((a, b) => a + b, 0); // O(n)
+this.metrics.performance.avgResponseTime =
+  sum / this.metrics.performance.responseTimes.length;
 ```
 
 **After**:
+
 ```javascript
 this.metrics.performance.responseTimes.push(responseTime);
 this.metrics.performance.runningSum += responseTime;
 
 if (this.metrics.performance.responseTimes.length > 1000) {
-    const removed = this.metrics.performance.responseTimes.shift();
-    this.metrics.performance.runningSum -= removed;
+  const removed = this.metrics.performance.responseTimes.shift();
+  this.metrics.performance.runningSum -= removed;
 }
 
 // O(1) calculation
 this.metrics.performance.avgResponseTime =
-    this.metrics.performance.runningSum / this.metrics.performance.responseTimes.length;
+  this.metrics.performance.runningSum /
+  this.metrics.performance.responseTimes.length;
 ```
 
 **Impact**:
+
 - O(1) average calculation instead of O(n)
 - No repeated iterations over response time array
 - Scales efficiently with high request volumes
@@ -110,41 +128,45 @@ this.metrics.performance.avgResponseTime =
 ---
 
 ### 4. **Gap Analyzer - Sequential API Calls**
+
 **File**: `agents/planning/gap-analyzer.js:44-85`
 
 **Problem**:
+
 - Iterated through repositories sequentially
 - Made GitHub API calls one-by-one in a `for` loop
 - 100 repos = 100 sequential API calls (10+ seconds total)
 
 **Before**:
+
 ```javascript
 for (const repo of repos) {
-    // Sequential API call
-    const { data: contents } = await this.github.repos.getContent({
-        owner,
-        repo: repo.name,
-        path: ''
-    });
-    // Process results...
+  // Sequential API call
+  const { data: contents } = await this.github.repos.getContent({
+    owner,
+    repo: repo.name,
+    path: "",
+  });
+  // Process results...
 }
 ```
 
 **After**:
+
 ```javascript
 // Parallelize all API calls
 const repoAnalysisPromises = repos.map(async (repo) => {
-    try {
-        const { data: contents } = await this.github.repos.getContent({
-            owner,
-            repo: repo.name,
-            path: ''
-        });
-        // Process results...
-    } catch (error) {
-        console.error(`Error analyzing repo ${repo.name}:`, error.message);
-    }
-    return repoGaps;
+  try {
+    const { data: contents } = await this.github.repos.getContent({
+      owner,
+      repo: repo.name,
+      path: "",
+    });
+    // Process results...
+  } catch (error) {
+    console.error(`Error analyzing repo ${repo.name}:`, error.message);
+  }
+  return repoGaps;
 });
 
 const allRepoGaps = await Promise.all(repoAnalysisPromises);
@@ -152,6 +174,7 @@ gaps.push(...allRepoGaps.flat());
 ```
 
 **Impact**:
+
 - Potential 10-100x speedup depending on repository count
 - Reduced total analysis time from minutes to seconds
 - Better utilization of I/O concurrency
@@ -159,13 +182,16 @@ gaps.push(...allRepoGaps.flat());
 ---
 
 ### 5. **MCP Coordinator - Sequential Agent Broadcasting**
+
 **File**: `agents/core/mcp-coordinator.js:88-104`
 
 **Problem**:
+
 - Broadcast messages sent sequentially to each agent
 - 10 agents × 1 second each = 10 seconds total latency
 
 **Before**:
+
 ```javascript
 async broadcast(fromAgentId, message, context = {}) {
     const responses = [];
@@ -179,6 +205,7 @@ async broadcast(fromAgentId, message, context = {}) {
 ```
 
 **After**:
+
 ```javascript
 async broadcast(fromAgentId, message, context = {}) {
     const broadcastPromises = [];
@@ -198,6 +225,7 @@ async broadcast(fromAgentId, message, context = {}) {
 ```
 
 **Impact**:
+
 - Parallel execution reduces latency from O(n) to O(1)
 - 10 agents respond in ~1 second instead of 10 seconds
 - Better agent coordination responsiveness
@@ -205,23 +233,27 @@ async broadcast(fromAgentId, message, context = {}) {
 ---
 
 ### 6. **Contribution Manager - N+1 Database Query**
+
 **File**: `trunk/contribution-manager/src/index.js:170-174`
 
 **Problem**:
+
 - Made separate database query for count
 - Two round-trips to database per request
 - Count query didn't use same filters as data query (potential bug)
 
 **Before**:
-```javascript
-const result = await pool.query(query, params);  // Query 1
 
-const countQuery = 'SELECT COUNT(*) FROM contributions';  // Query 2
+```javascript
+const result = await pool.query(query, params); // Query 1
+
+const countQuery = "SELECT COUNT(*) FROM contributions"; // Query 2
 const countResult = await pool.query(countQuery);
 const total = parseInt(countResult.rows[0].count);
 ```
 
 **After**:
+
 ```javascript
 // Single query using window function
 const query = `
@@ -238,6 +270,7 @@ const contributions = result.rows.map(({ total_count, ...row }) => row);
 ```
 
 **Impact**:
+
 - 50% reduction in database queries
 - Single network round-trip instead of two
 - Count respects same filters as data query (bug fix)
@@ -246,14 +279,17 @@ const contributions = result.rows.map(({ total_count, ...row }) => row);
 ---
 
 ### 7. **ReWOO Executor - Unbounded Memory Growth**
+
 **File**: `agents/orchestration/rewoo-executor.js:32`
 
 **Problem**:
+
 - All execution history stored in Map indefinitely
 - No cleanup mechanism
 - Memory leak with long-running systems
 
 **Before**:
+
 ```javascript
 constructor(config = {}) {
     this.executions = new Map();  // Grows forever
@@ -262,6 +298,7 @@ constructor(config = {}) {
 ```
 
 **After**:
+
 ```javascript
 constructor(config = {}) {
     this.config = {
@@ -310,6 +347,7 @@ destroy() {
 ```
 
 **Impact**:
+
 - Prevents unbounded memory growth
 - Automatic cleanup of stale execution records
 - Configurable TTL and max size limits
@@ -318,14 +356,17 @@ destroy() {
 ---
 
 ### 8. **Health Monitor - Connection Reuse**
+
 **File**: `monitoring/health-check.js:33-40`
 
 **Problem**:
+
 - Created new axios instance per request
 - No connection pooling
 - Unnecessary TCP handshakes on every health check
 
 **Before**:
+
 ```javascript
 async checkEndpoint(endpoint) {
     const response = await axios.get(`${this.baseUrl}${endpoint}`, {
@@ -336,6 +377,7 @@ async checkEndpoint(endpoint) {
 ```
 
 **After**:
+
 ```javascript
 constructor(baseUrl, interval = 60000) {
     // ...
@@ -354,6 +396,7 @@ async checkEndpoint(endpoint) {
 ```
 
 **Impact**:
+
 - Connection reuse via keep-alive
 - Reduced TCP handshake overhead
 - Lower latency for health checks
@@ -363,16 +406,16 @@ async checkEndpoint(endpoint) {
 
 ## Performance Impact Summary
 
-| Component | Issue | Before | After | Improvement |
-|-----------|-------|--------|-------|-------------|
-| Immutable Logger | Redundant chmod | 3 syscalls/log | 1 syscall/log | 3x faster |
-| Event Bus | Array slicing | O(n) copy | O(1) splice | Memory efficient |
-| Analytics | Recalculating average | O(n) reduce | O(1) increment | 1000x faster |
-| Gap Analyzer | Sequential API calls | 100 seconds | 1-2 seconds | 50-100x faster |
-| MCP Coordinator | Sequential broadcast | 10 seconds | 1 second | 10x faster |
-| Contribution Manager | N+1 queries | 2 DB queries | 1 DB query | 2x fewer queries |
-| ReWOO Executor | Memory leak | Unbounded growth | TTL cleanup | No leak |
-| Health Monitor | No connection reuse | New connection | Keep-alive | Lower latency |
+| Component            | Issue                 | Before           | After          | Improvement      |
+| -------------------- | --------------------- | ---------------- | -------------- | ---------------- |
+| Immutable Logger     | Redundant chmod       | 3 syscalls/log   | 1 syscall/log  | 3x faster        |
+| Event Bus            | Array slicing         | O(n) copy        | O(1) splice    | Memory efficient |
+| Analytics            | Recalculating average | O(n) reduce      | O(1) increment | 1000x faster     |
+| Gap Analyzer         | Sequential API calls  | 100 seconds      | 1-2 seconds    | 50-100x faster   |
+| MCP Coordinator      | Sequential broadcast  | 10 seconds       | 1 second       | 10x faster       |
+| Contribution Manager | N+1 queries           | 2 DB queries     | 1 DB query     | 2x fewer queries |
+| ReWOO Executor       | Memory leak           | Unbounded growth | TTL cleanup    | No leak          |
+| Health Monitor       | No connection reuse   | New connection   | Keep-alive     | Lower latency    |
 
 ---
 
@@ -413,6 +456,7 @@ To track the impact of these improvements:
 ## Rollback Plan
 
 If issues are discovered:
+
 1. All changes are isolated to specific functions/methods
 2. Git history preserves original implementations
 3. No breaking API changes - all interfaces remain compatible
@@ -423,6 +467,7 @@ If issues are discovered:
 ## Conclusion
 
 These optimizations address the most critical performance bottlenecks identified in the codebase:
+
 - **Eliminated blocking I/O operations** that stalled the event loop
 - **Removed O(n) operations** from hot paths
 - **Parallelized sequential operations** for better concurrency
