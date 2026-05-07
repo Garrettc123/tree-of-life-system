@@ -32,6 +32,7 @@ Self-building, self-organizing agent orchestration for the Tree of Life enterpri
 ## Agent Specifications
 
 ### 1. Planning Agent (`planning/`)
+
 - **Purpose**: Strategic coordination and system state analysis
 - **Capabilities**:
   - Monitors all Linear projects and Notion pages
@@ -41,6 +42,7 @@ Self-building, self-organizing agent orchestration for the Tree of Life enterpri
 - **Triggers**: Scheduled (hourly) + Manual + Event-driven
 
 ### 2. Development Agent (`development/`)
+
 - **Purpose**: Autonomous code generation and repository management
 - **Capabilities**:
   - Creates GitHub repositories from Linear project specs
@@ -50,6 +52,7 @@ Self-building, self-organizing agent orchestration for the Tree of Life enterpri
 - **Triggers**: Planning agent tasks + Linear issue creation
 
 ### 3. Project Management Agent (`project-management/`)
+
 - **Purpose**: Linear workflow automation
 - **Capabilities**:
   - Creates issues from system requirements
@@ -59,6 +62,7 @@ Self-building, self-organizing agent orchestration for the Tree of Life enterpri
 - **Triggers**: GitHub events + Planning agent + Time-based
 
 ### 4. Documentation Agent (`documentation/`)
+
 - **Purpose**: Notion knowledge base maintenance
 - **Capabilities**:
   - Generates documentation from code and issues
@@ -115,6 +119,7 @@ agents/
 ## Getting Started
 
 ### Prerequisites
+
 ```bash
 # Node.js 18+
 node --version
@@ -125,6 +130,7 @@ cp .env.example .env
 ```
 
 ### Installation
+
 ```bash
 cd agents
 npm install
@@ -155,46 +161,50 @@ module.exports = {
   agents: {
     planning: {
       enabled: true,
-      schedule: '0 * * * *', // Every hour
-      aiModel: 'gpt-4-turbo'
+      schedule: "0 * * * *", // Every hour
+      aiModel: "gpt-4-turbo",
     },
     development: {
       enabled: true,
       autoCommit: true,
-      requiresApproval: false
+      requiresApproval: false,
     },
     projectManagement: {
       enabled: true,
       autoAssign: true,
-      syncInterval: 300000 // 5 minutes
+      syncInterval: 300000, // 5 minutes
     },
     documentation: {
       enabled: true,
       autoGenerate: true,
-      notionSync: true
-    }
-  }
+      notionSync: true,
+    },
+  },
 };
 ```
 
 ## Self-Healing Architecture
 
 ### Observability Layer
+
 - Collects comprehensive telemetry from all agents
 - Monitors GitHub API rate limits, Linear sync status, Notion updates
 - Tracks agent performance metrics and execution times
 
 ### Intelligence Layer
+
 - Detects anomalies using ML-based pattern recognition
 - Predicts potential failures before they occur
 - Analyzes trends in agent behavior
 
 ### Decision Layer
+
 - Evaluates remediation strategies
 - Calculates impact assessments
 - Selects optimal recovery actions
 
 ### Execution Layer
+
 - Implements automated fixes
 - Restarts failed agents
 - Adjusts workflow parameters dynamically
@@ -202,6 +212,7 @@ module.exports = {
 ## Event-Driven Workflows
 
 ### GitHub → Linear → Notion Flow
+
 ```
 1. Code pushed to GitHub
 2. Development Agent detects commit
@@ -211,6 +222,7 @@ module.exports = {
 ```
 
 ### Linear → GitHub → Notion Flow
+
 ```
 1. New Linear issue created
 2. Planning Agent analyzes requirements
@@ -220,6 +232,7 @@ module.exports = {
 ```
 
 ### Notion → Linear → GitHub Flow
+
 ```
 1. New project added to Notion database
 2. Planning Agent creates execution plan
