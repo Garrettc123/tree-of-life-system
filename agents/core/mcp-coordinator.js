@@ -3,8 +3,8 @@
  * Manages agent-to-agent communication and coordination
  */
 
-const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const EventEmitter = require("events");
+const { v4: uuidv4 } = require("uuid");
 
 class MCPCoordinator extends EventEmitter {
   constructor(config = {}) {
@@ -15,7 +15,7 @@ class MCPCoordinator extends EventEmitter {
     this.config = {
       maxRetries: 3,
       timeout: 30000, // 30 seconds
-      ...config
+      ...config,
     };
   }
 
@@ -31,12 +31,12 @@ class MCPCoordinator extends EventEmitter {
       id: agentId,
       instance: agent,
       capabilities: agent.capabilities || [],
-      status: 'active',
-      registeredAt: new Date()
+      status: "active",
+      registeredAt: new Date(),
     });
 
     console.log(`[MCP] Agent registered: ${agentId}`);
-    this.emit('agent:registered', { agentId, agent });
+    this.emit("agent:registered", { agentId, agent });
   }
 
   /**
@@ -49,7 +49,7 @@ class MCPCoordinator extends EventEmitter {
 
     this.agents.delete(agentId);
     console.log(`[MCP] Agent unregistered: ${agentId}`);
-    this.emit('agent:unregistered', { agentId });
+    this.emit("agent:unregistered", { agentId });
     return true;
   }
 
@@ -68,16 +68,16 @@ class MCPCoordinator extends EventEmitter {
       message,
       context,
       timestamp: new Date(),
-      retries: 0
+      retries: 0,
     };
 
     try {
       const response = await this._deliverMessage(envelope);
-      this.emit('message:delivered', { envelope, response });
+      this.emit("message:delivered", { envelope, response });
       return response;
     } catch (error) {
       console.error(`[MCP] Failed to deliver message ${messageId}:`, error);
-      this.emit('message:failed', { envelope, error });
+      this.emit("message:failed", { envelope, error });
       throw error;
     }
   }
@@ -94,8 +94,8 @@ class MCPCoordinator extends EventEmitter {
 
       // Create promise that handles its own errors
       const promise = this.sendMessage(fromAgentId, agentId, message, context)
-        .then(response => ({ agentId, response }))
-        .catch(error => {
+        .then((response) => ({ agentId, response }))
+        .catch((error) => {
           console.error(`[MCP] Broadcast to ${agentId} failed:`, error);
           return { agentId, error: error.message };
         });
@@ -113,8 +113,9 @@ class MCPCoordinator extends EventEmitter {
    */
   async requestCapability(requesterId, capability, params = {}) {
     // Find agents with the requested capability
-    const capableAgents = Array.from(this.agents.values())
-      .filter(a => a.capabilities.includes(capability) && a.status === 'active');
+    const capableAgents = Array.from(this.agents.values()).filter(
+      (a) => a.capabilities.includes(capability) && a.status === "active",
+    );
 
     if (capableAgents.length === 0) {
       throw new Error(`No agent found with capability: ${capability}`);
@@ -122,12 +123,12 @@ class MCPCoordinator extends EventEmitter {
 
     // Use the first capable agent (can be enhanced with load balancing)
     const targetAgent = capableAgents[0];
-    
+
     return await this.sendMessage(
       requesterId,
       targetAgent.id,
-      { type: 'capability-request', capability, params },
-      { requestType: 'capability' }
+      { type: "capability-request", capability, params },
+      { requestType: "capability" },
     );
   }
 
@@ -135,11 +136,11 @@ class MCPCoordinator extends EventEmitter {
    * Get status of all registered agents
    */
   getAgentStatus() {
-    return Array.from(this.agents.values()).map(agent => ({
+    return Array.from(this.agents.values()).map((agent) => ({
       id: agent.id,
       capabilities: agent.capabilities,
       status: agent.status,
-      registeredAt: agent.registeredAt
+      registeredAt: agent.registeredAt,
     }));
   }
 
@@ -153,7 +154,7 @@ class MCPCoordinator extends EventEmitter {
       throw new Error(`Target agent not found: ${envelope.to}`);
     }
 
-    if (targetAgent.status !== 'active') {
+    if (targetAgent.status !== "active") {
       throw new Error(`Target agent is not active: ${envelope.to}`);
     }
 
@@ -161,7 +162,7 @@ class MCPCoordinator extends EventEmitter {
       // Call the agent's message handler
       const response = await Promise.race([
         targetAgent.instance.handleMessage(envelope),
-        this._timeout(this.config.timeout)
+        this._timeout(this.config.timeout),
       ]);
 
       return response;
@@ -169,7 +170,9 @@ class MCPCoordinator extends EventEmitter {
       // Retry logic
       if (envelope.retries < this.config.maxRetries) {
         envelope.retries++;
-        console.log(`[MCP] Retrying message ${envelope.id} (attempt ${envelope.retries})`);
+        console.log(
+          `[MCP] Retrying message ${envelope.id} (attempt ${envelope.retries})`,
+        );
         await this._delay(1000 * envelope.retries); // Exponential backoff
         return await this._deliverMessage(envelope);
       }
@@ -178,13 +181,13 @@ class MCPCoordinator extends EventEmitter {
   }
 
   _timeout(ms) {
-    return new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Message delivery timeout')), ms)
+    return new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Message delivery timeout")), ms),
     );
   }
 
   _delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
