@@ -11,30 +11,16 @@ This guide shows you how to deploy your entire GitHub portfolio to any cloud pla
 ### Primary Systems (18 repositories)
 
 **Core Platform:**
+
 1. `tree-of-life-system` - Main TITAN orchestrator
 2. `revenue-agent-system` - Revenue generation system
 3. `APEX-Universal-AI-Operating-System` - AI OS orchestration
 
-**Business Automation:**
-4. `product-development-branch` - Product development automation
-5. `customer-intelligence-branch` - Customer intelligence
-6. `marketing-automation-branch` - Marketing automation
+**Business Automation:** 4. `product-development-branch` - Product development automation 5. `customer-intelligence-branch` - Customer intelligence 6. `marketing-automation-branch` - Marketing automation
 
-**Advanced AI Systems:**
-7. `NEXUS-Quantum-Intelligence-Framework` - Quantum computing
-8. `SINGULARITY-AGI-Research-Platform` - AGI research
-9. `TITAN-Autonomous-Business-Empire` - Autonomous business
+**Advanced AI Systems:** 7. `NEXUS-Quantum-Intelligence-Framework` - Quantum computing 8. `SINGULARITY-AGI-Research-Platform` - AGI research 9. `TITAN-Autonomous-Business-Empire` - Autonomous business
 
-**Enterprise Infrastructure:**
-10. `intelligent-customer-data-platform` - Customer data
-11. `enterprise-feature-flag-system` - Feature flags
-12. `intelligent-ci-cd-orchestrator` - CI/CD automation
-13. `conversational-ai-engine` - Chatbot platform
-14. `security-sentinel-framework` - Security automation
-15. `distributed-job-orchestration-engine` - Job scheduling
-16. `real-time-streaming-analytics` - Streaming analytics
-17. `enterprise-mlops-platform` - MLOps platform
-18. `ai-ops-studio` - AI operations
+**Enterprise Infrastructure:** 10. `intelligent-customer-data-platform` - Customer data 11. `enterprise-feature-flag-system` - Feature flags 12. `intelligent-ci-cd-orchestrator` - CI/CD automation 13. `conversational-ai-engine` - Chatbot platform 14. `security-sentinel-framework` - Security automation 15. `distributed-job-orchestration-engine` - Job scheduling 16. `real-time-streaming-analytics` - Streaming analytics 17. `enterprise-mlops-platform` - MLOps platform 18. `ai-ops-studio` - AI operations
 
 **Total: 68 repositories** (50 more available)
 
@@ -49,6 +35,7 @@ bash scripts/deploy-all-repos.sh
 ```
 
 **Interactive Menu:**
+
 1. Railway (Recommended - $5 free/month per repo)
 2. Heroku (Free tier available)
 3. Google Cloud Run (Best performance)
@@ -62,6 +49,7 @@ bash scripts/deploy-all-repos.sh
 ### Strategy 1: Deploy Core Systems Only (Recommended)
 
 **Deploy these 5 essential repos:**
+
 1. `tree-of-life-system` - Main orchestrator
 2. `revenue-agent-system` - Revenue generation
 3. `customer-intelligence-branch` - Customer insights
@@ -113,12 +101,14 @@ bash scripts/deploy-all-repos.sh
 ### Railway (Recommended)
 
 **Free Tier per Repo:**
+
 - $5 free credit/month
 - 512MB RAM
 - 0.5 CPU
 - Auto-sleep after 30 min
 
 **Costs:**
+
 - 5 repos: $0-25/month (within free credits)
 - 10 repos: $25-50/month
 - 20 repos: $50-100/month
@@ -127,15 +117,18 @@ bash scripts/deploy-all-repos.sh
 ### Heroku
 
 **Free Tier per Repo:**
+
 - 550 free hours/month
 - Sleeps after 30 min
 
 **Hobby Tier ($7/month per repo):**
+
 - Always on
 - SSL
 - Metrics
 
 **Costs:**
+
 - 5 repos: $0 (free tier)
 - 10 repos: $70/month (hobby)
 - 68 repos: $476/month (hobby)
@@ -143,11 +136,13 @@ bash scripts/deploy-all-repos.sh
 ### Google Cloud Run
 
 **Per Repo:**
+
 - $0-10/month at low traffic
 - Scales to zero
 - Pay per request
 
 **Costs:**
+
 - 5 repos: $25-50/month
 - 10 repos: $50-100/month
 - 68 repos: $300-680/month
@@ -202,18 +197,21 @@ done
 ### Monitor Costs
 
 **Railway:**
+
 ```bash
 # Check usage dashboard
 https://railway.app/account/usage
 ```
 
 **Heroku:**
+
 ```bash
 heroku ps --app repo-name
 heroku logs --tail --app repo-name
 ```
 
 **Google Cloud:**
+
 ```bash
 gcloud billing accounts list
 gcloud run services list
@@ -237,6 +235,7 @@ tree-of-life-system (HUB)
 ```
 
 **Benefits:**
+
 - Central orchestration
 - Shared authentication
 - Unified monitoring
@@ -249,12 +248,14 @@ tree-of-life-system (HUB)
 ### Repository Won't Deploy
 
 **Check:**
+
 1. Project has `package.json` or `requirements.txt`
 2. Start command is defined
 3. Port is set to `process.env.PORT`
 4. Dependencies are listed
 
 **Fix:**
+
 ```bash
 # Add Procfile (for Heroku)
 echo "web: npm start" > Procfile
@@ -266,6 +267,7 @@ echo '{"build":{"builder":"NIXPACKS"},"deploy":{"startCommand":"npm start"}}' > 
 ### High Costs
 
 **Reduce costs:**
+
 1. Use free tiers first
 2. Enable auto-sleep
 3. Deploy only active projects
@@ -274,11 +276,13 @@ echo '{"build":{"builder":"NIXPACKS"},"deploy":{"startCommand":"npm start"}}' > 
 ### Service Unreachable
 
 **Verify:**
+
 ```bash
 curl https://repo-name.railway.app/health
 ```
 
 **Check logs:**
+
 ```bash
 # Railway
 railway logs
@@ -297,6 +301,7 @@ gcloud run services logs read repo-name
 ### Memory Optimization
 
 **For Node.js repos:**
+
 ```json
 "scripts": {
   "start": "node --max-old-space-size=512 index.js"
@@ -304,6 +309,7 @@ gcloud run services logs read repo-name
 ```
 
 **For Python repos:**
+
 ```python
 # Use gunicorn
 gunicorn --workers=2 --threads=2 app:app
@@ -312,6 +318,7 @@ gunicorn --workers=2 --threads=2 app:app
 ### CPU Optimization
 
 **Limit workers:**
+
 ```javascript
 const workers = process.env.WEB_CONCURRENCY || 1;
 ```
@@ -321,6 +328,7 @@ const workers = process.env.WEB_CONCURRENCY || 1;
 ## 🎉 Success Metrics
 
 **After deployment, you'll have:**
+
 - ✅ All repositories deployed
 - ✅ Unified dashboard
 - ✅ Automated monitoring
