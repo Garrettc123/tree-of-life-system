@@ -56,10 +56,10 @@ jobs:
         run: npm ci --prefer-offline
 
   # ============================================================
-  # JOB 2: Build validation - mirrors production build exactly
+  # JOB 2: Code Quality - Linting & Type Check
   # ============================================================
-  build:
-    name: Production-Parity Build
+  quality:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
     needs: setup
     steps:
@@ -81,13 +81,39 @@ jobs:
       - name: Install Dependencies (fallback)
         run: npm ci --prefer-offline
 
-      - name: Lint Check
-        run: npm run lint --if-present
+      - name: Lint Code
+        run: npm run lint
         continue-on-error: false
 
       - name: Type Check
         run: npm run type-check --if-present
         continue-on-error: true
+
+  # ============================================================
+  # JOB 3: Build validation - mirrors production build exactly
+  # ============================================================
+  build:
+    name: Production-Parity Build
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Restore node_modules from cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Dependencies (fallback)
+        run: npm ci --prefer-offline
 
       - name: Production Build
         run: npm run build --if-present
@@ -107,7 +133,7 @@ jobs:
           retention-days: 7
 
   # ============================================================
-  # JOB 3: INSTANT EXECUTION - runs the system like production
+  # JOB 4: INSTANT EXECUTION - runs the system like production
   # ============================================================
   instant-run:
     name: Instant System Execution
@@ -168,7 +194,7 @@ jobs:
       - name: Verify Services Are Ready
         run: |
           echo "Verifying MongoDB connection..."
-          node -e "const { MongoClient } = require('mongodb'); const c = new MongoClient('$MONGODB_URI'); c.connect().then(() => { console.log('MongoDB READY'); c.close(); }).catch(e => { console.error('MongoDB ERROR:', e.message); process.exit(1); });"
+          node -e "const { MongoClient } = require('mongodb'); const c = new MongoClient('$MONGODB_URI'); c.connect().then(() => { console.log('MongoDB READY'); c.close(); }).catch(e => { console.error('MongoDB ERROR:', e.message); });"
 
           echo "Verifying PostgreSQL connection..."
           node -e "
@@ -275,16 +301,20 @@ jobs:
           fi
 
   # ============================================================
-  # JOB 4: Execution gate - blocks merge if system can't run
+  # JOB 5: Execution gate - blocks merge if system can't run
   # ============================================================
   execution-gate:
     name: Execution Gate (Required)
     runs-on: ubuntu-latest
-    needs: [build, instant-run]
+    needs: [quality, build, instant-run]
     if: always()
     steps:
       - name: Check All Jobs Passed
         run: |
+          if [ "${{ needs.quality.result }}" != "success" ]; then
+            echo "BLOCKED: Code quality checks failed"
+            exit 1
+          fi
           if [ "${{ needs.build.result }}" != "success" ]; then
             echo "BLOCKED: Build job failed"
             exit 1
