@@ -40,44 +40,19 @@ jobs:
       - name: Verify Railway CLI
         run: railway --version
 
-      - name: Validate orchestration-engine layout
-        working-directory: orchestration-engine
+      - name: Validate orchestration-engine
         run: |
-          test -f main.py || { echo "Missing main.py"; exit 1; }
-          if [ ! -f requirements.txt ] && [ ! -f pyproject.toml ]; then
-            echo "Missing requirements.txt or pyproject.toml" >&2
-            exit 1
-          fi
-          python -m py_compile main.py
+          test -f orchestration-engine/main.py || { echo "Missing orchestration-engine/main.py"; exit 1; }
+          test -f orchestration-engine/requirements.txt || { echo "Missing orchestration-engine/requirements.txt"; exit 1; }
+          python -m py_compile orchestration-engine/main.py
           echo "Syntax OK"
 
-      - name: Ensure Dockerfile
-        working-directory: orchestration-engine
-        run: |
-          if [ ! -f Dockerfile ]; then
-            cat > Dockerfile <<'DOCKERFILE'
-          FROM python:3.11-slim
-          ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8000
-          WORKDIR /app
-          COPY requirements.txt /app/requirements.txt
-          RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r /app/requirements.txt
-          COPY . /app
-          EXPOSE 8000
-          CMD ["python", "main.py"]
-          DOCKERFILE
-            echo "Dockerfile written"
-          else
-            echo "Dockerfile exists"
-          fi
-
       - name: Link Railway project
-        working-directory: orchestration-engine
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway link ${{ env.PROJECT_ID }}
 
       - name: Deploy to Railway
-        working-directory: orchestration-engine
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
@@ -96,7 +71,6 @@ jobs:
 
       - name: Tail deploy logs
         if: always()
-        working-directory: orchestration-engine
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
