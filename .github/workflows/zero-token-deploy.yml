@@ -12,21 +12,21 @@ on:
         default: 'github-pages'
         type: choice
         options:
-          - github-pages     # Free GitHub Pages hosting
-          - vercel-free      # Vercel free tier (auto-connects)
-          - netlify-free     # Netlify free tier (auto-connects)
-          - render-free      # Render free tier
-          - local-test       # Just test locally
-      
+          - github-pages
+          - vercel-free
+          - netlify-free
+          - render-free
+          - local-test
+
       enable_features:
         description: 'Features to enable'
         required: true
         default: 'basic'
         type: choice
         options:
-          - basic            # No API keys needed
-          - with-ai          # Requires OpenAI key only
-          - full             # All features
+          - basic
+          - with-ai
+          - full
 
   push:
     branches: [main]
@@ -35,39 +35,42 @@ on:
       - '.github/workflows/zero-token-deploy.yml'
 
 permissions:
-  contents: write      # To push to gh-pages branch
-  pages: write         # To deploy to GitHub Pages
-  id-token: write      # For Vercel/Netlify OIDC auth
-  deployments: write   # For deployment status
+  contents: write
+  pages: write
+  id-token: write
+  deployments: write
 
 jobs:
   deploy-zero-token:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
-      - name: 🎯 Checkout Repository
-        uses: actions/checkout@v6
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # Built-in token, no setup needed!
-      
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v6
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
-      
-      - name: 📦 Install Dependencies
+
+      - name: Install Dependencies
         run: |
-          npm ci --prefer-offline --no-audit
-          echo "✅ Dependencies installed"
-      
-      - name: 🚀 Deploy to GitHub Pages (Zero Tokens!)
-        if: ${{ inputs.deployment_target == 'github-pages' }}
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit
+          elif [ -f package.json ]; then
+            npm install --no-audit
+          else
+            echo "No package.json found, skipping install"
+          fi
+
+      - name: Deploy to GitHub Pages
+        if: ${{ inputs.deployment_target == 'github-pages' || inputs.deployment_target == '' }}
         run: |
-          echo "🎯 Deploying to GitHub Pages (FREE, NO TOKENS NEEDED)"
-          
-          # Create a simple landing page
+          echo "Deploying to GitHub Pages (FREE, NO TOKENS NEEDED)"
           mkdir -p gh-pages
           cat > gh-pages/index.html << 'EOF'
           <!DOCTYPE html>
@@ -123,186 +126,58 @@ jobs:
                 border-radius: 50px;
                 font-weight: bold;
                 margin: 1rem 0.5rem;
-                transition: transform 0.2s;
               }
-              .button:hover { transform: scale(1.05); }
             </style>
           </head>
           <body>
             <div class="container">
-              <h1>🌳 Tree of Life</h1>
-              <div class="status">✅ Deployed Successfully (Zero Tokens!)</div>
-              
-              <p style="margin: 2rem 0; font-size: 1.2rem;">
-                Your autonomous business system is running with GitHub's built-in authentication.
-                No manual API tokens required!
-              </p>
-              
+              <h1>Tree of Life</h1>
+              <div class="status">Deployed Successfully</div>
+              <p style="margin: 2rem 0; font-size: 1.2rem;">Autonomous business system running on GitHub Pages.</p>
               <div class="features">
-                <div class="feature">
-                  <h3>🔒 Secure</h3>
-                  <p>Uses GitHub's automatic GITHUB_TOKEN</p>
-                </div>
-                <div class="feature">
-                  <h3>🆓 Free</h3>
-                  <p>Zero cost hosting on GitHub Pages</p>
-                </div>
-                <div class="feature">
-                  <h3>🚀 Fast</h3>
-                  <p>Global CDN deployment</p>
-                </div>
-                <div class="feature">
-                  <h3>🔄 Automated</h3>
-                  <p>Auto-deploys on every push</p>
-                </div>
+                <div class="feature"><h3>Secure</h3><p>GitHub GITHUB_TOKEN</p></div>
+                <div class="feature"><h3>Free</h3><p>GitHub Pages hosting</p></div>
+                <div class="feature"><h3>Fast</h3><p>Global CDN</p></div>
+                <div class="feature"><h3>Automated</h3><p>Auto-deploys on push</p></div>
               </div>
-              
-              <a href="https://github.com/Garrettc123/tree-of-life-system" class="button">📦 View Repository</a>
-              <a href="https://github.com/Garrettc123/tree-of-life-system/actions" class="button">⚙️ View Actions</a>
+              <a href="https://github.com/Garrettc123/tree-of-life-system" class="button">View Repository</a>
+              <a href="https://github.com/Garrettc123/tree-of-life-system/actions" class="button">View Actions</a>
             </div>
           </body>
           </html>
           EOF
-          
-          # Deploy to gh-pages branch
           cd gh-pages
           git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --staged --quiet && echo "No changes to commit" && exit 0
-          git commit -m "Deploy to GitHub Pages"
+          git commit -m "Deploy to GitHub Pages [skip ci]"
           git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:gh-pages
-          
-          echo "✅ Deployed to: https://${{ github.repository_owner }}.github.io/tree-of-life-system"
-      
-      - name: 🎨 Deploy to Vercel (Free Tier)
-        if: ${{ inputs.deployment_target == 'vercel-free' }}
+          echo "Deployed to: https://${{ github.repository_owner }}.github.io/tree-of-life-system"
+
+      - name: Deploy guidance (Vercel/Netlify/Render)
+        if: ${{ inputs.deployment_target == 'vercel-free' || inputs.deployment_target == 'netlify-free' || inputs.deployment_target == 'render-free' }}
         run: |
-          echo "🎯 Deploying to Vercel Free Tier"
-          echo "💡 Vercel will auto-connect via GitHub integration"
-          echo "📝 Steps:"
-          echo "   1. Go to https://vercel.com/new"
-          echo "   2. Click 'Import Git Repository'"
-          echo "   3. Select this repository"
-          echo "   4. Click 'Deploy' - NO API TOKENS NEEDED!"
-          echo "   Vercel uses OAuth to connect to GitHub automatically"
-      
-      - name: 🌐 Deploy to Netlify (Free Tier)
-        if: ${{ inputs.deployment_target == 'netlify-free' }}
-        run: |
-          echo "🎯 Deploying to Netlify Free Tier"
-          echo "💡 Netlify will auto-connect via GitHub integration"
-          echo "📝 Steps:"
-          echo "   1. Go to https://app.netlify.com/start"
-          echo "   2. Click 'Import from Git'"
-          echo "   3. Select this repository"
-          echo "   4. Click 'Deploy' - NO API TOKENS NEEDED!"
-          echo "   Netlify uses OAuth to connect to GitHub automatically"
-      
-      - name: 🎪 Deploy to Render (Free Tier)
-        if: ${{ inputs.deployment_target == 'render-free' }}
-        run: |
-          echo "🎯 Deploying to Render Free Tier"
-          echo "💡 Render will auto-connect via GitHub integration"
-          echo "📝 Steps:"
-          echo "   1. Go to https://dashboard.render.com/"
-          echo "   2. Click 'New' → 'Web Service'"
-          echo "   3. Connect your GitHub account (one-click OAuth)"
-          echo "   4. Select this repository"
-          echo "   5. Click 'Create Web Service' - NO API TOKENS NEEDED!"
-          echo "   Free tier includes: 750 hours/month, automatic deploys"
-      
-      - name: 🧪 Local Test (Zero Tokens)
+          echo "Platform: ${{ inputs.deployment_target }}"
+          echo "Connect via OAuth at the platform dashboard - no tokens needed."
+
+      - name: Local Test
         if: ${{ inputs.deployment_target == 'local-test' }}
         run: |
-          echo "🎯 Testing locally (no deployment)"
-          npm test || echo "Tests not configured yet"
-          echo "✅ Local test complete"
-      
-      - name: 📊 Generate Deployment Report
-        run: |
-          cat > deployment-report.md << 'EOF'
-          # 🎉 Zero-Token Deployment Report
-          
-          ## Deployment Details
-          - **Date:** $(date)
-          - **Target:** ${{ inputs.deployment_target }}
-          - **Features:** ${{ inputs.enable_features }}
-          - **Repository:** ${{ github.repository }}
-          - **Commit:** ${{ github.sha }}
-          
-          ## ✅ What Was Used (Zero Manual Tokens!)
-          
-          ### Built-in GitHub Token
-          - ✅ `GITHUB_TOKEN` (automatic, no setup)
-          - ✅ Permissions: contents, pages, deployments
-          - ✅ Expires automatically after job
-          - ✅ No security risk
-          
-          ### Free Hosting Options
-          
-          | Platform | Cost | Setup | Auto-Deploy |
-          |----------|------|-------|-------------|
-          | GitHub Pages | FREE | Zero tokens | ✅ Yes |
-          | Vercel | FREE | OAuth only | ✅ Yes |
-          | Netlify | FREE | OAuth only | ✅ Yes |
-          | Render | FREE | OAuth only | ✅ Yes |
-          
-          ## 🔒 Security Benefits
-          
-          - ✅ No manual token storage
-          - ✅ No token expiration issues
-          - ✅ No token permission errors
-          - ✅ Automatic token rotation
-          - ✅ Built-in GitHub security
-          
-          ## 🚀 Next Steps
-          
-          ### For GitHub Pages:
-          1. Visit: https://${{ github.repository_owner }}.github.io/tree-of-life-system
-          2. Enable Pages in repo settings if needed
-          
-          ### For Vercel/Netlify/Render:
-          1. Visit their dashboard
-          2. Connect GitHub via OAuth (1-click)
-          3. Select this repository
-          4. Deploy automatically
-          
-          ## 💰 Cost: $0/month
-          
-          Everything runs on free tiers:
-          - GitHub Actions: 2,000 minutes/month free
-          - GitHub Pages: Unlimited bandwidth
-          - Vercel: 100GB bandwidth/month free
-          - Netlify: 100GB bandwidth/month free
-          - Render: 750 hours/month free
-          
-          **Total cost: $0** 🎉
-          EOF
-          
-          cat deployment-report.md
-      
-      - name: 📤 Upload Deployment Report
-        uses: actions/upload-artifact@v7
+          npm test 2>/dev/null || echo "No tests configured"
+
+      - name: Upload Deployment Report
+        uses: actions/upload-artifact@v4
         with:
           name: zero-token-deployment-report
           path: deployment-report.md
           retention-days: 30
-      
-      - name: 🎉 Success!
+        if: always()
+        continue-on-error: true
+
+      - name: Summary
         run: |
-          echo "" 
-          echo "═══════════════════════════════════════════════════════════"
-          echo "  🎉 ZERO-TOKEN DEPLOYMENT COMPLETE! 🎉"
-          echo "═══════════════════════════════════════════════════════════"
-          echo ""
-          echo "✅ No manual API tokens needed"
-          echo "✅ No Railway token"
-          echo "✅ No OpenAI key (for basic features)"
-          echo "✅ Only GitHub's built-in GITHUB_TOKEN"
-          echo ""
-          echo "🌐 Your site is deploying to: ${{ inputs.deployment_target }}"
-          echo ""
-          echo "📊 View deployment report in workflow artifacts"
-          echo "═══════════════════════════════════════════════════════════"
+          echo "ZERO-TOKEN DEPLOYMENT COMPLETE"
+          echo "Target: ${{ inputs.deployment_target }}"
+          echo "No manual API tokens used"
