@@ -1,0 +1,120 @@
+name: Deploy Orchestration Engine
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "orchestration-engine/**"
+      - ".github/workflows/deploy-orchestration.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-orchestration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: e3b5cb0e-d4f1-4326-801f-e936d99d231a
+      SERVICE_ID: f6619604-8a7d-4ff1-9b62-264139e17e96
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+
+      - name: Validate orchestration-engine layout
+        working-directory: orchestration-engine
+        run: |
+          echo "==> Checking required files"
+          test -f main.py || { echo "Missing main.py"; exit 1; }
+          if [ ! -f requirements.txt ] && [ ! -f pyproject.toml ]; then
+            echo "Missing requirements.txt or pyproject.toml" >&2
+            exit 1
+          fi
+          python -m py_compile main.py
+          echo "Syntax check passed"
+
+      - name: Ensure Dockerfile exists
+        working-directory: orchestration-engine
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "==> Writing Dockerfile"
+            cat > Dockerfile <<'DOCKERFILE'
+          FROM python:3.11-slim
+
+          ENV PYTHONDONTWRITEBYTECODE=1 \
+              PYTHONUNBUFFERED=1 \
+              PORT=8000
+
+          WORKDIR /app
+
+          COPY requirements.txt /app/requirements.txt
+          RUN pip install --no-cache-dir --upgrade pip && \
+              pip install --no-cache-dir -r /app/requirements.txt
+
+          COPY . /app
+
+          EXPOSE 8000
+
+          CMD ["python", "main.py"]
+          DOCKERFILE
+          else
+            echo "Dockerfile already present"
+          fi
+
+      - name: Ensure .dockerignore exists
+        working-directory: orchestration-engine
+        run: |
+          if [ ! -f .dockerignore ]; then
+            cat > .dockerignore <<'DOCKERIGNORE'
+          .git
+          .github
+          __pycache__
+          *.pyc
+          *.pyo
+          .venv
+          venv
+          node_modules
+          dist
+          build
+          .env
+          .env.*
+          DOCKERIGNORE
+          fi
+
+      - name: Link Railway project
+        working-directory: orchestration-engine
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway link ${{ env.PROJECT_ID }}
+
+      - name: Deploy to Railway
+        working-directory: orchestration-engine
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service ${{ env.SERVICE_ID }} --detach
+          echo "Deploy dispatched — service ${{ env.SERVICE_ID }}"
+
+      - name: Tail deploy logs
+        if: always()
+        working-directory: orchestration-engine
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          sleep 15
+          railway logs --service ${{ env.SERVICE_ID }} --tail 60 || true

@@ -1,0 +1,51 @@
+name: Auto-Sync to Linear
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: linear-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Skip when bot commits include [skip ci] to prevent re-trigger loops
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Sync to Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f scripts/github-to-linear.py ]; then
+            python scripts/github-to-linear.py
+          else
+            echo "scripts/github-to-linear.py not found — skipping sync"
+            exit 0
+          fi
