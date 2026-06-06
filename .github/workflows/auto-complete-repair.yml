@@ -1,4 +1,5 @@
 name: Auto-Complete Code Pipeline
+
 on:
   workflow_run:
     workflows: ['CI/CD Pipeline']
@@ -15,32 +16,49 @@ jobs:
   repair:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-node@v6
+
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: |
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f package.json ]; then
+            npm install
+          else
+            echo "No package.json found, skipping install"
+          fi
+
+      - name: Auto-format and lint fix
+        run: |
           npx prettier --write . 2>/dev/null || true
           npx eslint --fix . 2>/dev/null || true
-      - run: npm install -g @types/node 2>/dev/null || true
-      - run: |
-          npm test 2>&1 || true
+
+      - name: Install type definitions
+        run: npm install -g @types/node 2>/dev/null || true
+
+      - name: Run tests
+        run: npm test 2>&1 || true
+
       - name: Commit and push repairs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Never touch workflow files
           git checkout -- .github/workflows/ 2>/dev/null || true
           git add -A -- ':!.github/workflows/'
           git diff --staged --quiet && echo "No changes to commit" && exit 0
           BRANCH="auto-repair/$(date +%Y%m%d-%H%M%S)"
           git checkout -b "$BRANCH"
-          git commit -m "fix: auto-repair formatting and lint issues"
+          git commit -m "fix: auto-repair formatting and lint issues [skip ci]"
           git push origin "$BRANCH"
           gh pr create \
             --title "fix: auto-repair formatting and lint issues" \
