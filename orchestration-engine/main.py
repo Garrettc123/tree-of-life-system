@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GAR-25 Orchestration Engine
+GAR-25 Orchestration Engine v1.0.1
 Entry point for Railway deployment.
 Delegates to root-level orchestrator if available.
 """
@@ -32,7 +32,7 @@ def main():
         import uvicorn
         from fastapi import FastAPI
 
-        app = FastAPI(title="GAR-25 Orchestration Engine", version="1.0.0")
+        app = FastAPI(title="GAR-25 Orchestration Engine", version="1.0.1")
 
         @app.get("/health")
         def health():
@@ -46,13 +46,12 @@ def main():
         uvicorn.run(app, host="0.0.0.0", port=PORT)
 
     except ImportError:
-        # Ultra-minimal stdlib fallback
         from http.server import HTTPServer, BaseHTTPRequestHandler
         import json
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = json.dumps({"status": "ok", "service": "orchestration-engine"}).encode()
+                body = json.dumps({"status": "ok", "service": "orchestration-engine", "version": "1.0.1"}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", len(body))
