@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    # Run every day at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
 
@@ -17,13 +16,13 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for secret scanning
-      
+          fetch-depth: 0
+
       - name: Run Trivy vulnerability scanner
         continue-on-error: true
         uses: aquasecurity/trivy-action@master
@@ -33,237 +32,105 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-      
+
       - name: Upload Trivy results to GitHub Security
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v3
         if: hashFiles('trivy-results.sarif') != ''
         with:
           sarif_file: 'trivy-results.sarif'
-      
+
       - name: Scan for secrets
         run: |
-          echo "🔍 Scanning for leaked secrets..."
-          echo ""
-          
+          echo "Scanning for leaked secrets..."
           SECRETS_FOUND=0
-          
-          # Check for OpenAI API keys
-          echo "Checking for OpenAI keys..."
-          if git log --all --source --full-history -S "sk-" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  WARNING: Potential OpenAI key pattern found in history!"
-            echo "ACTION: Review git history and rotate OpenAI API key if needed"
-            SECRETS_FOUND=1
-          else
-            echo "✅ No OpenAI key patterns found"
-          fi
-          echo ""
-          
-          # Check for GitHub tokens
-          echo "Checking for GitHub tokens..."
-          if git log --all --source --full-history -S "ghp_" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  WARNING: Potential GitHub token found in history!"
-            echo "ACTION: Rotate GitHub token immediately at https://github.com/settings/tokens"
-            SECRETS_FOUND=1
-          else
-            echo "✅ No GitHub token patterns found"
-          fi
-          echo ""
-          
-          # Check for Stripe keys
-          echo "Checking for Stripe keys..."
-          if git log --all --source --full-history -S "sk_live_" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  WARNING: Potential Stripe key found in history!"
-            echo "ACTION: Rotate Stripe key at https://dashboard.stripe.com/apikeys"
-            SECRETS_FOUND=1
-          elif git log --all --source --full-history -S "sk_test_" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  INFO: Stripe test key pattern found (less critical)"
-          else
-            echo "✅ No Stripe key patterns found"
-          fi
-          echo ""
-          
-          # Check for Railway tokens
-          echo "Checking for Railway tokens..."
-          if git log --all --source --full-history -S "railway_" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  WARNING: Potential Railway token found!"
-            SECRETS_FOUND=1
-          else
-            echo "✅ No Railway token patterns found"
-          fi
-          echo ""
-          
-          # Check for AWS keys
-          echo "Checking for AWS keys..."
-          if git log --all --source --full-history -S "AKIA" --oneline 2>/dev/null | head -n 1; then
-            echo "⚠️  WARNING: Potential AWS key found!"
-            SECRETS_FOUND=1
-          else
-            echo "✅ No AWS key patterns found"
-          fi
-          echo ""
-          
+
+          for PATTERN in "sk-" "ghp_" "sk_live_" "railway_" "AKIA"; do
+            if git log --all -S "$PATTERN" --oneline 2>/dev/null | head -n 1 | grep -q .; then
+              echo "WARNING: Pattern '$PATTERN' found in git history"
+              SECRETS_FOUND=1
+            else
+              echo "OK: No '$PATTERN' pattern found"
+            fi
+          done
+
           if [ $SECRETS_FOUND -eq 1 ]; then
-            echo ""
-            echo "🚨 SECURITY ALERT: Potential secrets detected!"
-            echo ""
-            echo "Immediate actions:"
-            echo "1. Review the warnings above"
-            echo "2. Rotate any exposed API keys"
-            echo "3. Consider using git-filter-repo to remove secrets from history"
-            echo "4. Enable secret scanning in GitHub repository settings"
-            echo ""
+            echo "SECURITY ALERT: Potential secrets detected - rotate any exposed keys"
           else
-            echo "✅ Secret scan completed - no obvious patterns found"
+            echo "Secret scan completed - no patterns found"
           fi
-      
+
       - name: Check for sensitive files
         run: |
-          echo "📁 Checking for sensitive files..."
-          echo ""
-          
+          echo "Checking for sensitive files..."
           ISSUES_FOUND=0
-          
-          # Check if .env exists
+
           if [ -f ".env" ]; then
-            echo "❌ ERROR: .env file found in repository!"
-            echo "This file should NEVER be committed"
+            echo "ERROR: .env file found in repository!"
             ISSUES_FOUND=1
           else
-            echo "✅ No .env file in repo"
+            echo "OK: No .env file in repo"
           fi
-          
-          # Check .gitignore
+
           if [ -f ".gitignore" ]; then
-            if grep -q "^\.env$" .gitignore || grep -q "^.env$" .gitignore; then
-              echo "✅ .env is in .gitignore"
+            if grep -qE "^\.env" .gitignore; then
+              echo "OK: .env is in .gitignore"
             else
-              echo "⚠️  WARNING: .env not explicitly in .gitignore"
+              echo "WARNING: .env not in .gitignore"
               ISSUES_FOUND=1
             fi
           else
-            echo "⚠️  WARNING: No .gitignore file found"
-            ISSUES_FOUND=1
+            echo "WARNING: No .gitignore found"
           fi
-          
-          # Check for other sensitive patterns
-          if find . -name "*.pem" -o -name "*.key" -o -name "*_rsa" 2>/dev/null | grep -v node_modules | grep -v .git; then
-            echo "⚠️  WARNING: Potential private key files found"
-            ISSUES_FOUND=1
-          fi
-          
-          echo ""
+
+          find . -name "*.pem" -o -name "*.key" -o -name "*_rsa" 2>/dev/null \
+            | grep -v node_modules | grep -v .git \
+            | while read f; do echo "WARNING: Private key file found: $f"; done
+
           if [ $ISSUES_FOUND -eq 0 ]; then
-            echo "✅ File sensitivity check passed"
-          else
-            echo "⚠️  File sensitivity issues detected - review recommended"
+            echo "File sensitivity check passed"
           fi
-      
+
       - name: Dependency audit
         continue-on-error: true
         run: |
-          echo "📦 Running dependency audit..."
-          echo ""
-          
           if [ -f "package.json" ]; then
-            echo "Running npm audit..."
-            npm audit --audit-level=moderate || echo "⚠️  Vulnerabilities found (see details above)"
+            npm audit --audit-level=moderate || echo "Vulnerabilities found (see above)"
           else
             echo "No package.json found, skipping npm audit"
           fi
-          
-          echo ""
-          echo "✅ Dependency audit completed"
-      
-      - name: Check repository security settings
+
+      - name: Repository security check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔒 Checking repository security settings..."
-          echo ""
-          
-          # Get repository info
           REPO_INFO=$(gh api repos/${{ github.repository }} 2>/dev/null || echo '{}')
-          
-          # Check if repository is public or private
           IS_PRIVATE=$(echo "$REPO_INFO" | jq -r '.private // false')
-          
           if [ "$IS_PRIVATE" = "true" ]; then
-            echo "✅ Repository is private"
+            echo "Repository is private"
           else
-            echo "⚠️  Repository is PUBLIC"
-            echo "   Ensure no secrets are committed"
+            echo "Repository is PUBLIC - ensure no secrets are committed"
           fi
-          
-          # Check if security advisories are enabled
-          echo ""
-          echo "Security features to enable:"
-          echo "1. Dependabot alerts: https://github.com/${{ github.repository }}/settings/security_analysis"
-          echo "2. Secret scanning: https://github.com/${{ github.repository }}/settings/security_analysis"
-          echo "3. Branch protection: https://github.com/${{ github.repository }}/settings/branches"
-          echo "4. Two-factor authentication for all collaborators"
-      
+
       - name: Create security report
         if: always()
         run: |
+          DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           cat > security-report.md << EOF
           # Security Scan Report
-          
-          **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          **Date:** $DATE
           **Repository:** ${{ github.repository }}
           **Branch:** ${{ github.ref_name }}
           **Triggered by:** ${{ github.event_name }}
-          **Workflow run:** ${{ github.run_number }}
-          
-          ## Summary
-          
-          - ✅ Trivy vulnerability scan completed
-          - ✅ Secret pattern scanning completed
-          - ✅ Dependency audit completed
-          - ✅ File sensitivity check completed
-          - ✅ Repository security check completed
-          
-          ## Recommendations
-          
-          ### Immediate Actions
-          1. 🔑 Rotate any API keys found in scan warnings
-          2. 🔒 Enable branch protection on main branch
-          3. 👥 Enable 2FA for all collaborators
-          4. 🚨 Enable Dependabot security alerts
-          5. 🔍 Enable secret scanning (if not already enabled)
-          
-          ### Regular Maintenance
-          1. Review and update dependencies monthly
-          2. Audit access permissions quarterly
-          3. Rotate API keys every 90 days
-          4. Monitor security advisories
-          5. Keep GitHub Actions up to date
-          
-          ### Links
-          - Security settings: https://github.com/${{ github.repository }}/settings/security_analysis
-          - Branch protection: https://github.com/${{ github.repository }}/settings/branches
-          - Secrets management: https://github.com/${{ github.repository }}/settings/secrets/actions
-          - Dependabot: https://github.com/${{ github.repository }}/security/dependabot
-          
           EOF
-          
           cat security-report.md
-      
+
       - name: Upload security artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: security-report-${{ github.run_number }}
           path: |
             security-report.md
             trivy-results.sarif
           retention-days: 90
-      
-      - name: Security summary
-        if: always()
-        run: |
-          echo ""
-          echo "✅ Security scan completed!"
-          echo ""
-          echo "View full report in artifacts: security-report-${{ github.run_number }}"
-          echo ""
