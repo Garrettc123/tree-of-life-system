@@ -13,13 +13,15 @@ concurrency:
   group: deploy-orchestration-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GITHUB_USER: Garrettc123
+  EMAIL: gwc2780@gmail.com
+  PROJECT_ID: e3b5cb0e-d4f1-4326-801f-e936d99d231a
+  SERVICE_ID: f6619604-8a7d-4ff1-9b62-264139e17e96
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    env:
-      PROJECT_ID: e3b5cb0e-d4f1-4326-801f-e936d99d231a
-      SERVICE_ID: f6619604-8a7d-4ff1-9b62-264139e17e96
 
     steps:
       - name: Checkout repo
@@ -38,77 +40,56 @@ jobs:
       - name: Validate orchestration-engine layout
         working-directory: orchestration-engine
         run: |
-          echo "==> Checking required files"
           test -f main.py || { echo "Missing main.py"; exit 1; }
           if [ ! -f requirements.txt ] && [ ! -f pyproject.toml ]; then
             echo "Missing requirements.txt or pyproject.toml" >&2
             exit 1
           fi
           python -m py_compile main.py
-          echo "Syntax check passed"
+          echo "Syntax OK"
 
-      - name: Ensure Dockerfile exists
+      - name: Ensure Dockerfile
         working-directory: orchestration-engine
         run: |
           if [ ! -f Dockerfile ]; then
-            echo "==> Writing Dockerfile"
             cat > Dockerfile <<'DOCKERFILE'
           FROM python:3.11-slim
-
-          ENV PYTHONDONTWRITEBYTECODE=1 \
-              PYTHONUNBUFFERED=1 \
-              PORT=8000
-
+          ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8000
           WORKDIR /app
-
           COPY requirements.txt /app/requirements.txt
-          RUN pip install --no-cache-dir --upgrade pip && \
-              pip install --no-cache-dir -r /app/requirements.txt
-
+          RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r /app/requirements.txt
           COPY . /app
-
           EXPOSE 8000
-
           CMD ["python", "main.py"]
           DOCKERFILE
+            echo "Dockerfile written"
           else
-            echo "Dockerfile already present"
-          fi
-
-      - name: Ensure .dockerignore exists
-        working-directory: orchestration-engine
-        run: |
-          if [ ! -f .dockerignore ]; then
-            cat > .dockerignore <<'DOCKERIGNORE'
-          .git
-          .github
-          __pycache__
-          *.pyc
-          *.pyo
-          .venv
-          venv
-          node_modules
-          dist
-          build
-          .env
-          .env.*
-          DOCKERIGNORE
+            echo "Dockerfile exists"
           fi
 
       - name: Link Railway project
         working-directory: orchestration-engine
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway link ${{ env.PROJECT_ID }}
+        run: railway link ${{ env.PROJECT_ID }}
 
       - name: Deploy to Railway
         working-directory: orchestration-engine
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           railway up --service ${{ env.SERVICE_ID }} --detach
-          echo "Deploy dispatched — service ${{ env.SERVICE_ID }}"
+          echo "Deploy dispatched to service ${{ env.SERVICE_ID }}"
 
       - name: Tail deploy logs
         if: always()
@@ -116,5 +97,5 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          sleep 15
-          railway logs --service ${{ env.SERVICE_ID }} --tail 60 || true
+          sleep 20
+          railway logs --service ${{ env.SERVICE_ID }} --tail 80 || true
