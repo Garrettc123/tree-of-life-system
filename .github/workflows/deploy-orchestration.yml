@@ -50,7 +50,8 @@ jobs:
       - name: Link Railway project
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway link ${{ env.PROJECT_ID }}
+        run: |
+          railway link --project ${{ env.PROJECT_ID }}
 
       - name: Deploy to Railway
         env:
