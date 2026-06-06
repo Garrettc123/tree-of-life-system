@@ -34,8 +34,11 @@ jobs:
 
       - name: Install Railway CLI
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          curl -fsSL https://railway.app/install.sh | bash
+          echo "${HOME}/.railway/bin" >> "${GITHUB_PATH}"
+
+      - name: Verify Railway CLI
+        run: railway --version
 
       - name: Validate orchestration-engine layout
         working-directory: orchestration-engine
