@@ -61,7 +61,7 @@ jobs:
           DATABASE_URL: postgresql://test_user:testpass123@localhost:5432/test_db
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         if: always()
         continue-on-error: true
 
