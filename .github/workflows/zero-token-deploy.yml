@@ -168,7 +168,7 @@ jobs:
           npm test 2>/dev/null || echo "No tests configured"
 
       - name: Upload Deployment Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: zero-token-deployment-report
           path: deployment-report.md
