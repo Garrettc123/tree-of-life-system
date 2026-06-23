@@ -3,6 +3,7 @@
 ## Start Free, Scale with Revenue
 
 ### Phase 0: Development ($0/month)
+
 - Run locally: `npm run dev`
 - Test all features
 - No cloud costs
@@ -10,16 +11,19 @@
 ### Phase 1: Free Tier Launch ($0-5/month)
 
 **Primary: Railway**
+
 - Cost: $5 free credit/month
 - Sufficient for: 100 users/day, 10K API calls
 - Revenue potential: $0-500/month
 
 **Backup: Heroku Free**
+
 - Cost: $0 (550 free hours/month)
 - Limitations: Sleeps after 30 min inactivity
 - Good for: Redundancy, testing
 
 **Deploy with:**
+
 ```bash
 bash scripts/deploy-free-tier.sh
 ```
@@ -47,6 +51,7 @@ bash scripts/deploy-free-tier.sh
    - Metrics dashboard
 
 **Deploy with:**
+
 ```bash
 bash scripts/scale-after-revenue.sh
 ```
@@ -78,6 +83,7 @@ bash scripts/scale-after-revenue.sh
    - Rate limiting
 
 **Deploy with:**
+
 ```bash
 bash deployment/gcp-setup.sh your-project
 ```
@@ -109,6 +115,7 @@ bash deployment/gcp-setup.sh your-project
    - Uptime monitors ($5/mo)
 
 **Deploy with:**
+
 ```bash
 bash scripts/deploy-all.sh
 ```
@@ -122,6 +129,7 @@ bash scripts/deploy-all.sh
 ### 1. Free Tier Optimization
 
 **Railway ($5 credit/month)**
+
 ```javascript
 // Optimize container size
 FROM node:18-alpine  // Use alpine (50MB vs 900MB)
@@ -129,6 +137,7 @@ RUN npm ci --only=production  // No dev dependencies
 ```
 
 **Stay within free tier by:**
+
 - Efficient code (less CPU)
 - Caching responses
 - Lazy loading features
@@ -137,11 +146,13 @@ RUN npm ci --only=production  // No dev dependencies
 ### 2. Pay Only for What You Use
 
 **Google Cloud Run**
+
 - Scales to zero when idle
 - Pay per request ($0.40 per 1M)
 - No minimum charges
 
 **Example costs:**
+
 - 10K requests: $0.04
 - 100K requests: $0.40
 - 1M requests: $4.00
@@ -149,6 +160,7 @@ RUN npm ci --only=production  // No dev dependencies
 ### 3. Caching to Reduce Compute
 
 **Add Redis caching:**
+
 ```javascript
 // Cache AI responses (expensive)
 const cached = await redis.get(`review:${prId}`);
@@ -165,12 +177,12 @@ await redis.setex(`review:${prId}`, 86400, result);
 
 **By revenue tier:**
 
-| Revenue | Platform | Cost | Resources |
-|---------|----------|------|----------|
-| $0-100 | Railway Free | $0-5 | 512MB, 0.5 CPU |
-| $100-1K | Railway Dev | $10 | 2GB, 2 CPU |
-| $1K-5K | GCP Run | $50 | Auto-scale |
-| $5K+ | Multi-cloud | $185 | Enterprise |
+| Revenue | Platform     | Cost | Resources      |
+| ------- | ------------ | ---- | -------------- |
+| $0-100  | Railway Free | $0-5 | 512MB, 0.5 CPU |
+| $100-1K | Railway Dev  | $10  | 2GB, 2 CPU     |
+| $1K-5K  | GCP Run      | $50  | Auto-scale     |
+| $5K+    | Multi-cloud  | $185 | Enterprise     |
 
 ### 5. Revenue-First Pricing
 
@@ -192,10 +204,12 @@ $5K revenue → $185/month cost (3.7% of revenue)
 ### Set Up Alerts
 
 **Railway:**
+
 1. Settings → Usage → Set budget alert
 2. Email when usage > $4 (before free credit exhausted)
 
 **GCP:**
+
 ```bash
 gcloud billing budgets create \
   --billing-account=ACCOUNT_ID \
@@ -205,6 +219,7 @@ gcloud billing budgets create \
 ```
 
 **AWS:**
+
 ```bash
 aws budgets create-budget \
   --account-id ACCOUNT_ID \
@@ -232,6 +247,7 @@ aws ce get-cost-and-usage --time-period Start=2025-01-01,End=2025-01-31
 ### If costs spike unexpectedly:
 
 **1. Immediate actions:**
+
 ```bash
 # Scale down to zero
 gcloud run services update titan --max-instances=0
@@ -244,12 +260,14 @@ railway logs --tail
 ```
 
 **2. Identify the issue:**
+
 - Infinite loops?
 - DDoS attack?
 - Memory leak?
 - Expensive API calls?
 
 **3. Fix and redeploy:**
+
 ```bash
 # Fix code
 git commit -m "Fix cost issue"
@@ -264,6 +282,7 @@ gcloud run deploy --max-instances=10
 ## Cost Optimization Checklist
 
 **Before deploying:**
+
 - [ ] Use free tiers first
 - [ ] Set up cost alerts
 - [ ] Enable auto-scaling limits
@@ -271,11 +290,13 @@ gcloud run deploy --max-instances=10
 - [ ] Optimize Docker images
 
 **After first revenue:**
+
 - [ ] Revenue > $100? → Upgrade to $17/month tier
 - [ ] Revenue > $1K? → Move to GCP ($75/month)
 - [ ] Revenue > $5K? → Full production ($185/month)
 
 **Ongoing:**
+
 - [ ] Monitor costs weekly
 - [ ] Review bills monthly
 - [ ] Optimize inefficient code
@@ -291,6 +312,7 @@ gcloud run deploy --max-instances=10
 **ROI:** 95%+ profit margins
 
 **Deploy free tier now:**
+
 ```bash
 bash scripts/deploy-free-tier.sh
 ```
