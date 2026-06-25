@@ -1,19 +1,35 @@
-name: Auto-Deploy Enterprise System
-on: [push]
+# .github/workflows/deploy.yml
+# tree-of-life-system — owns atlas-ingest edge fn + ATLAS schema migrations
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        default: production
+        type: choice
+        options: [production, staging, preview]
+
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm install
-      - name: Build Project
-        run: npm run build --if-present
-      - name: Run Tests
-        run: npm test --if-present
-      - name: Deployment Status
-        run: echo "✅ Enterprise System Verified & Ready"
+  deploy:
+    uses: Garrettc123/garcar-control-plane/.github/workflows/garcar-deploy.yml@main
+    with:
+      service_name: tree-of-life-system
+      environment: ${{ github.event.inputs.environment || 'production' }}
+      railway_service_id: ""
+      deploy_edge_function: atlas-ingest
+      run_schema_migration: true
+      notify_atlas: true
+    secrets:
+      RAILWAY_TOKEN:         ${{ secrets.RAILWAY_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID:   ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_URL:       ${{ secrets.SUPABASE_DB_URL }}
+      ATLAS_INGEST_URL:      ${{ secrets.ATLAS_INGEST_URL }}
+      ATLAS_API_KEY:         ${{ secrets.ATLAS_API_KEY }}
+      ECR_REGISTRY:          ${{ secrets.ECR_REGISTRY }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:            ${{ secrets.AWS_REGION }}
