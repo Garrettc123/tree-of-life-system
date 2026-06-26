@@ -1,9 +1,9 @@
 [build]
 builder = "NIXPACKS"
-builder_command = "npm install"
+build_command = "pip install -r orchestrator/requirements.txt"
 
 [deploy]
-start_command = "node orchestrator/index.js"
+start_command = "python -m uvicorn orchestrator.main:app --host 0.0.0.0 --port ${PORT:-8001}"
 restart_policy_type = "ON_FAILURE"
 restart_policy_max_retries = 10
 
@@ -11,3 +11,9 @@ restart_policy_max_retries = 10
 path = "/health"
 interval = 60
 timeout = 10
+
+# Atlas Dispatch (second Railway service — same repo, different start command):
+# start_command = "python -m uvicorn orchestrator.atlas_dispatch:app --host 0.0.0.0 --port ${PORT:-8000}"
+# Required env vars for atlas_dispatch service:
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ATLAS_API_KEY,
+#   DISPATCH_URL, NTFY_TOPIC, NTFY_URL
