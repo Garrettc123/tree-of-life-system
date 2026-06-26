@@ -31,7 +31,7 @@ jobs:
       has-package: ${{ steps.check.outputs.has-package }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check for package.json
         id: check
@@ -79,7 +79,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         if: needs.setup.outputs.has-package == 'true'
@@ -110,7 +110,7 @@ jobs:
     needs: quality
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         if: needs.setup.outputs.has-package == 'true'
@@ -160,7 +160,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
