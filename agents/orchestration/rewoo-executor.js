@@ -1,12 +1,12 @@
 /**
  * ReWOO Orchestration Executor
  * Reasoning Without Observation - 3-stage agent orchestration
- * 
+ *
  * Stages:
  * 1. Planning: MCP Coordinator creates execution blueprint (no tool calls)
  * 2. Execution: Agents call tools with plan constraints
  * 3. Synthesis: Reflexion agents critique and refine outputs
- * 
+ *
  * Benefits:
  * - Better reasoning quality (multi-stage planning)
  * - Autonomous error correction
@@ -14,8 +14,8 @@
  * - Improved scalability without central bottleneck
  */
 
-const EventEmitter = require('events');
-const uuid = require('uuid');
+const EventEmitter = require("events");
+const uuid = require("uuid");
 
 class ReWOOExecutor extends EventEmitter {
   constructor(config = {}) {
@@ -35,7 +35,10 @@ class ReWOOExecutor extends EventEmitter {
     this.agents = new Map();
 
     // Periodically clean up old executions to prevent memory leak
-    this.cleanupInterval = setInterval(() => this.cleanupOldExecutions(), 300000); // Every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => this.cleanupOldExecutions(),
+      300000,
+    ); // Every 5 minutes
   }
 
   /**
@@ -57,8 +60,9 @@ class ReWOOExecutor extends EventEmitter {
 
     // If still over limit, remove oldest executions
     if (this.executions.size > this.config.maxExecutions) {
-      const sortedExecutions = Array.from(this.executions.entries())
-        .sort((a, b) => new Date(a[1].timestamp) - new Date(b[1].timestamp));
+      const sortedExecutions = Array.from(this.executions.entries()).sort(
+        (a, b) => new Date(a[1].timestamp) - new Date(b[1].timestamp),
+      );
 
       const toRemove = this.executions.size - this.config.maxExecutions;
       for (let i = 0; i < toRemove; i++) {
@@ -68,7 +72,9 @@ class ReWOOExecutor extends EventEmitter {
     }
 
     if (removedCount > 0) {
-      console.log(`[ReWOOExecutor] Cleaned up ${removedCount} old executions. Current size: ${this.executions.size}`);
+      console.log(
+        `[ReWOOExecutor] Cleaned up ${removedCount} old executions. Current size: ${this.executions.size}`,
+      );
     }
   }
 
@@ -80,7 +86,7 @@ class ReWOOExecutor extends EventEmitter {
       clearInterval(this.cleanupInterval);
     }
     this.executions.clear();
-    console.log('[ReWOOExecutor] Resources cleaned up');
+    console.log("[ReWOOExecutor] Resources cleaned up");
   }
 
   registerAgent(agentId, agent) {
@@ -96,7 +102,7 @@ class ReWOOExecutor extends EventEmitter {
       context,
       stages: {},
       timestamp: new Date().toISOString(),
-      status: 'initiated',
+      status: "initiated",
     };
 
     this.executions.set(executionId, execution);
@@ -104,8 +110,12 @@ class ReWOOExecutor extends EventEmitter {
     try {
       // STAGE 1: PLANNING
       console.log(`[ReWOOExecutor] Stage 1 - Planning (${executionId})`);
-      execution.stages.planning = await this.stagePlanning(task, context, executionId);
-      
+      execution.stages.planning = await this.stagePlanning(
+        task,
+        context,
+        executionId,
+      );
+
       if (!execution.stages.planning.success) {
         throw new Error(`Planning failed: ${execution.stages.planning.error}`);
       }
@@ -115,11 +125,13 @@ class ReWOOExecutor extends EventEmitter {
       execution.stages.execution = await this.stageExecution(
         execution.stages.planning.plan,
         context,
-        executionId
+        executionId,
       );
 
       if (!execution.stages.execution.success) {
-        throw new Error(`Execution failed: ${execution.stages.execution.error}`);
+        throw new Error(
+          `Execution failed: ${execution.stages.execution.error}`,
+        );
       }
 
       // STAGE 3: SYNTHESIS
@@ -128,11 +140,11 @@ class ReWOOExecutor extends EventEmitter {
         execution.stages.execution.outputs,
         execution.stages.planning.plan,
         context,
-        executionId
+        executionId,
       );
 
-      execution.status = 'completed';
-      this.emit('execution:completed', execution);
+      execution.status = "completed";
+      this.emit("execution:completed", execution);
 
       return {
         success: true,
@@ -141,11 +153,14 @@ class ReWOOExecutor extends EventEmitter {
         stages: execution.stages,
       };
     } catch (error) {
-      execution.status = 'failed';
+      execution.status = "failed";
       execution.error = error.message;
-      this.emit('execution:failed', execution);
+      this.emit("execution:failed", execution);
 
-      console.error(`[ReWOOExecutor] Execution failed (${executionId}):`, error.message);
+      console.error(
+        `[ReWOOExecutor] Execution failed (${executionId}):`,
+        error.message,
+      );
       return {
         success: false,
         executionId,
@@ -157,12 +172,12 @@ class ReWOOExecutor extends EventEmitter {
 
   async stagePlanning(task, context, executionId) {
     const startTime = Date.now();
-    
+
     try {
       // Get planning agent
-      const planningAgent = this.agents.get('planning-agent');
+      const planningAgent = this.agents.get("planning-agent");
       if (!planningAgent) {
-        throw new Error('Planning agent not found');
+        throw new Error("Planning agent not found");
       }
 
       // Create execution plan WITHOUT making tool calls
@@ -173,7 +188,7 @@ class ReWOOExecutor extends EventEmitter {
 
       const duration = Date.now() - startTime;
 
-      this.emit('stage:planning:completed', {
+      this.emit("stage:planning:completed", {
         executionId,
         planSteps: plan.steps.length,
         duration,
@@ -206,7 +221,9 @@ class ReWOOExecutor extends EventEmitter {
         // Get execution agent for this step's type
         const agent = this.agents.get(step.agentId);
         if (!agent) {
-          console.warn(`[ReWOOExecutor] Agent not found for step ${step.id}: ${step.agentId}`);
+          console.warn(
+            `[ReWOOExecutor] Agent not found for step ${step.id}: ${step.agentId}`,
+          );
           continue;
         }
 
@@ -222,21 +239,24 @@ class ReWOOExecutor extends EventEmitter {
             timestamp: new Date().toISOString(),
           });
 
-          this.emit('step:completed', {
+          this.emit("step:completed", {
             executionId,
             stepId: step.id,
             success: true,
           });
         } catch (stepError) {
-          console.error(`[ReWOOExecutor] Step ${step.id} failed:`, stepError.message);
-          
+          console.error(
+            `[ReWOOExecutor] Step ${step.id} failed:`,
+            stepError.message,
+          );
+
           outputs.push({
             stepId: step.id,
             error: stepError.message,
             timestamp: new Date().toISOString(),
           });
 
-          this.emit('step:failed', {
+          this.emit("step:failed", {
             executionId,
             stepId: step.id,
             error: stepError.message,
@@ -268,9 +288,9 @@ class ReWOOExecutor extends EventEmitter {
 
     try {
       // Get reflexion agent for synthesis
-      const reflexionAgent = this.agents.get('reflexion-agent');
+      const reflexionAgent = this.agents.get("reflexion-agent");
       if (!reflexionAgent) {
-        throw new Error('Reflexion agent not found');
+        throw new Error("Reflexion agent not found");
       }
 
       // Synthesize outputs and generate critique
@@ -281,7 +301,7 @@ class ReWOOExecutor extends EventEmitter {
 
       const duration = Date.now() - startTime;
 
-      this.emit('stage:synthesis:completed', {
+      this.emit("stage:synthesis:completed", {
         executionId,
         critiques: synthesis.critiques?.length || 0,
         duration,
@@ -295,10 +315,13 @@ class ReWOOExecutor extends EventEmitter {
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       // Fallback synthesis if reflexion agent fails
-      console.warn(`[ReWOOExecutor] Reflexion synthesis failed, using fallback:`, error.message);
-      
+      console.warn(
+        `[ReWOOExecutor] Reflexion synthesis failed, using fallback:`,
+        error.message,
+      );
+
       return {
         success: false,
         error: error.message,
@@ -312,9 +335,9 @@ class ReWOOExecutor extends EventEmitter {
   fallbackSynthesis(outputs) {
     // Combine outputs into unified result if synthesis fails
     return {
-      outputs: outputs.filter(o => !o.error),
-      errors: outputs.filter(o => o.error),
-      summary: `${outputs.filter(o => !o.error).length} steps completed, ${outputs.filter(o => o.error).length} failed`,
+      outputs: outputs.filter((o) => !o.error),
+      errors: outputs.filter((o) => o.error),
+      summary: `${outputs.filter((o) => !o.error).length} steps completed, ${outputs.filter((o) => o.error).length} failed`,
     };
   }
 
@@ -330,8 +353,8 @@ class ReWOOExecutor extends EventEmitter {
 
   getMetrics() {
     const executions = Array.from(this.executions.values());
-    const completed = executions.filter(e => e.status === 'completed').length;
-    const failed = executions.filter(e => e.status === 'failed').length;
+    const completed = executions.filter((e) => e.status === "completed").length;
+    const failed = executions.filter((e) => e.status === "failed").length;
 
     return {
       totalExecutions: executions.length,
