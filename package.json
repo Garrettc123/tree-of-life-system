@@ -48,7 +48,7 @@
     "dotenv": "^17.4.2",
     "events": "^3.3.0",
     "kafkajs": "^2.2.4",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
