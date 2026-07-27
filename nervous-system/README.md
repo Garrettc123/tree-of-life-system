@@ -5,6 +5,7 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 ## Agent Types
 
 ### 1. Verification Agents
+
 - **Purpose**: Automated contribution validation
 - **Capabilities**:
   - Data quality assessment
@@ -15,6 +16,7 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 - **Models**: GPT-4, Claude, custom fine-tuned models
 
 ### 2. Risk Assessment Agents
+
 - **Purpose**: Security and fraud prevention
 - **Capabilities**:
   - Fraud pattern detection
@@ -25,6 +27,7 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 - **Techniques**: ML classification, anomaly detection, graph analysis
 
 ### 3. Orchestration Agents
+
 - **Purpose**: System coordination and workflow management
 - **Capabilities**:
   - Task scheduling
@@ -35,6 +38,7 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 - **Framework**: LangChain, AutoGPT patterns
 
 ### 4. Optimization Agents
+
 - **Purpose**: System efficiency and improvement
 - **Capabilities**:
   - Gas optimization
@@ -45,6 +49,7 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 - **Methods**: Reinforcement learning, evolutionary algorithms
 
 ## Technology Stack
+
 - **Language**: Python 3.11+
 - **AI/ML**: TensorFlow, PyTorch, scikit-learn
 - **LLM Integration**: OpenAI API, Anthropic, Cohere
@@ -53,7 +58,9 @@ The Nervous System is the intelligent layer of the NWU Protocol, consisting of s
 - **Vector DB**: Pinecone, Weaviate
 
 ## Agent Communication
+
 Agents communicate via:
+
 - Message queue (RabbitMQ)
 - Shared state store (Redis)
 - Event bus integration
@@ -70,4 +77,5 @@ python agents/orchestrator.py
 ```
 
 ## Configuration
+
 Agent behaviors are configured in `nervous-system/config/agents.yaml`
