@@ -4,7 +4,9 @@ require("hardhat-gas-reporter");
 require("solidity-coverage");
 require("dotenv").config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0x0000000000000000000000000000000000000000000000000000000000000000";
+const PRIVATE_KEY =
+  process.env.PRIVATE_KEY ||
+  "0x0000000000000000000000000000000000000000000000000000000000000000";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "";
 const INFURA_API_KEY = process.env.INFURA_API_KEY || "";
