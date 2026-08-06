@@ -24,7 +24,12 @@
             "name": "AI Engine Root",
             "platforms": ["GitHub"],
             "purpose": "Core AI/ML capabilities",
-            "branches": ["NLP", "Predictive Analytics", "Automated Decisions", "Content Generation"],
+            "branches": [
+              "NLP",
+              "Predictive Analytics",
+              "Automated Decisions",
+              "Content Generation"
+            ],
             "status": "active"
           }
         ]
@@ -34,24 +39,44 @@
         "systems": [
           {
             "name": "Perplexity Integration Hub",
-            "capabilities": ["Search Integration", "Content Generation", "Research Automation", "Knowledge Base"],
+            "capabilities": [
+              "Search Integration",
+              "Content Generation",
+              "Research Automation",
+              "Knowledge Base"
+            ],
             "status": "active"
           },
           {
             "name": "Linear Project Orchestration",
             "team_id": "0a42fa2d-5df2-45f5-a1c2-1dd78749fe93",
-            "workflows": ["Issue Automation", "Sprint Planning", "Resource Allocation", "Progress Tracking"],
+            "workflows": [
+              "Issue Automation",
+              "Sprint Planning",
+              "Resource Allocation",
+              "Progress Tracking"
+            ],
             "status": "active"
           },
           {
             "name": "GitHub Code Infrastructure",
             "repositories": 61,
-            "features": ["CI/CD Pipelines", "Branch Strategy", "Code Review", "Deployment"],
+            "features": [
+              "CI/CD Pipelines",
+              "Branch Strategy",
+              "Code Review",
+              "Deployment"
+            ],
             "status": "active"
           },
           {
             "name": "Notion Knowledge Network",
-            "databases": ["Systems Registry", "Divine Alignment", "Security", "Sprint Innovation"],
+            "databases": [
+              "Systems Registry",
+              "Divine Alignment",
+              "Security",
+              "Sprint Innovation"
+            ],
             "status": "active"
           }
         ]
@@ -61,31 +86,57 @@
         "systems": [
           {
             "name": "Marketing Automation",
-            "components": ["Content Calendar", "SEO Engine", "Social Automation", "Analytics", "Email Campaigns"],
+            "components": [
+              "Content Calendar",
+              "SEO Engine",
+              "Social Automation",
+              "Analytics",
+              "Email Campaigns"
+            ],
             "spawns_from": ["Perplexity Hub", "AI Engine"],
             "status": "building"
           },
           {
             "name": "Customer Intelligence",
-            "components": ["Sentiment Analysis", "Lead Scoring", "Behavior Tracking", "Churn Prevention"],
+            "components": [
+              "Sentiment Analysis",
+              "Lead Scoring",
+              "Behavior Tracking",
+              "Churn Prevention"
+            ],
             "spawns_from": ["Data Architecture", "AI Engine"],
             "status": "building"
           },
           {
             "name": "Financial Operations",
-            "components": ["Revenue Forecasting", "Expense Optimization", "Invoice Automation", "Compliance"],
+            "components": [
+              "Revenue Forecasting",
+              "Expense Optimization",
+              "Invoice Automation",
+              "Compliance"
+            ],
             "spawns_from": ["Financial Security Tracker"],
             "status": "building"
           },
           {
             "name": "Product Development",
-            "components": ["Feature Prioritization", "Bug Prediction", "Code Review AI", "Deployment Orchestration"],
+            "components": [
+              "Feature Prioritization",
+              "Bug Prediction",
+              "Code Review AI",
+              "Deployment Orchestration"
+            ],
             "spawns_from": ["GitHub", "Linear"],
             "status": "building"
           },
           {
             "name": "Support & Success",
-            "components": ["AI Chatbot", "Knowledge Generator", "Ticket Routing", "Health Scoring"],
+            "components": [
+              "AI Chatbot",
+              "Knowledge Generator",
+              "Ticket Routing",
+              "Health Scoring"
+            ],
             "spawns_from": ["Perplexity", "Notion"],
             "status": "building"
           }
@@ -94,10 +145,34 @@
       "leaf": {
         "level": 4,
         "use_cases": {
-          "content_creation": ["Blog Posts", "Video Scripts", "Graphics", "Podcasts", "Social Captions"],
-          "sales_enablement": ["Proposals", "Demo Scheduling", "Follow-ups", "Territory Optimization", "Commissions"],
-          "operations": ["Meeting Summaries", "Email Triage", "Calendar Optimization", "Task Delegation", "Bottleneck Detection"],
-          "innovation": ["Patent Research", "Competitive Intelligence", "Trend Analysis", "Partnership Finder", "Grant Assistant"]
+          "content_creation": [
+            "Blog Posts",
+            "Video Scripts",
+            "Graphics",
+            "Podcasts",
+            "Social Captions"
+          ],
+          "sales_enablement": [
+            "Proposals",
+            "Demo Scheduling",
+            "Follow-ups",
+            "Territory Optimization",
+            "Commissions"
+          ],
+          "operations": [
+            "Meeting Summaries",
+            "Email Triage",
+            "Calendar Optimization",
+            "Task Delegation",
+            "Bottleneck Detection"
+          ],
+          "innovation": [
+            "Patent Research",
+            "Competitive Intelligence",
+            "Trend Analysis",
+            "Partnership Finder",
+            "Grant Assistant"
+          ]
         }
       }
     },
