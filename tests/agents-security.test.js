@@ -68,7 +68,12 @@ describe('gRPCGateway security', function () {
       () => gateway.authenticate({ metadata: metadataWith('wrong-secret-value') }),
       /Unauthenticated/
     );
-    assert.strictEqual(gateway.metrics.unauthenticatedRequests, 2);
+    // Same length as TEST_TOKEN, so only the constant-time comparison rejects it.
+    assert.throws(
+      () => gateway.authenticate({ metadata: metadataWith('unit-test-shared-secreT') }),
+      /Unauthenticated/
+    );
+    assert.strictEqual(gateway.metrics.unauthenticatedRequests, 3);
   });
 
   it('accepts RPCs presenting the configured token', function () {

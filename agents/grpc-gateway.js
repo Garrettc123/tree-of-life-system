@@ -19,6 +19,7 @@ const uuid = require('uuid');
 
 const AUTH_METADATA_KEY = 'authorization';
 const AUTH_SCHEME = 'Bearer';
+const AUTH_SCHEME_PREFIX = /^Bearer\s+/i;
 
 /**
  * Only propagate gRPC status codes we set ourselves; Node system errors carry
@@ -170,13 +171,12 @@ class gRPCGateway extends EventEmitter {
   }
 
   isValidToken(presented) {
-    const normalized = presented.trim().replace(new RegExp('^' + AUTH_SCHEME + '\\s+', 'i'), '');
-    const expected = Buffer.from(this.config.authToken, 'utf8');
-    const actual = Buffer.from(normalized, 'utf8');
+    const normalized = presented.trim().replace(AUTH_SCHEME_PREFIX, '');
 
-    if (expected.length !== actual.length) {
-      return false;
-    }
+    // Comparing fixed-length digests keeps the comparison constant time even
+    // when the presented token has a different length than the expected one.
+    const expected = crypto.createHash('sha256').update(this.config.authToken, 'utf8').digest();
+    const actual = crypto.createHash('sha256').update(normalized, 'utf8').digest();
 
     return crypto.timingSafeEqual(expected, actual);
   }

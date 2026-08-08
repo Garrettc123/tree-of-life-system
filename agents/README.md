@@ -236,6 +236,34 @@ module.exports = {
 - **Rate Limiting**: Intelligent throttling to prevent API abuse
 - **Human Override**: Emergency stop for critical operations
 
+### Transport security
+
+The gRPC gateway can execute arbitrary agent tasks and the Kafka event bus carries
+those task payloads, so both refuse to run in an exposed, unprotected configuration.
+All settings live in `.env` (see `.env.template`).
+
+**gRPC gateway** (`agents/grpc-gateway.js`)
+
+| Variable | Purpose |
+| --- | --- |
+| `GRPC_HOST` | Bind address. Defaults to `127.0.0.1`; any other address requires TLS **and** caller authentication. |
+| `GRPC_TLS_ENABLED` / `GRPC_TLS_CERT_PATH` / `GRPC_TLS_KEY_PATH` | Serve over TLS instead of cleartext HTTP/2. |
+| `GRPC_TLS_CA_PATH` / `GRPC_REQUIRE_CLIENT_CERT` | Verify client certificates (mutual TLS). |
+| `GRPC_AUTH_TOKEN` | Shared secret checked (in constant time) against the `authorization` metadata of every RPC. |
+| `GRPC_ALLOW_INSECURE` | Escape hatch that disables the checks above. Local development only. |
+
+**Kafka event bus** (`agents/event-bus/kafka-coordinator.js`)
+
+| Variable | Purpose |
+| --- | --- |
+| `KAFKA_SECURITY_PROTOCOL` | `PLAINTEXT`, `SSL`, `SASL_SSL` or `SASL_PLAINTEXT`. Remote brokers require an SSL variant. |
+| `KAFKA_SASL_MECHANISM` / `KAFKA_SASL_USERNAME` / `KAFKA_SASL_PASSWORD` | Broker credentials (default mechanism `scram-sha-512`). |
+| `KAFKA_SSL_CA_CERT` | CA bundle used to verify the broker certificate. |
+| `KAFKA_ALLOW_PLAINTEXT` | Escape hatch permitting plaintext to remote brokers. Local development only. |
+
+Startup fails fast with an explanatory error when an insecure combination is
+detected, rather than silently exposing the control plane.
+
 ## Monitoring & Observability
 
 ```bash
