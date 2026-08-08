@@ -13,7 +13,12 @@
     "test": "jest",
     "status": "node scripts/status.js"
   },
-  "keywords": ["agents", "automation", "mcp", "autonomous"],
+  "keywords": [
+    "agents",
+    "automation",
+    "mcp",
+    "autonomous"
+  ],
   "author": "Garrett Carrol",
   "license": "MIT",
   "dependencies": {
