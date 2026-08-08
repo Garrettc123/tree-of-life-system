@@ -86,6 +86,11 @@ services:
       GRPC_HOST: app
       GRPC_PORT: 50051
       LOG_LEVEL: debug
+      # Local development stack only: the bundled broker and gateway run without
+      # TLS or authentication, so the insecure transports must be acknowledged
+      # explicitly. Never set these in a real deployment.
+      KAFKA_ALLOW_PLAINTEXT: "true"
+      GRPC_ALLOW_INSECURE: "true"
     ports:
       - "3000:3000"
       - "50051:50051"

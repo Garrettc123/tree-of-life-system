@@ -12,8 +12,21 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const EventEmitter = require('events');
 const uuid = require('uuid');
+
+const AUTH_METADATA_KEY = 'authorization';
+const AUTH_SCHEME = 'Bearer';
+
+/**
+ * Only propagate gRPC status codes we set ourselves; Node system errors carry
+ * string codes such as 'ENOENT' which are not valid gRPC statuses.
+ */
+function statusCodeFor(error, fallback) {
+  return typeof error?.code === 'number' ? error.code : fallback;
+}
 
 class gRPCGateway extends EventEmitter {
   constructor(config = {}) {
@@ -27,8 +40,17 @@ class gRPCGateway extends EventEmitter {
       maxSendMessageLength: config.maxSendMessageLength || 4 * 1024 * 1024,
       keepaliveTime: config.keepaliveTime || 30000,
       keepaliveTimeout: config.keepaliveTimeout || 10000,
+      tlsEnabled: config.tlsEnabled === true,
+      tlsCertPath: config.tlsCertPath || null,
+      tlsKeyPath: config.tlsKeyPath || null,
+      tlsCaPath: config.tlsCaPath || null,
+      requireClientCert: config.requireClientCert === true,
+      authToken: config.authToken || null,
+      allowInsecure: config.allowInsecure === true,
       ...config,
     };
+
+    this.assertSecureConfiguration();
 
     this.server = null;
     this.client = null;
@@ -40,7 +62,123 @@ class gRPCGateway extends EventEmitter {
       errorsEncountered: 0,
       averageLatency: 0,
       latencyHistory: [],
+      unauthenticatedRequests: 0,
     };
+  }
+
+  /**
+   * Reject configurations that would expose the agent control plane without
+   * transport encryption or caller authentication.
+   *
+   * `executeTask` runs arbitrary agent tasks on behalf of the caller, so an
+   * unauthenticated listener on a non-loopback interface is remote code
+   * execution by design. Insecure setups therefore have to be opted into
+   * explicitly via `allowInsecure`.
+   */
+  assertSecureConfiguration() {
+    if (this.config.allowInsecure) {
+      console.warn(
+        '[gRPCGateway] SECURITY WARNING: insecure mode enabled - traffic is unencrypted and callers are not authenticated'
+      );
+      return;
+    }
+
+    const isLoopback = ['127.0.0.1', 'localhost', '::1'].includes(this.config.host);
+
+    if (!this.config.tlsEnabled && !isLoopback) {
+      throw new Error(
+        `gRPC TLS is disabled while binding to a non-loopback host (${this.config.host}). ` +
+          'Set GRPC_TLS_ENABLED=true with GRPC_TLS_CERT_PATH/GRPC_TLS_KEY_PATH, bind to 127.0.0.1, ' +
+          'or set GRPC_ALLOW_INSECURE=true to acknowledge the risk.'
+      );
+    }
+
+    if (!this.config.authToken && !this.config.requireClientCert && !isLoopback) {
+      throw new Error(
+        'gRPC gateway has no caller authentication configured while listening on a non-loopback host. ' +
+          'Set GRPC_AUTH_TOKEN, enable mutual TLS via GRPC_TLS_CA_PATH, or set GRPC_ALLOW_INSECURE=true ' +
+          'to acknowledge the risk.'
+      );
+    }
+
+    if (this.config.tlsEnabled && (!this.config.tlsCertPath || !this.config.tlsKeyPath)) {
+      throw new Error(
+        'gRPC TLS is enabled but GRPC_TLS_CERT_PATH and GRPC_TLS_KEY_PATH are not both configured.'
+      );
+    }
+  }
+
+  /**
+   * Build server credentials, preferring TLS (and mutual TLS when a CA is supplied).
+   */
+  buildServerCredentials() {
+    if (!this.config.tlsEnabled) {
+      return grpc.ServerCredentials.createInsecure();
+    }
+
+    const rootCert = this.config.tlsCaPath ? fs.readFileSync(this.config.tlsCaPath) : null;
+    const keyCertPairs = [
+      {
+        private_key: fs.readFileSync(this.config.tlsKeyPath),
+        cert_chain: fs.readFileSync(this.config.tlsCertPath),
+      },
+    ];
+
+    return grpc.ServerCredentials.createSsl(rootCert, keyCertPairs, this.config.requireClientCert);
+  }
+
+  /**
+   * Build client credentials matching the server's transport configuration.
+   */
+  buildClientCredentials() {
+    if (!this.config.tlsEnabled) {
+      return grpc.credentials.createInsecure();
+    }
+
+    const rootCert = this.config.tlsCaPath ? fs.readFileSync(this.config.tlsCaPath) : null;
+    const privateKey =
+      this.config.requireClientCert && this.config.tlsKeyPath
+        ? fs.readFileSync(this.config.tlsKeyPath)
+        : null;
+    const certChain =
+      this.config.requireClientCert && this.config.tlsCertPath
+        ? fs.readFileSync(this.config.tlsCertPath)
+        : null;
+
+    return grpc.credentials.createSsl(rootCert, privateKey, certChain);
+  }
+
+  /**
+   * Verify the shared secret presented by the caller in request metadata.
+   * Uses a constant-time comparison to avoid leaking the token via timing.
+   */
+  authenticate(call) {
+    if (!this.config.authToken) {
+      return;
+    }
+
+    const metadata = call?.metadata;
+    const rawValues = typeof metadata?.get === 'function' ? metadata.get(AUTH_METADATA_KEY) : [];
+    const presented = Array.isArray(rawValues) ? rawValues[0] : rawValues;
+
+    if (typeof presented !== 'string' || !this.isValidToken(presented)) {
+      this.metrics.unauthenticatedRequests++;
+      const error = new Error('Unauthenticated: valid credentials are required');
+      error.code = grpc.status.UNAUTHENTICATED;
+      throw error;
+    }
+  }
+
+  isValidToken(presented) {
+    const normalized = presented.trim().replace(new RegExp('^' + AUTH_SCHEME + '\\s+', 'i'), '');
+    const expected = Buffer.from(this.config.authToken, 'utf8');
+    const actual = Buffer.from(normalized, 'utf8');
+
+    if (expected.length !== actual.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expected, actual);
   }
 
   async loadProto() {
@@ -76,14 +214,17 @@ class gRPCGateway extends EventEmitter {
       return new Promise((resolve, reject) => {
         this.server.bindAsync(
           `${this.config.host}:${this.config.port}`,
-          grpc.ServerCredentials.createInsecure(),
+          this.buildServerCredentials(),
           (error) => {
             if (error) {
               console.error('[gRPCGateway] Bind error:', error.message);
               reject(error);
             } else {
               this.server.start();
-              console.log(`[gRPCGateway] Server started on ${this.config.host}:${this.config.port}`);
+              console.log(
+                `[gRPCGateway] Server started on ${this.config.host}:${this.config.port} ` +
+                  `(tls=${this.config.tlsEnabled}, auth=${Boolean(this.config.authToken)})`
+              );
               this.emit('server:started');
               resolve();
             }
@@ -100,7 +241,7 @@ class gRPCGateway extends EventEmitter {
     try {
       await this.loadProto();
 
-      const credentials = grpc.ChannelCredentials.createInsecure();
+      const credentials = this.buildClientCredentials();
       const channelOptions = {
         'grpc.max_receive_message_length': this.config.maxReceiveMessageLength,
         'grpc.max_send_message_length': this.config.maxSendMessageLength,
@@ -138,6 +279,8 @@ class gRPCGateway extends EventEmitter {
     const requestId = uuid.v4();
 
     try {
+      this.authenticate(call);
+
       const { agentId, taskId, taskType, payload } = call.request;
 
       console.log(`[gRPCGateway] Executing task ${taskId} on agent ${agentId}`);
@@ -175,7 +318,7 @@ class gRPCGateway extends EventEmitter {
       console.error('[gRPCGateway] Task execution error:', error.message);
 
       callback({
-        code: grpc.status.INTERNAL,
+        code: statusCodeFor(error, grpc.status.INTERNAL),
         message: error.message,
         details: { requestId, latency },
       });
@@ -185,6 +328,13 @@ class gRPCGateway extends EventEmitter {
   }
 
   async streamEvents(call) {
+    try {
+      this.authenticate(call);
+    } catch (error) {
+      call.emit('error', error);
+      return;
+    }
+
     const { agentId, eventTypes } = call.request;
     const streamId = uuid.v4();
 
@@ -217,6 +367,8 @@ class gRPCGateway extends EventEmitter {
 
   async getStatus(call, callback) {
     try {
+      this.authenticate(call);
+
       const { agentId } = call.request;
       const agent = this.agents.get(agentId);
 
@@ -235,7 +387,7 @@ class gRPCGateway extends EventEmitter {
       callback(null, status);
     } catch (error) {
       callback({
-        code: grpc.status.NOT_FOUND,
+        code: statusCodeFor(error, grpc.status.NOT_FOUND),
         message: error.message,
       });
     }
@@ -244,6 +396,17 @@ class gRPCGateway extends EventEmitter {
   registerAgent(agentId, agent) {
     this.agents.set(agentId, agent);
     console.log(`[gRPCGateway] Registered agent: ${agentId}`);
+  }
+
+  /**
+   * Metadata that outbound calls must attach so the peer gateway accepts them.
+   */
+  buildCallMetadata() {
+    const metadata = new grpc.Metadata();
+    if (this.config.authToken) {
+      metadata.set(AUTH_METADATA_KEY, AUTH_SCHEME + ' ' + this.config.authToken);
+    }
+    return metadata;
   }
 
   recordMetric(latency) {

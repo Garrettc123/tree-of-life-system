@@ -17,6 +17,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const KafkaCoordinator = require('./event-bus/kafka-coordinator');
 const gRPCGateway = require('./grpc-gateway');
 const ReWOOExecutor = require('./orchestration/rewoo-executor');
+const { buildKafkaSecurityConfig, buildGrpcSecurityConfig } = require('./config/security');
 
 class BootstrapOrchestrator {
   constructor() {
@@ -24,10 +25,12 @@ class BootstrapOrchestrator {
       kafka: {
         brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
         clientId: 'tree-of-life-orchestrator',
+        ...buildKafkaSecurityConfig(),
       },
       grpc: {
         host: process.env.GRPC_HOST || 'localhost',
         port: parseInt(process.env.GRPC_PORT || '50051'),
+        ...buildGrpcSecurityConfig(),
       },
       executionConfig: {
         maxIterations: 3,

@@ -14,18 +14,26 @@ const { Kafka, logLevel } = require('kafkajs');
 const EventEmitter = require('events');
 const uuid = require('uuid');
 
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
 class KafkaCoordinator extends EventEmitter {
   constructor(config = {}) {
     super();
-    
+
+    const brokers = config.brokers || ['localhost:9092'];
+    const ssl = config.ssl || false;
+    const sasl = config.sasl || null;
+
+    KafkaCoordinator.assertTransportSecurity(brokers, ssl, sasl, config.allowPlaintext === true);
+
     this.kafka = new Kafka({
       clientId: config.clientId || `coordinator-${uuid.v4().slice(0, 8)}`,
-      brokers: config.brokers || ['localhost:9092'],
+      brokers,
       logLevel: logLevel.INFO,
-      ssl: config.ssl || false,
-      sasl: config.sasl || null,
-      connectionTimeout: 10000,
-      requestTimeout: 30000,
+      ssl,
+      sasl,
+      connectionTimeout: config.connectionTimeout || 10000,
+      requestTimeout: config.requestTimeout || 30000,
     });
 
     this.producer = null;
@@ -33,6 +41,41 @@ class KafkaCoordinator extends EventEmitter {
     this.admin = null;
     this.eventRegistry = new Map();
     this.subscriptions = new Map();
+  }
+
+  /**
+   * Refuse to open an unencrypted, unauthenticated connection to a remote broker.
+   *
+   * The coordinator also opens an admin client, so anyone able to reach a
+   * plaintext broker can read every inter-agent payload and inject forged
+   * events into the `event-*` topics. Plaintext is only tolerated for local
+   * brokers, or when explicitly acknowledged via `allowPlaintext`.
+   */
+  static assertTransportSecurity(brokers, ssl, sasl, allowPlaintext) {
+    if (ssl || allowPlaintext) {
+      return;
+    }
+
+    const remoteBrokers = brokers.filter((broker) => !KafkaCoordinator.isLoopbackBroker(broker));
+
+    if (remoteBrokers.length > 0) {
+      throw new Error(
+        `Kafka TLS is disabled for remote broker(s): ${remoteBrokers.join(', ')}. ` +
+          'Set KAFKA_SECURITY_PROTOCOL=SASL_SSL (or SSL) with the matching credentials, ' +
+          'or set KAFKA_ALLOW_PLAINTEXT=true to acknowledge the risk.'
+      );
+    }
+
+    if (sasl) {
+      console.warn(
+        '[KafkaCoordinator] SECURITY WARNING: SASL credentials are being sent over a plaintext connection'
+      );
+    }
+  }
+
+  static isLoopbackBroker(broker) {
+    const host = String(broker).trim().replace(/:\d+$/, '').toLowerCase();
+    return LOOPBACK_HOSTS.includes(host);
   }
 
   async connect() {

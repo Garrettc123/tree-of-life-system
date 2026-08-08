@@ -25,6 +25,7 @@ const KafkaCoordinator = require('./event-bus/kafka-coordinator');
 const gRPCGateway = require('./grpc-gateway');
 const ReWOOExecutor = require('./orchestration/rewoo-executor');
 const BootstrapOrchestrator = require('./bootstrap');
+const { buildKafkaSecurityConfig, buildGrpcSecurityConfig } = require('./config/security');
 
 class StartupSequence extends EventEmitter {
   constructor() {
@@ -59,12 +60,14 @@ class StartupSequence extends EventEmitter {
           clientId: process.env.KAFKA_CLIENT_ID || 'tree-of-life-orchestrator',
           connectionTimeout: parseInt(process.env.KAFKA_CONNECTION_TIMEOUT || '10000'),
           requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000'),
+          ...buildKafkaSecurityConfig(),
         },
         grpc: {
-          host: process.env.GRPC_HOST || '0.0.0.0',
+          host: process.env.GRPC_HOST || '127.0.0.1',
           port: parseInt(process.env.GRPC_PORT || '50051'),
           maxReceiveMessageLength: parseInt(process.env.GRPC_MAX_RECEIVE_MESSAGE_LENGTH || '4194304'),
           maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304'),
+          ...buildGrpcSecurityConfig(),
         },
         rewoo: {
           maxIterations: parseInt(process.env.REWOO_MAX_ITERATIONS || '3'),
