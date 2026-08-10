@@ -17,6 +17,7 @@ nano .env  # or vim, code, etc.
 **Get it here**: https://github.com/settings/tokens
 
 **Steps**:
+
 1. Click "Generate new token (classic)"
 2. Name it: `Tree of Life Agents`
 3. Select scopes:
@@ -28,6 +29,7 @@ nano .env  # or vim, code, etc.
 6. Paste into `.env` as `GITHUB_TOKEN=ghp_xxxxx...`
 
 **Example**:
+
 ```env
 GITHUB_TOKEN=ghp_ABcd1234EFgh5678IJkl9012MNop3456QRst7890
 ```
@@ -37,6 +39,7 @@ GITHUB_TOKEN=ghp_ABcd1234EFgh5678IJkl9012MNop3456QRst7890
 **Get it here**: https://linear.app/settings/api
 
 **Steps**:
+
 1. Scroll to "Personal API keys"
 2. Click "Create key"
 3. Name it: `Tree of Life Agents`
@@ -46,6 +49,7 @@ GITHUB_TOKEN=ghp_ABcd1234EFgh5678IJkl9012MNop3456QRst7890
 **Your Team ID is already configured**: `0a42fa2d-5df2-45f5-a1c2-1dd78749fe93`
 
 **Example**:
+
 ```env
 LINEAR_API_KEY=lin_api_abcd1234efgh5678ijkl9012mnop3456
 LINEAR_TEAM_ID=0a42fa2d-5df2-45f5-a1c2-1dd78749fe93
@@ -56,6 +60,7 @@ LINEAR_TEAM_ID=0a42fa2d-5df2-45f5-a1c2-1dd78749fe93
 **Get it here**: https://www.notion.so/my-integrations
 
 **Steps**:
+
 1. Click "+ New integration"
 2. Name: `Tree of Life Agents`
 3. Select workspace
@@ -63,11 +68,13 @@ LINEAR_TEAM_ID=0a42fa2d-5df2-45f5-a1c2-1dd78749fe93
 5. Paste into `.env` as `NOTION_TOKEN=secret_xxxxx...`
 
 **Important**: After creating the integration, you must:
+
 - Open the Notion pages you want agents to access
 - Click "⋯" (three dots) → "Add connections"
 - Select "Tree of Life Agents"
 
 **Example**:
+
 ```env
 NOTION_TOKEN=secret_abcd1234efgh5678ijkl9012mnop3456
 ```
@@ -107,6 +114,7 @@ node index.js
 ```
 
 You should see:
+
 ```
 ┌────────────────────────────────────────────────┐
 │  🤖 Tree of Life Autonomous Agent System  │
@@ -118,6 +126,7 @@ You should see:
 ```
 
 If you see errors:
+
 - ❌ `GITHUB_TOKEN not configured` → Check your GitHub token
 - ❌ `LINEAR_API_KEY not configured` → Check your Linear key
 - ❌ Connection errors → Verify tokens are valid and have correct permissions
@@ -137,16 +146,19 @@ git status
 ## Token Permissions
 
 ### GitHub Token Scopes Explained
+
 - `repo`: Allows agents to create files, branches, PRs in your repos
 - `workflow`: Allows agents to create/modify GitHub Actions
 - `admin:org`: (Optional) For organization-level features
 
 ### Linear API Key Permissions
+
 - Full API access to your Linear workspace
 - Can create issues, update projects, manage cycles
 - Scoped to the team: `Garrettc (GAR)`
 
 ### Notion Integration Capabilities
+
 - Read/write access to connected pages
 - Must explicitly share pages with the integration
 - Cannot access pages that aren't shared
@@ -154,18 +166,22 @@ git status
 ## Troubleshooting
 
 ### "401 Unauthorized" - GitHub
+
 - Token is invalid or expired
 - Regenerate at https://github.com/settings/tokens
 
-### "401 Unauthorized" - Linear  
+### "401 Unauthorized" - Linear
+
 - API key is invalid
 - Regenerate at https://linear.app/settings/api
 
 ### "403 Forbidden" - Notion
+
 - Integration not connected to pages
 - Share pages with your integration in Notion
 
 ### "Missing environment variables"
+
 - Check `.env` file exists in `agents/` directory
 - Verify no typos in variable names
 - Make sure no extra spaces around `=` signs
@@ -175,19 +191,23 @@ git status
 Once configured:
 
 1. **Test the system**:
+
    ```bash
    node index.js
    ```
 
 2. **Run Planning Agent**:
+
    ```bash
    npm run agent:planning
    ```
 
 3. **Enable auto-execution**:
+
    ```env
    AGENT_AUTO_EXECUTE=true
    ```
+
    Then run `node index.js`
 
 4. **View generated tasks**:
