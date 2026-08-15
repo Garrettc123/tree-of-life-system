@@ -107,12 +107,13 @@ jobs:
                   echo "ERROR: RAILWAY_TOKEN required for manual Railway deployment"; exit 1
                 fi
                 echo "WARNING: Skipping Railway deployment on push because RAILWAY_TOKEN is not set"
-                exit 0
-              fi
-              if [ -f scripts/deploy-autonomous-business.sh ]; then
-                bash scripts/deploy-autonomous-business.sh 2>&1 | tee logs/deployment.log
+                echo "Railway deployment skipped: missing RAILWAY_TOKEN" | tee logs/deployment.log
               else
-                echo "deploy-autonomous-business.sh not found"; exit 1
+                if [ -f scripts/deploy-autonomous-business.sh ]; then
+                  bash scripts/deploy-autonomous-business.sh 2>&1 | tee logs/deployment.log
+                else
+                  echo "deploy-autonomous-business.sh not found"; exit 1
+                fi
               fi
               ;;
             "gcp")
