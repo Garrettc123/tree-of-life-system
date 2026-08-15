@@ -62,7 +62,6 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -n "$GITHUB_TOKEN" ]; then
-            echo "GH_TOKEN=$GITHUB_TOKEN" >> "$GITHUB_ENV"
             echo "GitHub token present"
           else
             echo "WARNING: No GitHub token found - GitHub CLI operations may fail"
@@ -104,7 +103,10 @@ jobs:
               ;;
             "railway")
               if [ -z "$RAILWAY_TOKEN" ]; then
-                echo "WARNING: Skipping Railway deployment because RAILWAY_TOKEN is not set"
+                if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                  echo "ERROR: RAILWAY_TOKEN required for manual Railway deployment"; exit 1
+                fi
+                echo "WARNING: Skipping Railway deployment on push because RAILWAY_TOKEN is not set"
                 exit 0
               fi
               if [ -f scripts/deploy-autonomous-business.sh ]; then
