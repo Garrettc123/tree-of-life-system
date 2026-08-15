@@ -51,7 +51,9 @@ describe('Tree of Life System - Basic Tests', function() {
   
   describe('Core Modules', function() {
     it('should be able to require core dependencies', function() {
-      const dependencies = ['express', 'axios', 'dotenv'];
+      const pkg = require('../package.json');
+      const dependencies = Object.keys(pkg.dependencies || {});
+      assert(dependencies.length > 0, 'Expected at least one runtime dependency');
       
       dependencies.forEach(dep => {
         try {
