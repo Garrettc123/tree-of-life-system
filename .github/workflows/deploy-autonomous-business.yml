@@ -61,8 +61,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
-          gh auth status
+          if [ -n "$GITHUB_TOKEN" ]; then
+            echo "GH_TOKEN=$GITHUB_TOKEN" >> "$GITHUB_ENV"
+            echo "GitHub token present"
+          else
+            echo "WARNING: No GitHub token found - GitHub CLI operations may fail"
+          fi
           if [ -n "$RAILWAY_TOKEN" ]; then
             echo "Railway token present"
           else
@@ -100,7 +104,8 @@ jobs:
               ;;
             "railway")
               if [ -z "$RAILWAY_TOKEN" ]; then
-                echo "ERROR: RAILWAY_TOKEN required for Railway deployment"; exit 1
+                echo "WARNING: Skipping Railway deployment because RAILWAY_TOKEN is not set"
+                exit 0
               fi
               if [ -f scripts/deploy-autonomous-business.sh ]; then
                 bash scripts/deploy-autonomous-business.sh 2>&1 | tee logs/deployment.log

@@ -47,13 +47,28 @@ jobs:
           python -m py_compile orchestration-engine/main.py
           echo "Syntax OK"
 
+      - name: Check Railway credentials
+        id: railway_auth
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -n "$RAILWAY_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+            echo "Railway token present"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "WARNING: RAILWAY_TOKEN not set - skipping Railway deploy steps"
+          fi
+
       - name: Link Railway project
+        if: ${{ steps.railway_auth.outputs.has_token == 'true' }}
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway link --project ${{ env.PROJECT_ID }}
 
       - name: Deploy to Railway
+        if: ${{ steps.railway_auth.outputs.has_token == 'true' }}
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
@@ -71,7 +86,7 @@ jobs:
           echo "Deploy dispatched to service ${{ env.SERVICE_ID }}"
 
       - name: Tail deploy logs
-        if: always()
+        if: ${{ always() && steps.railway_auth.outputs.has_token == 'true' }}
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
