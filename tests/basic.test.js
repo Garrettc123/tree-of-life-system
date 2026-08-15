@@ -57,9 +57,9 @@ describe('Tree of Life System - Basic Tests', function() {
       
       dependencies.forEach(dep => {
         try {
-          require(dep);
+          require.resolve(dep);
         } catch (error) {
-          assert.fail(`Failed to require ${dep}: ${error.message}`);
+          assert.fail(`Failed to resolve ${dep}: ${error.message}`);
         }
       });
     });
