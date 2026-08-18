@@ -3,29 +3,29 @@
  * Auto-label, assign, manage issues with AI
  */
 
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 // Issue categories for auto-labeling
 const labelRules = {
-  bug: ['error', 'crash', 'broken', 'not working', 'failed'],
-  feature: ['add', 'implement', 'new', 'feature request'],
-  documentation: ['docs', 'readme', 'documentation', 'guide'],
-  performance: ['slow', 'performance', 'optimization', 'speed'],
-  security: ['vulnerability', 'security', 'exploit', 'xss', 'sql injection'],
-  enhancement: ['improve', 'better', 'enhance', 'upgrade']
+  bug: ["error", "crash", "broken", "not working", "failed"],
+  feature: ["add", "implement", "new", "feature request"],
+  documentation: ["docs", "readme", "documentation", "guide"],
+  performance: ["slow", "performance", "optimization", "speed"],
+  security: ["vulnerability", "security", "exploit", "xss", "sql injection"],
+  enhancement: ["improve", "better", "enhance", "upgrade"],
 };
 
 // Team assignment rules
 const assignmentRules = {
-  bug: ['@tech-lead', '@qa-engineer'],
-  security: ['@security-lead', '@tech-lead'],
-  documentation: ['@technical-writer'],
-  feature: ['@product-manager', '@tech-lead']
+  bug: ["@tech-lead", "@qa-engineer"],
+  security: ["@security-lead", "@tech-lead"],
+  documentation: ["@technical-writer"],
+  feature: ["@product-manager", "@tech-lead"],
 };
 
 // Auto-label issues
-router.post('/issue/auto-label', async (req, res) => {
+router.post("/issue/auto-label", async (req, res) => {
   const { issueNumber, title, body } = req.body;
 
   const content = `${title} ${body}`.toLowerCase();
@@ -33,32 +33,37 @@ router.post('/issue/auto-label', async (req, res) => {
 
   // Detect labels based on content
   for (const [label, keywords] of Object.entries(labelRules)) {
-    if (keywords.some(keyword => content.includes(keyword))) {
+    if (keywords.some((keyword) => content.includes(keyword))) {
       detectedLabels.push(label);
     }
   }
 
   // Priority detection
-  if (content.includes('urgent') || content.includes('critical')) {
-    detectedLabels.push('priority:high');
-  } else if (content.includes('nice to have') || content.includes('low priority')) {
-    detectedLabels.push('priority:low');
+  if (content.includes("urgent") || content.includes("critical")) {
+    detectedLabels.push("priority:high");
+  } else if (
+    content.includes("nice to have") ||
+    content.includes("low priority")
+  ) {
+    detectedLabels.push("priority:low");
   } else {
-    detectedLabels.push('priority:medium');
+    detectedLabels.push("priority:medium");
   }
 
-  console.log(`[Issue] Auto-labeled #${issueNumber}: ${detectedLabels.join(', ')}`);
+  console.log(
+    `[Issue] Auto-labeled #${issueNumber}: ${detectedLabels.join(", ")}`,
+  );
 
   res.json({
     success: true,
     issueNumber,
     labels: detectedLabels,
-    message: 'Issue automatically labeled'
+    message: "Issue automatically labeled",
   });
 });
 
 // Auto-assign issues
-router.post('/issue/auto-assign', async (req, res) => {
+router.post("/issue/auto-assign", async (req, res) => {
   const { issueNumber, labels } = req.body;
 
   let assignees = [];
@@ -73,18 +78,20 @@ router.post('/issue/auto-assign', async (req, res) => {
   // Remove duplicates
   assignees = [...new Set(assignees)];
 
-  console.log(`[Issue] Auto-assigned #${issueNumber} to: ${assignees.join(', ')}`);
+  console.log(
+    `[Issue] Auto-assigned #${issueNumber} to: ${assignees.join(", ")}`,
+  );
 
   res.json({
     success: true,
     issueNumber,
     assignees,
-    message: 'Issue automatically assigned'
+    message: "Issue automatically assigned",
   });
 });
 
 // Duplicate detection
-router.post('/issue/detect-duplicate', async (req, res) => {
+router.post("/issue/detect-duplicate", async (req, res) => {
   const { issueNumber, title, body } = req.body;
 
   // Simulate duplicate detection with AI
@@ -103,23 +110,23 @@ router.post('/issue/detect-duplicate', async (req, res) => {
     isDuplicate,
     similarIssues,
     confidence: isDuplicate ? 0.85 : 0,
-    action: isDuplicate ? 'mark_duplicate' : 'keep_open'
+    action: isDuplicate ? "mark_duplicate" : "keep_open",
   });
 });
 
 // Template enforcement
-router.post('/issue/validate-template', async (req, res) => {
+router.post("/issue/validate-template", async (req, res) => {
   const { issueNumber, body } = req.body;
 
   const requiredSections = [
-    'Description',
-    'Steps to Reproduce',
-    'Expected Behavior',
-    'Actual Behavior'
+    "Description",
+    "Steps to Reproduce",
+    "Expected Behavior",
+    "Actual Behavior",
   ];
 
   const missingSections = requiredSections.filter(
-    section => !body.includes(section)
+    (section) => !body.includes(section),
   );
 
   const isValid = missingSections.length === 0;
@@ -128,26 +135,26 @@ router.post('/issue/validate-template', async (req, res) => {
     success: true,
     isValid,
     missingSections,
-    message: isValid 
-      ? 'Issue follows template' 
-      : 'Issue missing required sections'
+    message: isValid
+      ? "Issue follows template"
+      : "Issue missing required sections",
   });
 });
 
 // Issue Status
-router.get('/issue/status', (req, res) => {
+router.get("/issue/status", (req, res) => {
   res.json({
     features: [
-      'Auto-labeling',
-      'Auto-assignment',
-      'Duplicate detection',
-      'Template validation',
-      'Priority scoring'
+      "Auto-labeling",
+      "Auto-assignment",
+      "Duplicate detection",
+      "Template validation",
+      "Priority scoring",
     ],
     rules: {
       labels: Object.keys(labelRules).length,
-      assignments: Object.keys(assignmentRules).length
-    }
+      assignments: Object.keys(assignmentRules).length,
+    },
   });
 });
 
