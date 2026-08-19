@@ -28,7 +28,7 @@ class ReWOOExecutor extends EventEmitter {
       synthesisTimeout: config.synthesisTimeout || 30000,
       executionTTL: config.executionTTL || 3600000, // 1 hour default TTL
       maxExecutions: config.maxExecutions || 1000, // Max executions to keep in memory
-      ...config,
+      ...config
     };
 
     this.executions = new Map();
@@ -96,7 +96,7 @@ class ReWOOExecutor extends EventEmitter {
       context,
       stages: {},
       timestamp: new Date().toISOString(),
-      status: 'initiated',
+      status: 'initiated'
     };
 
     this.executions.set(executionId, execution);
@@ -138,7 +138,7 @@ class ReWOOExecutor extends EventEmitter {
         success: true,
         executionId,
         result: execution.stages.synthesis.result,
-        stages: execution.stages,
+        stages: execution.stages
       };
     } catch (error) {
       execution.status = 'failed';
@@ -150,7 +150,7 @@ class ReWOOExecutor extends EventEmitter {
         success: false,
         executionId,
         error: error.message,
-        stages: execution.stages,
+        stages: execution.stages
       };
     }
   }
@@ -168,7 +168,7 @@ class ReWOOExecutor extends EventEmitter {
       // Create execution plan WITHOUT making tool calls
       const plan = await Promise.race([
         planningAgent.createPlan(task, context),
-        this.timeout(this.config.planningTimeout),
+        this.timeout(this.config.planningTimeout)
       ]);
 
       const duration = Date.now() - startTime;
@@ -176,21 +176,21 @@ class ReWOOExecutor extends EventEmitter {
       this.emit('stage:planning:completed', {
         executionId,
         planSteps: plan.steps.length,
-        duration,
+        duration
       });
 
       return {
         success: true,
         plan,
         duration,
-        stepsCount: plan.steps.length,
+        stepsCount: plan.steps.length
       };
     } catch (error) {
       const duration = Date.now() - startTime;
       return {
         success: false,
         error: error.message,
-        duration,
+        duration
       };
     }
   }
@@ -213,19 +213,19 @@ class ReWOOExecutor extends EventEmitter {
         try {
           const output = await Promise.race([
             agent.executeStep(step, context),
-            this.timeout(this.config.executionTimeout),
+            this.timeout(this.config.executionTimeout)
           ]);
 
           outputs.push({
             stepId: step.id,
             output,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           });
 
           this.emit('step:completed', {
             executionId,
             stepId: step.id,
-            success: true,
+            success: true
           });
         } catch (stepError) {
           console.error(`[ReWOOExecutor] Step ${step.id} failed:`, stepError.message);
@@ -233,13 +233,13 @@ class ReWOOExecutor extends EventEmitter {
           outputs.push({
             stepId: step.id,
             error: stepError.message,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           });
 
           this.emit('step:failed', {
             executionId,
             stepId: step.id,
-            error: stepError.message,
+            error: stepError.message
           });
         }
       }
@@ -250,7 +250,7 @@ class ReWOOExecutor extends EventEmitter {
         success: outputs.length > 0,
         outputs,
         duration,
-        stepsExecuted: outputs.length,
+        stepsExecuted: outputs.length
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -258,7 +258,7 @@ class ReWOOExecutor extends EventEmitter {
         success: false,
         error: error.message,
         duration,
-        outputs,
+        outputs
       };
     }
   }
@@ -276,7 +276,7 @@ class ReWOOExecutor extends EventEmitter {
       // Synthesize outputs and generate critique
       const synthesis = await Promise.race([
         reflexionAgent.synthesize(outputs, plan, context),
-        this.timeout(this.config.synthesisTimeout),
+        this.timeout(this.config.synthesisTimeout)
       ]);
 
       const duration = Date.now() - startTime;
@@ -284,27 +284,27 @@ class ReWOOExecutor extends EventEmitter {
       this.emit('stage:synthesis:completed', {
         executionId,
         critiques: synthesis.critiques?.length || 0,
-        duration,
+        duration
       });
 
       return {
         success: true,
         result: synthesis.result,
         critiques: synthesis.critiques || [],
-        duration,
+        duration
       };
     } catch (error) {
       const duration = Date.now() - startTime;
       
       // Fallback synthesis if reflexion agent fails
-      console.warn(`[ReWOOExecutor] Reflexion synthesis failed, using fallback:`, error.message);
+      console.warn('[ReWOOExecutor] Reflexion synthesis failed, using fallback:', error.message);
       
       return {
         success: false,
         error: error.message,
         result: this.fallbackSynthesis(outputs),
         duration,
-        isFallback: true,
+        isFallback: true
       };
     }
   }
@@ -314,7 +314,7 @@ class ReWOOExecutor extends EventEmitter {
     return {
       outputs: outputs.filter(o => !o.error),
       errors: outputs.filter(o => o.error),
-      summary: `${outputs.filter(o => !o.error).length} steps completed, ${outputs.filter(o => o.error).length} failed`,
+      summary: `${outputs.filter(o => !o.error).length} steps completed, ${outputs.filter(o => o.error).length} failed`
     };
   }
 
@@ -339,7 +339,7 @@ class ReWOOExecutor extends EventEmitter {
       failed,
       successRate: completed / executions.length || 0,
       registeredAgents: this.agents.size,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 }

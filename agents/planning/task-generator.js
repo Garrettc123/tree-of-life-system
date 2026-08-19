@@ -178,7 +178,7 @@ class TaskGenerator {
    */
   completeTask(taskId, result) {
     const taskIndex = this.taskQueue.findIndex(t => t.id === taskId);
-    if (taskIndex === -1) return false;
+    if (taskIndex === -1) {return false;}
 
     this.taskQueue[taskIndex].status = 'completed';
     this.taskQueue[taskIndex].completedAt = new Date();

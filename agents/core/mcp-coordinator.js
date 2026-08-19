@@ -90,7 +90,7 @@ class MCPCoordinator extends EventEmitter {
     const broadcastPromises = [];
 
     for (const [agentId, agent] of this.agents) {
-      if (agentId === fromAgentId) continue; // Don't send to self
+      if (agentId === fromAgentId) {continue;} // Don't send to self
 
       // Create promise that handles its own errors
       const promise = this.sendMessage(fromAgentId, agentId, message, context)

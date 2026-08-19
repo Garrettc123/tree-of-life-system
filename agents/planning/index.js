@@ -111,26 +111,26 @@ class PlanningAgent {
     const { message } = envelope;
 
     switch (message.type) {
-      case 'request-analysis':
-        return await this.execute();
+    case 'request-analysis':
+      return await this.execute();
       
-      case 'task-completed':
-        this.taskGenerator.completeTask(message.taskId, message.result);
-        return { acknowledged: true };
+    case 'task-completed':
+      this.taskGenerator.completeTask(message.taskId, message.result);
+      return { acknowledged: true };
       
-      case 'capability-request':
-        if (message.capability === 'gap-analysis') {
-          const gaps = await this.gapAnalyzer.analyzeSystem(
-            message.params.owner,
-            message.params.teamId
-          );
-          return { gaps };
-        }
-        break;
+    case 'capability-request':
+      if (message.capability === 'gap-analysis') {
+        const gaps = await this.gapAnalyzer.analyzeSystem(
+          message.params.owner,
+          message.params.teamId
+        );
+        return { gaps };
+      }
+      break;
       
-      default:
-        console.warn(`[PlanningAgent] Unknown message type: ${message.type}`);
-        return { error: 'Unknown message type' };
+    default:
+      console.warn(`[PlanningAgent] Unknown message type: ${message.type}`);
+      return { error: 'Unknown message type' };
     }
   }
 
@@ -153,7 +153,7 @@ class PlanningAgent {
 
     // Send tasks to each agent
     for (const [agent, tasks] of Object.entries(agentTasks)) {
-      if (tasks.length === 0) continue;
+      if (tasks.length === 0) {continue;}
 
       try {
         await this.mcp.sendMessage('planning', agent, {
