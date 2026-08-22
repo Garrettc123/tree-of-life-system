@@ -22,11 +22,13 @@ npm install
 ## 🔧 Configuration
 
 1. Copy `.env.example` to `.env`:
+
 ```bash
 cp .env.example .env
 ```
 
 2. Fill in your environment variables:
+
 - `PRIVATE_KEY`: Your deployment wallet private key
 - `INFURA_KEY`: Your Infura project ID
 - `ETHERSCAN_API_KEY`: For contract verification
@@ -36,11 +38,13 @@ cp .env.example .env
 ### Local Development
 
 1. Start local Hardhat node:
+
 ```bash
 npm run node
 ```
 
 2. Deploy contracts:
+
 ```bash
 npm run deploy:localhost
 ```
@@ -60,11 +64,13 @@ npm run deploy:mainnet
 ## 🧪 Testing
 
 Run all tests:
+
 ```bash
 npm test
 ```
 
 Run with coverage:
+
 ```bash
 npm run coverage
 ```
@@ -80,6 +86,7 @@ npx hardhat verify --network <network> <contract-address> <constructor-args>
 ## 📋 Contract Features
 
 ### NWUProtocol
+
 - Contribution submission and tracking
 - Multi-verifier verification system
 - Automated reward distribution
@@ -88,6 +95,7 @@ npx hardhat verify --network <network> <contract-address> <constructor-args>
 - Verifier reputation system
 
 ### NWUToken
+
 - ERC20 standard compliance
 - Governance voting (ERC20Votes)
 - Token vesting schedules
@@ -96,6 +104,7 @@ npx hardhat verify --network <network> <contract-address> <constructor-args>
 - Role-based access control
 
 ### Governance
+
 - Proposal creation and voting
 - Timelock for security
 - Quorum requirements
@@ -103,6 +112,7 @@ npx hardhat verify --network <network> <contract-address> <constructor-args>
 - On-chain execution
 
 ### Treasury
+
 - Multi-token support
 - Budget management
 - Time-locked allocations
