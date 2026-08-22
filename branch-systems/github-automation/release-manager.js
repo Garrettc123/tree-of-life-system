@@ -3,38 +3,38 @@
  * Auto-generate changelogs, version bumping, releases
  */
 
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 // Release tracking
 const releases = [];
 
 // Auto-generate changelog
-router.post('/release/changelog', async (req, res) => {
-  const { fromTag, toTag = 'HEAD' } = req.body;
+router.post("/release/changelog", async (req, res) => {
+  const { fromTag, toTag = "HEAD" } = req.body;
 
   // Parse commits between tags
   const changelog = {
     version: toTag,
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
     sections: {
       features: [
-        '✨ Added revenue generation system',
-        '✨ Implemented GitHub automation suite',
-        '✨ Added AI-powered code reviews'
+        "✨ Added revenue generation system",
+        "✨ Implemented GitHub automation suite",
+        "✨ Added AI-powered code reviews",
       ],
       fixes: [
-        '🐛 Fixed webhook authentication',
-        '🐛 Resolved database connection issues'
+        "🐛 Fixed webhook authentication",
+        "🐛 Resolved database connection issues",
       ],
       improvements: [
-        '🚀 Optimized API response times',
-        '🚀 Enhanced error handling'
+        "🚀 Optimized API response times",
+        "🚀 Enhanced error handling",
       ],
-      breaking: []
+      breaking: [],
     },
-    contributors: ['Garrett Wayne'],
-    commits: 45
+    contributors: ["Garrett Wayne"],
+    commits: 45,
   };
 
   console.log(`[Release] Generated changelog: ${fromTag} -> ${toTag}`);
@@ -42,50 +42,50 @@ router.post('/release/changelog', async (req, res) => {
   res.json({
     success: true,
     changelog,
-    markdown: generateChangelogMarkdown(changelog)
+    markdown: generateChangelogMarkdown(changelog),
   });
 });
 
 function generateChangelogMarkdown(changelog) {
   let md = `# Release ${changelog.version} - ${changelog.date}\n\n`;
-  
+
   if (changelog.sections.breaking.length > 0) {
-    md += `## ⚠️ Breaking Changes\n${changelog.sections.breaking.map(c => `- ${c}`).join('\n')}\n\n`;
+    md += `## ⚠️ Breaking Changes\n${changelog.sections.breaking.map((c) => `- ${c}`).join("\n")}\n\n`;
   }
-  
+
   if (changelog.sections.features.length > 0) {
-    md += `## 🎉 Features\n${changelog.sections.features.map(c => `- ${c}`).join('\n')}\n\n`;
+    md += `## 🎉 Features\n${changelog.sections.features.map((c) => `- ${c}`).join("\n")}\n\n`;
   }
-  
+
   if (changelog.sections.fixes.length > 0) {
-    md += `## 🐛 Bug Fixes\n${changelog.sections.fixes.map(c => `- ${c}`).join('\n')}\n\n`;
+    md += `## 🐛 Bug Fixes\n${changelog.sections.fixes.map((c) => `- ${c}`).join("\n")}\n\n`;
   }
-  
+
   if (changelog.sections.improvements.length > 0) {
-    md += `## 🚀 Improvements\n${changelog.sections.improvements.map(c => `- ${c}`).join('\n')}\n\n`;
+    md += `## 🚀 Improvements\n${changelog.sections.improvements.map((c) => `- ${c}`).join("\n")}\n\n`;
   }
-  
-  md += `## 👥 Contributors\n${changelog.contributors.map(c => `- ${c}`).join('\n')}\n`;
-  
+
+  md += `## 👥 Contributors\n${changelog.contributors.map((c) => `- ${c}`).join("\n")}\n`;
+
   return md;
 }
 
 // Version bumping
-router.post('/release/bump-version', async (req, res) => {
-  const { type = 'minor' } = req.body; // major, minor, patch
+router.post("/release/bump-version", async (req, res) => {
+  const { type = "minor" } = req.body; // major, minor, patch
 
-  const currentVersion = '1.0.0';
-  const [major, minor, patch] = currentVersion.split('.').map(Number);
+  const currentVersion = "1.0.0";
+  const [major, minor, patch] = currentVersion.split(".").map(Number);
 
   let newVersion;
   switch (type) {
-    case 'major':
+    case "major":
       newVersion = `${major + 1}.0.0`;
       break;
-    case 'minor':
+    case "minor":
       newVersion = `${major}.${minor + 1}.0`;
       break;
-    case 'patch':
+    case "patch":
       newVersion = `${major}.${minor}.${patch + 1}`;
       break;
   }
@@ -97,12 +97,12 @@ router.post('/release/bump-version', async (req, res) => {
     oldVersion: currentVersion,
     newVersion,
     type,
-    files: ['package.json', 'package-lock.json']
+    files: ["package.json", "package-lock.json"],
   });
 });
 
 // Create release
-router.post('/release/create', async (req, res) => {
+router.post("/release/create", async (req, res) => {
   const { version, changelog, prerelease = false } = req.body;
 
   const release = {
@@ -113,7 +113,7 @@ router.post('/release/create', async (req, res) => {
     prerelease,
     createdAt: new Date().toISOString(),
     assets: [],
-    downloads: 0
+    downloads: 0,
   };
 
   releases.push(release);
@@ -123,13 +123,13 @@ router.post('/release/create', async (req, res) => {
   res.json({
     success: true,
     release,
-    url: `https://github.com/${process.env.GITHUB_USERNAME}/tree-of-life-system/releases/tag/${version}`
+    url: `https://github.com/${process.env.GITHUB_USERNAME}/tree-of-life-system/releases/tag/${version}`,
   });
 });
 
 // Deploy automation
-router.post('/release/deploy', async (req, res) => {
-  const { version, environment = 'production' } = req.body;
+router.post("/release/deploy", async (req, res) => {
+  const { version, environment = "production" } = req.body;
 
   console.log(`[Release] Deploying ${version} to ${environment}`);
 
@@ -137,40 +137,40 @@ router.post('/release/deploy', async (req, res) => {
     id: `deploy_${Date.now()}`,
     version,
     environment,
-    status: 'in_progress',
+    status: "in_progress",
     steps: [
-      { name: 'Build', status: 'completed' },
-      { name: 'Test', status: 'completed' },
-      { name: 'Deploy', status: 'in_progress' },
-      { name: 'Verify', status: 'pending' }
+      { name: "Build", status: "completed" },
+      { name: "Test", status: "completed" },
+      { name: "Deploy", status: "in_progress" },
+      { name: "Verify", status: "pending" },
     ],
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
   };
 
   setTimeout(() => {
-    deployment.status = 'completed';
+    deployment.status = "completed";
     deployment.completedAt = new Date().toISOString();
   }, 5000);
 
   res.json({
     success: true,
     deployment,
-    message: `Deploying ${version} to ${environment}`
+    message: `Deploying ${version} to ${environment}`,
   });
 });
 
 // Release Status
-router.get('/release/status', (req, res) => {
+router.get("/release/status", (req, res) => {
   res.json({
     totalReleases: releases.length,
     latestRelease: releases[releases.length - 1],
     features: [
-      'Auto-generate changelogs',
-      'Version bumping',
-      'Release creation',
-      'Deploy automation',
-      'Rollback capability'
-    ]
+      "Auto-generate changelogs",
+      "Version bumping",
+      "Release creation",
+      "Deploy automation",
+      "Rollback capability",
+    ],
   });
 });
 
