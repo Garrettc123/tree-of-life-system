@@ -3,7 +3,7 @@
  * Handles events from GitHub, Linear, Notion, and internal agents
  */
 
-const EventEmitter = require('events');
+const EventEmitter = require("events");
 
 class EventBus extends EventEmitter {
   constructor() {
@@ -16,14 +16,14 @@ class EventBus extends EventEmitter {
   /**
    * Publish an event to the bus
    */
-  publish(eventType, data, source = 'unknown') {
+  publish(eventType, data, source = "unknown") {
     const event = {
       id: this._generateEventId(),
       type: eventType,
       data,
       source,
       timestamp: new Date(),
-      processed: false
+      processed: false,
     };
 
     // Log the event
@@ -31,7 +31,7 @@ class EventBus extends EventEmitter {
 
     // Emit to subscribers
     this.emit(eventType, event);
-    this.emit('*', event); // Global listener
+    this.emit("*", event); // Global listener
 
     console.log(`[EventBus] Published: ${eventType} from ${source}`);
     return event;
@@ -40,14 +40,14 @@ class EventBus extends EventEmitter {
   /**
    * Subscribe to specific event types
    */
-  subscribe(eventType, handler, subscriberId = 'anonymous') {
+  subscribe(eventType, handler, subscriberId = "anonymous") {
     const handlerId = `${subscriberId}:${eventType}:${Date.now()}`;
-    
+
     this.handlers.set(handlerId, {
       eventType,
       handler,
       subscriberId,
-      subscribedAt: new Date()
+      subscribedAt: new Date(),
     });
 
     this.on(eventType, handler);
@@ -66,7 +66,9 @@ class EventBus extends EventEmitter {
     this.off(handlerInfo.eventType, handlerInfo.handler);
     this.handlers.delete(handlerId);
 
-    console.log(`[EventBus] Unsubscribed: ${handlerInfo.subscriberId} from ${handlerInfo.eventType}`);
+    console.log(
+      `[EventBus] Unsubscribed: ${handlerInfo.subscriberId} from ${handlerInfo.eventType}`,
+    );
     return true;
   }
 
@@ -75,9 +77,9 @@ class EventBus extends EventEmitter {
    */
   getRecentEvents(limit = 100, eventType = null) {
     let events = this.eventLog;
-    
+
     if (eventType) {
-      events = events.filter(e => e.type === eventType);
+      events = events.filter((e) => e.type === eventType);
     }
 
     return events.slice(-limit);
@@ -90,7 +92,7 @@ class EventBus extends EventEmitter {
     const stats = {
       totalEvents: this.eventLog.length,
       subscribers: this.handlers.size,
-      eventTypes: {}
+      eventTypes: {},
     };
 
     for (const event of this.eventLog) {
@@ -122,32 +124,32 @@ class EventBus extends EventEmitter {
 // Event type constants
 EventBus.Events = {
   // GitHub events
-  GITHUB_PUSH: 'github:push',
-  GITHUB_PR_OPENED: 'github:pr:opened',
-  GITHUB_PR_MERGED: 'github:pr:merged',
-  GITHUB_ISSUE_OPENED: 'github:issue:opened',
-  GITHUB_REPO_CREATED: 'github:repo:created',
+  GITHUB_PUSH: "github:push",
+  GITHUB_PR_OPENED: "github:pr:opened",
+  GITHUB_PR_MERGED: "github:pr:merged",
+  GITHUB_ISSUE_OPENED: "github:issue:opened",
+  GITHUB_REPO_CREATED: "github:repo:created",
 
   // Linear events
-  LINEAR_ISSUE_CREATED: 'linear:issue:created',
-  LINEAR_ISSUE_UPDATED: 'linear:issue:updated',
-  LINEAR_ISSUE_COMPLETED: 'linear:issue:completed',
-  LINEAR_PROJECT_CREATED: 'linear:project:created',
+  LINEAR_ISSUE_CREATED: "linear:issue:created",
+  LINEAR_ISSUE_UPDATED: "linear:issue:updated",
+  LINEAR_ISSUE_COMPLETED: "linear:issue:completed",
+  LINEAR_PROJECT_CREATED: "linear:project:created",
 
   // Notion events
-  NOTION_PAGE_CREATED: 'notion:page:created',
-  NOTION_PAGE_UPDATED: 'notion:page:updated',
-  NOTION_DATABASE_UPDATED: 'notion:database:updated',
+  NOTION_PAGE_CREATED: "notion:page:created",
+  NOTION_PAGE_UPDATED: "notion:page:updated",
+  NOTION_DATABASE_UPDATED: "notion:database:updated",
 
   // Agent events
-  AGENT_TASK_STARTED: 'agent:task:started',
-  AGENT_TASK_COMPLETED: 'agent:task:completed',
-  AGENT_TASK_FAILED: 'agent:task:failed',
-  AGENT_ERROR: 'agent:error',
+  AGENT_TASK_STARTED: "agent:task:started",
+  AGENT_TASK_COMPLETED: "agent:task:completed",
+  AGENT_TASK_FAILED: "agent:task:failed",
+  AGENT_ERROR: "agent:error",
 
   // System events
-  SYSTEM_HEALTH_CHECK: 'system:health',
-  SYSTEM_ERROR: 'system:error'
+  SYSTEM_HEALTH_CHECK: "system:health",
+  SYSTEM_ERROR: "system:error",
 };
 
 module.exports = EventBus;
