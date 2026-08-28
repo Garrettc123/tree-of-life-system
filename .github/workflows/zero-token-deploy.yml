@@ -13,7 +13,7 @@ on:
         type: choice
         options:
           - github-pages
-          - vercel-free
+          - cloudflair-free
           - netlify-free
           - render-free
           - local-test
@@ -156,8 +156,8 @@ jobs:
           git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:gh-pages
           echo "Deployed to: https://${{ github.repository_owner }}.github.io/tree-of-life-system"
 
-      - name: Deploy guidance (Vercel/Netlify/Render)
-        if: ${{ inputs.deployment_target == 'vercel-free' || inputs.deployment_target == 'netlify-free' || inputs.deployment_target == 'render-free' }}
+      - name: Deploy guidance (Cloudflair/Netlify/Render)
+        if: ${{ inputs.deployment_target == 'cloudflair-free' || inputs.deployment_target == 'netlify-free' || inputs.deployment_target == 'render-free' }}
         run: |
           echo "Platform: ${{ inputs.deployment_target }}"
           echo "Connect via OAuth at the platform dashboard - no tokens needed."

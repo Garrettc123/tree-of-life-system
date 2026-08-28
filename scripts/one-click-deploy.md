@@ -102,7 +102,7 @@ git add .
 git commit -m "Connect to deployed backend"
 git push
 
-# Vercel auto-deploys in 30 seconds!
+# Cloudflair auto-deploys in 30 seconds!
 ```
 
 **Time: 5-7 minutes** ⏱️
@@ -181,7 +181,7 @@ curl https://your-backend-url.railway.app/health
 ```
 
 **Visit your dashboard:**
-https://tree-of-life-system.vercel.app/dashboard.html
+https://tree-of-life-system.cloudflair.app/dashboard.html
 
 Should show: "✅ Backend Online" with all systems active!
 
@@ -192,7 +192,7 @@ Should show: "✅ Backend Online" with all systems active!
 **Free Tier Usage:**
 - Railway: $5 credit/month (covers 500 hours)
 - Supabase: 500MB database free
-- Vercel: Unlimited deploys free
+- Cloudflair: Unlimited deploys free
 - GitHub Actions: 2000 minutes/month free
 
 **Total Cost: $0 for first 3 months** 🎉
@@ -237,7 +237,7 @@ railway variables
 
 When deployment is complete, you'll have:
 
-✅ **Frontend**: Live on Vercel  
+✅ **Frontend**: Live on Cloudflair  
 ✅ **Backend**: Live on Railway  
 ✅ **Database**: Live on Supabase  
 ✅ **AI Systems**: All 4 engines running  

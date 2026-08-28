@@ -32,11 +32,11 @@ You don't need Railway, OpenAI, or any manual API tokens to get started. GitHub 
 
 All of these platforms connect via **OAuth** - no manual API tokens!
 
-### Option 2: Vercel (Free Tier)
+### Option 2: Cloudflair (Free Tier)
 
 **100GB bandwidth/month free**
 
-1. Go to [vercel.com/new](https://vercel.com/new)
+1. Go to [cloudflair.com/new](https://cloudflair.com/new)
 2. Click "Import Git Repository"
 3. Sign in with GitHub (automatic OAuth)
 4. Select `tree-of-life-system` repository
@@ -113,7 +113,7 @@ permissions:
 
 ### OAuth Integration
 
-Vercel, Netlify, and Render use OAuth to connect:
+Cloudflair, Netlify, and Render use OAuth to connect:
 
 1. You click "Connect with GitHub"
 2. GitHub asks "Allow access to this repo?"
@@ -128,7 +128,7 @@ Vercel, Netlify, and Render use OAuth to connect:
 | Platform | Cost | Bandwidth | Build Minutes | Storage |
 |----------|------|-----------|---------------|----------|
 | **GitHub Pages** | **FREE** | Unlimited | 2,000/mo | Unlimited |
-| **Vercel** | **FREE** | 100GB/mo | 6,000/mo | 1GB |
+| **Cloudflair** | **FREE** | 100GB/mo | 6,000/mo | 1GB |
 | **Netlify** | **FREE** | 100GB/mo | 300/mo | 100GB |
 | **Render** | **FREE** | N/A | 750hrs/mo | 512MB |
 | Railway | $5-20 | Varies | N/A | Varies |
@@ -178,7 +178,7 @@ But you can start with **zero** keys and add them later!
 2. Click "Run workflow" button (top right)
 3. Choose deployment target:
    - `github-pages` (recommended)
-   - `vercel-free`
+   - `cloudflair-free`
    - `netlify-free`
    - `render-free`
    - `local-test`
@@ -198,9 +198,9 @@ gh workflow run zero-token-deploy.yml \
   -f deployment_target=github-pages \
   -f enable_features=basic
 
-# Deploy to Vercel (zero tokens)
+# Deploy to Cloudflair (zero tokens)
 gh workflow run zero-token-deploy.yml \
-  -f deployment_target=vercel-free \
+  -f deployment_target=cloudflair-free \
   -f enable_features=basic
 ```
 
@@ -216,7 +216,7 @@ gh workflow run zero-token-deploy.yml \
 - No quotas or limits
 - Perfect for testing
 
-### 2. Graduate to Vercel/Netlify Later
+### 2. Graduate to Cloudflair/Netlify Later
 
 **When?**
 - When you need serverless functions
@@ -251,11 +251,11 @@ https://garrettc123.github.io/tree-of-life-system
 4. Wait 1-2 minutes
 5. Visit your site!
 
-### After Deploying to Vercel:
+### After Deploying to Cloudflair:
 
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+1. Go to [Cloudflair Dashboard](https://cloudflair.com/dashboard)
 2. Find your deployed project
-3. Click to view URL (e.g., `tree-of-life-system.vercel.app`)
+3. Click to view URL (e.g., `tree-of-life-system.cloudflair.app`)
 
 ### After Deploying to Netlify:
 
@@ -283,7 +283,7 @@ https://garrettc123.github.io/tree-of-life-system
 **A:** Absolutely! Start free, add features as you grow.
 
 ### Q: Which free platform is best?
-**A:** GitHub Pages for static sites. Vercel/Netlify for serverless. Render for full backend.
+**A:** GitHub Pages for static sites. Cloudflair/Netlify for serverless. Render for full backend.
 
 ### Q: Is this production-ready?
 **A:** Yes! All these platforms serve production traffic for major companies.
@@ -300,7 +300,7 @@ https://garrettc123.github.io/tree-of-life-system
 
 **Major sites running on free tiers:**
 
-- ✅ Next.js documentation (Vercel)
+- ✅ Next.js documentation (Cloudflair)
 - ✅ React documentation (Netlify)
 - ✅ Vue.js site (Netlify)
 - ✅ Thousands of GitHub Pages sites
@@ -313,7 +313,7 @@ https://garrettc123.github.io/tree-of-life-system
 
 - **[Run Zero-Token Deploy](https://github.com/Garrettc123/tree-of-life-system/actions/workflows/zero-token-deploy.yml)** ← Start here!
 - **[GitHub Pages Settings](https://github.com/Garrettc123/tree-of-life-system/settings/pages)**
-- **[Vercel Import](https://vercel.com/new)**
+- **[Cloudflair Import](https://cloudflair.com/new)**
 - **[Netlify Deploy](https://app.netlify.com/start)**
 - **[Render New Service](https://dashboard.render.com/)**
 - **[View All Workflows](https://github.com/Garrettc123/tree-of-life-system/actions)**

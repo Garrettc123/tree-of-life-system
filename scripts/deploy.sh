@@ -99,7 +99,7 @@ git add public/dashboard.html
 git commit -m "🔗 Connect dashboard to deployed backend"
 git push origin main
 
-echo -e "${GREEN}✓ Frontend updated and auto-deploying via Vercel${NC}"
+echo -e "${GREEN}✓ Frontend updated and auto-deploying via Cloudflair${NC}"
 
 # Step 4: Configure GitHub Webhooks
 echo -e "\n${BLUE}Step 4: Configuring GitHub Webhooks...${NC}"
@@ -160,7 +160,7 @@ echo -e "\n${GREEN}================================================${NC}"
 echo -e "${GREEN}🎉 TITAN v4.0 Deployment Complete!${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo -e "${BLUE}Dashboard:${NC} https://tree-of-life-system.vercel.app/dashboard.html"
+echo -e "${BLUE}Dashboard:${NC} https://tree-of-life-system.cloudflair.app/dashboard.html"
 echo -e "${BLUE}Backend API:${NC} https://$RAILWAY_URL"
 echo -e "${BLUE}Database:${NC} Supabase (connected)"
 echo ""
