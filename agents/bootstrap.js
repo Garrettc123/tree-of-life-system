@@ -18,23 +18,37 @@ const KafkaCoordinator = require('./event-bus/kafka-coordinator');
 const gRPCGateway = require('./grpc-gateway');
 const ReWOOExecutor = require('./orchestration/rewoo-executor');
 
+/**
+ * Validate that required environment variables are present.
+ * Fails fast with a clear error message listing all missing vars.
+ */
+function validateEnv() {
+  const required = [
+    'NODE_ENV'
+  ];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
 class BootstrapOrchestrator {
   constructor() {
     this.config = {
       kafka: {
         brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
-        clientId: 'tree-of-life-orchestrator',
+        clientId: 'tree-of-life-orchestrator'
       },
       grpc: {
         host: process.env.GRPC_HOST || 'localhost',
-        port: parseInt(process.env.GRPC_PORT || '50051'),
+        port: parseInt(process.env.GRPC_PORT || '50051')
       },
       executionConfig: {
         maxIterations: 3,
         planningTimeout: 30000,
         executionTimeout: 60000,
-        synthesisTimeout: 30000,
-      },
+        synthesisTimeout: 30000
+      }
     };
 
     this.kafkaCoordinator = null;
@@ -61,7 +75,7 @@ class BootstrapOrchestrator {
         'task.synthesis',
         'agent.heartbeat',
         'system.error',
-        'system.metrics',
+        'system.metrics'
       ]);
       console.log('✅ Event topics created');
 
@@ -111,17 +125,17 @@ class BootstrapOrchestrator {
               id: 'step-1',
               agentId: 'execution-agent',
               type: 'execute_subtask',
-              description: 'Execute primary task',
+              description: 'Execute primary task'
             },
             {
               id: 'step-2',
               agentId: 'execution-agent',
               type: 'validate_output',
-              description: 'Validate execution results',
-            },
-          ],
+              description: 'Validate execution results'
+            }
+          ]
         };
-      },
+      }
     };
 
     const executionAgent = {
@@ -133,9 +147,9 @@ class BootstrapOrchestrator {
           stepId: step.id,
           success: true,
           output: `Completed ${step.type}`,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date().toISOString()
         };
-      },
+      }
     };
 
     const reflexionAgent = {
@@ -146,17 +160,17 @@ class BootstrapOrchestrator {
         return {
           result: {
             success: true,
-            summary: `Synthesis of ${outputs.length} steps completed`,
+            summary: `Synthesis of ${outputs.length} steps completed`
           },
           critiques: [
             {
               id: 'critique-1',
               severity: 'info',
-              message: 'All steps executed successfully',
-            },
-          ],
+              message: 'All steps executed successfully'
+            }
+          ]
         };
-      },
+      }
     };
 
     // Register agents with ReWOO executor
@@ -203,11 +217,11 @@ class BootstrapOrchestrator {
       kafka: await this.kafkaCoordinator.getMetrics(),
       grpc: this.grpcGateway.getMetrics(),
       rewoo: this.rewooExecutor.getMetrics(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     await this.kafkaCoordinator.publishEvent('system.metrics', metrics, {
-      source: 'bootstrap-orchestrator',
+      source: 'bootstrap-orchestrator'
     });
   }
 
@@ -222,13 +236,13 @@ class BootstrapOrchestrator {
       // Publish task to planning event
       await this.kafkaCoordinator.publishEvent('task.planning', {
         description: taskDescription,
-        context,
+        context
       });
 
       // Execute via ReWOO orchestrator
       const result = await this.rewooExecutor.execute(taskDescription, context);
 
-      console.log(`✅ Task execution completed:`, result.stages);
+      console.log('✅ Task execution completed:', result.stages);
 
       return result;
     } catch (error) {
@@ -262,13 +276,14 @@ class BootstrapOrchestrator {
       grpc: this.grpcGateway ? 'running' : 'stopped',
       rewoo: this.rewooExecutor ? 'ready' : 'not initialized',
       agentsRegistered: this.agents.size,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 }
 
 // Main execution
 if (require.main === module) {
+  validateEnv();
   const orchestrator = new BootstrapOrchestrator();
 
   orchestrator
@@ -280,7 +295,7 @@ if (require.main === module) {
       // Example autonomous task
       return orchestrator.executeAutonomousTask('Test autonomous execution cycle', {
         taskId: 'test-task-1',
-        mode: 'autonomous',
+        mode: 'autonomous'
       });
     })
     .then(() => {

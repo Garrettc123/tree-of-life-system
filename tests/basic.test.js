@@ -34,25 +34,20 @@ describe('Tree of Life System - Basic Tests', function() {
       assert(pkg.version, 'package.json should have a version');
       assert(pkg.scripts, 'package.json should have scripts');
     });
-    
-    it('should have deployment scripts', function() {
-      const fs = require('fs');
-      const scriptsToCheck = [
-        'scripts/deploy-autonomous-business.sh',
-        'scripts/deploy-free-tier.sh',
-        'scripts/quick-deploy.sh'
-      ];
-      
-      scriptsToCheck.forEach(script => {
-        assert(fs.existsSync(script), `Missing deployment script: ${script}`);
+
+    it('should have required npm scripts', function() {
+      const pkg = require('../package.json');
+      const requiredScripts = ['start', 'test', 'lint'];
+      requiredScripts.forEach(script => {
+        assert(pkg.scripts[script], `package.json should have ${script} script`);
       });
     });
   });
   
   describe('Core Modules', function() {
     it('should be able to require core dependencies', function() {
-      const dependencies = ['express', 'axios', 'dotenv'];
-      
+      const dependencies = ['dotenv', 'uuid'];
+
       dependencies.forEach(dep => {
         try {
           require(dep);

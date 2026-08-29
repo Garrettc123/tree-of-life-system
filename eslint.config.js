@@ -1,6 +1,6 @@
 module.exports = [
   {
-    files: ["agents/**/*.js", "scripts/**/*.js"],
+    files: ["agents/**/*.js", "scripts/**/*.js",  "tests/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "commonjs"

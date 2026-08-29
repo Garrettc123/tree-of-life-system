@@ -1,0 +1,42 @@
+# Ignore files that don't belong in the production Docker image
+
+# Dev dependencies and lock files
+node_modules/
+npm-debug.log*
+
+# Test files
+tests/
+coverage/
+.nyc_output/
+
+# Documentation
+*.md
+docs/
+
+# Shell scripts (not needed at runtime)
+*.sh
+
+# Static assets served separately
+public/
+
+# CI/CD configs
+.github/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Environment files (use secrets/env injection at runtime)
+.env
+.env.*
+
+# Blockchain / unused subsystems
+blockchain/
+
+# Temp and build artifacts
+tmp/
+temp/
+dist/
+build/

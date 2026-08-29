@@ -3,9 +3,13 @@
  */
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Security headers
+app.use(helmet());
 
 // Middleware
 app.use(cors());

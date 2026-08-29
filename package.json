@@ -13,23 +13,44 @@
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "test": "jest",
+    "test": "jest --forceExit",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:integration": "jest --testPathPattern=integration",
+    "test:coverage": "jest --coverage --forceExit",
+    "test:integration": "jest --testPathPattern=integration --forceExit",
     "test:kafka": "node scripts/test-kafka.js",
     "test:grpc": "node scripts/test-grpc.js",
     "test:load": "node scripts/load-test.js",
     "test:latency": "node scripts/latency-benchmark.js",
-    "lint": "eslint agents/**/*.js",
-    "lint:fix": "eslint agents/**/*.js --fix",
-    "format": "prettier --write 'agents/**/*.js'",
+    "lint": "eslint 'agents/**/*.js' 'scripts/**/*.js' 'tests/**/*.js'",
+    "lint:fix": "eslint 'agents/**/*.js' 'scripts/**/*.js' 'tests/**/*.js' --fix",
+    "format": "prettier --write 'agents/**/*.js' 'tests/**/*.js'",
+    "format:check": "prettier --check 'agents/**/*.js' 'tests/**/*.js'",
     "docs:generate": "jsdoc -c jsdoc.json",
     "health-check": "node scripts/health-check.js",
     "metrics": "node scripts/metrics-collector.js"
   },
   "jest": {
-    "testPathIgnorePatterns": ["/node_modules/", "/blockchain/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/blockchain/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 30,
+        "functions": 25,
+        "branches": 35,
+        "statements": 30
+      }
+    },
+    "collectCoverageFrom": [
+      "agents/**/*.js",
+      "src/**/*.js",
+      "!agents/bootstrap.js",
+      "!agents/startup.js"
+    ],
+    "moduleNameMapper": {
+      "^uuid$": "<rootDir>/tests/__mocks__/uuid.js"
+    }
   },
   "keywords": [
     "autonomous-agents",
@@ -47,6 +68,7 @@
     "@grpc/proto-loader": "^0.8.1",
     "dotenv": "^17.4.2",
     "events": "^3.3.0",
+    "helmet": "^8.3.0",
     "kafkajs": "^2.2.4",
     "uuid": "^14.0.2"
   },

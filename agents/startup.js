@@ -42,7 +42,7 @@ class StartupSequence extends EventEmitter {
       success: '✅',
       error: '❌',
       warn: '⚠️',
-      debug: '🔍',
+      debug: '🔍'
     }[type] || '🔄';
 
     console.log(`${prefix} [${timestamp}] [${phase}] ${message}`);
@@ -58,22 +58,22 @@ class StartupSequence extends EventEmitter {
           brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
           clientId: process.env.KAFKA_CLIENT_ID || 'tree-of-life-orchestrator',
           connectionTimeout: parseInt(process.env.KAFKA_CONNECTION_TIMEOUT || '10000'),
-          requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000'),
+          requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000')
         },
         grpc: {
           host: process.env.GRPC_HOST || '0.0.0.0',
           port: parseInt(process.env.GRPC_PORT || '50051'),
           maxReceiveMessageLength: parseInt(process.env.GRPC_MAX_RECEIVE_MESSAGE_LENGTH || '4194304'),
-          maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304'),
+          maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304')
         },
         rewoo: {
           maxIterations: parseInt(process.env.REWOO_MAX_ITERATIONS || '3'),
           planningTimeout: parseInt(process.env.REWOO_PLANNING_TIMEOUT || '30000'),
           executionTimeout: parseInt(process.env.REWOO_EXECUTION_TIMEOUT || '60000'),
-          synthesisTimeout: parseInt(process.env.REWOO_SYNTHESIS_TIMEOUT || '30000'),
+          synthesisTimeout: parseInt(process.env.REWOO_SYNTHESIS_TIMEOUT || '30000')
         },
         nodeEnv: process.env.NODE_ENV || 'development',
-        logLevel: process.env.LOG_LEVEL || 'info',
+        logLevel: process.env.LOG_LEVEL || 'info'
       };
 
       this.log('PHASE 1', `Kafka brokers: ${config.kafka.brokers.join(', ')}`, 'debug');
@@ -83,7 +83,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase1 = {
         success: true,
         config,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
 
       this.log('PHASE 1', '✅ Environment loaded successfully', 'success');
@@ -93,7 +93,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase1 = {
         success: false,
         error: error.message,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
       throw error;
     }
@@ -115,7 +115,7 @@ class StartupSequence extends EventEmitter {
         'task.synthesis',
         'agent.heartbeat',
         'system.error',
-        'system.metrics',
+        'system.metrics'
       ];
 
       await kafkaCoordinator.createTopics(topics);
@@ -125,7 +125,7 @@ class StartupSequence extends EventEmitter {
         success: true,
         brokers: config.kafka.brokers,
         topicsCreated: topics.length,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
 
       this.log('PHASE 2', '✅ Kafka event bus connected', 'success');
@@ -135,7 +135,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase2 = {
         success: false,
         error: error.message,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
       throw error;
     }
@@ -155,7 +155,7 @@ class StartupSequence extends EventEmitter {
         success: true,
         host: config.grpc.host,
         port: config.grpc.port,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
 
       this.log('PHASE 3', '✅ gRPC server initialized', 'success');
@@ -165,7 +165,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase3 = {
         success: false,
         error: error.message,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
       throw error;
     }
@@ -179,18 +179,18 @@ class StartupSequence extends EventEmitter {
         {
           id: 'planning-agent',
           role: 'planner',
-          type: 'Planning',
+          type: 'Planning'
         },
         {
           id: 'execution-agent',
           role: 'executor',
-          type: 'Execution',
+          type: 'Execution'
         },
         {
           id: 'reflexion-agent',
           role: 'critic',
-          type: 'Reflexion',
-        },
+          type: 'Reflexion'
+        }
       ];
 
       for (const agent of agents) {
@@ -203,7 +203,7 @@ class StartupSequence extends EventEmitter {
         success: true,
         agentsRegistered: agents.length,
         agents: agents.map(a => ({ id: a.id, type: a.type })),
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
 
       this.log('PHASE 4', `✅ ${agents.length} agents registered`, 'success');
@@ -213,7 +213,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase4 = {
         success: false,
         error: error.message,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
       throw error;
     }
@@ -225,15 +225,15 @@ class StartupSequence extends EventEmitter {
     try {
       const metrics = rewooExecutor.getMetrics();
 
-      this.log('PHASE 5', `ReWOO executor ready`, 'debug');
+      this.log('PHASE 5', 'ReWOO executor ready', 'debug');
       this.log('PHASE 5', `Registered agents: ${metrics.registeredAgents}`, 'debug');
-      this.log('PHASE 5', `Max iterations: 3, Timeouts: Planning 30s, Execution 60s, Synthesis 30s`, 'debug');
+      this.log('PHASE 5', 'Max iterations: 3, Timeouts: Planning 30s, Execution 60s, Synthesis 30s', 'debug');
 
       this.results.phase5 = {
         success: true,
         registeredAgents: metrics.registeredAgents,
         maxIterations: 3,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
 
       this.log('PHASE 5', '✅ ReWOO executor started', 'success');
@@ -243,7 +243,7 @@ class StartupSequence extends EventEmitter {
       this.results.phase5 = {
         success: false,
         error: error.message,
-        duration: Date.now() - this.startTime,
+        duration: Date.now() - this.startTime
       };
       throw error;
     }
@@ -306,7 +306,7 @@ class StartupSequence extends EventEmitter {
 
       this.emit('startup:complete', {
         duration: totalDuration,
-        results: this.results,
+        results: this.results
       });
 
       return {
@@ -315,7 +315,7 @@ class StartupSequence extends EventEmitter {
         kafkaCoordinator,
         grpcGateway,
         rewooExecutor,
-        results: this.results,
+        results: this.results
       };
     } catch (error) {
       console.log('\n');

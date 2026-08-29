@@ -25,7 +25,7 @@ class KafkaCoordinator extends EventEmitter {
       ssl: config.ssl || false,
       sasl: config.sasl || null,
       connectionTimeout: 10000,
-      requestTimeout: 30000,
+      requestTimeout: 30000
     });
 
     this.producer = null;
@@ -44,7 +44,7 @@ class KafkaCoordinator extends EventEmitter {
       this.producer = this.kafka.producer({
         idempotent: true,
         maxInFlightRequests: 5,
-        compression: 1,
+        compression: 1
       });
       await this.producer.connect();
       console.log('[KafkaCoordinator] Producer connected');
@@ -62,9 +62,9 @@ class KafkaCoordinator extends EventEmitter {
 
   async disconnect() {
     try {
-      if (this.producer) await this.producer.disconnect();
-      if (this.consumer) await this.consumer.disconnect();
-      if (this.admin) await this.admin.disconnect();
+      if (this.producer) {await this.producer.disconnect();}
+      if (this.consumer) {await this.consumer.disconnect();}
+      if (this.admin) {await this.admin.disconnect();}
       console.log('[KafkaCoordinator] Disconnected');
     } catch (error) {
       console.error('[KafkaCoordinator] Disconnect error:', error.message);
@@ -79,7 +79,7 @@ class KafkaCoordinator extends EventEmitter {
       source: options.source || 'coordinator',
       correlationId: options.correlationId || uuid.v4(),
       payload,
-      metadata: options.metadata || {},
+      metadata: options.metadata || {}
     };
 
     try {
@@ -94,17 +94,17 @@ class KafkaCoordinator extends EventEmitter {
             headers: {
               'event-id': event.id,
               'event-type': eventType,
-              'timestamp': event.timestamp,
-            },
-          },
-        ],
+              'timestamp': event.timestamp
+            }
+          }
+        ]
       });
 
       this.emit('event:published', {
         eventId: event.id,
         type: eventType,
         partition: result[0].partition,
-        offset: result[0].offset,
+        offset: result[0].offset
       });
 
       return event;
@@ -124,7 +124,7 @@ class KafkaCoordinator extends EventEmitter {
     try {
       await this.consumer.subscribe({
         topics,
-        fromBeginning: options.fromBeginning || false,
+        fromBeginning: options.fromBeginning || false
       });
 
       await this.consumer.run({
@@ -139,14 +139,14 @@ class KafkaCoordinator extends EventEmitter {
             this.emit('event:processed', {
               eventId: event.id,
               type: event.type,
-              partition,
+              partition
             });
           } catch (error) {
             console.error('[KafkaCoordinator] Handler error:', error.message);
             this.emit('error:handler', { error: error.message });
-            if (options.onError) await options.onError(error);
+            if (options.onError) {await options.onError(error);}
           }
-        },
+        }
       });
 
       this.subscriptions.set(subscriptionId, { topics, handler });
@@ -172,14 +172,14 @@ class KafkaCoordinator extends EventEmitter {
         configEntries: [
           { name: 'retention.ms', value: String(config.retentionMs || 6912000000) }, // 80 days
           { name: 'compression.type', value: 'snappy' },
-          { name: 'min.insync.replicas', value: '2' },
-        ],
+          { name: 'min.insync.replicas', value: '2' }
+        ]
       }));
 
       const result = await this.admin.createTopics({
         topics: topicSpecs,
         validateOnly: false,
-        waitForLeaders: true,
+        waitForLeaders: true
       });
 
       console.log('[KafkaCoordinator] Topics created:', result);
@@ -199,7 +199,7 @@ class KafkaCoordinator extends EventEmitter {
       subscriptions: this.subscriptions.size,
       registeredEvents: this.eventRegistry.size,
       connected: !!this.producer && !!this.consumer,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 }

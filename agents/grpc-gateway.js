@@ -27,7 +27,7 @@ class gRPCGateway extends EventEmitter {
       maxSendMessageLength: config.maxSendMessageLength || 4 * 1024 * 1024,
       keepaliveTime: config.keepaliveTime || 30000,
       keepaliveTimeout: config.keepaliveTimeout || 10000,
-      ...config,
+      ...config
     };
 
     this.server = null;
@@ -39,7 +39,7 @@ class gRPCGateway extends EventEmitter {
       requestsProcessed: 0,
       errorsEncountered: 0,
       averageLatency: 0,
-      latencyHistory: [],
+      latencyHistory: []
     };
   }
 
@@ -49,7 +49,7 @@ class gRPCGateway extends EventEmitter {
       longs: String,
       enums: String,
       defaults: true,
-      oneofs: true,
+      oneofs: true
     });
 
     const proto = grpc.loadPackageDefinition(packageDefinition);
@@ -63,14 +63,14 @@ class gRPCGateway extends EventEmitter {
 
       this.server = new grpc.Server({
         'grpc.max_receive_message_length': this.config.maxReceiveMessageLength,
-        'grpc.max_send_message_length': this.config.maxSendMessageLength,
+        'grpc.max_send_message_length': this.config.maxSendMessageLength
       });
 
       // Add service implementations
       this.server.addService(this.serviceDef.AgentService.service, {
         executeTask: this.executeTask.bind(this),
         streamEvents: this.streamEvents.bind(this),
-        getStatus: this.getStatus.bind(this),
+        getStatus: this.getStatus.bind(this)
       });
 
       return new Promise((resolve, reject) => {
@@ -106,7 +106,7 @@ class gRPCGateway extends EventEmitter {
         'grpc.max_send_message_length': this.config.maxSendMessageLength,
         'grpc.keepalive_time_ms': this.config.keepaliveTime,
         'grpc.keepalive_timeout_ms': this.config.keepaliveTimeout,
-        'grpc.http2.max_pings_without_data': 0,
+        'grpc.http2.max_pings_without_data': 0
       };
 
       const client = new this.serviceDef.AgentService(
@@ -120,7 +120,7 @@ class gRPCGateway extends EventEmitter {
         host,
         port,
         connected: true,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       });
 
       console.log(`[gRPCGateway] Client connection created for ${agentId} at ${host}:${port}`);
@@ -153,7 +153,7 @@ class gRPCGateway extends EventEmitter {
         taskId,
         taskType,
         payload,
-        requestId,
+        requestId
       });
 
       const latency = Date.now() - startTime;
@@ -164,7 +164,7 @@ class gRPCGateway extends EventEmitter {
         taskId,
         requestId,
         result,
-        latency,
+        latency
       });
 
       this.emit('task:executed', { taskId, agentId, latency });
@@ -177,7 +177,7 @@ class gRPCGateway extends EventEmitter {
       callback({
         code: grpc.status.INTERNAL,
         message: error.message,
-        details: { requestId, latency },
+        details: { requestId, latency }
       });
 
       this.emit('task:failed', { requestId, error: error.message });
@@ -203,7 +203,7 @@ class gRPCGateway extends EventEmitter {
           eventId: event.id,
           type: event.type,
           timestamp: event.timestamp,
-          payload: event.payload,
+          payload: event.payload
         });
       }
     });
@@ -229,14 +229,14 @@ class gRPCGateway extends EventEmitter {
         status: agent.getStatus?.() || 'active',
         uptime: Date.now() - agent.startTime || 0,
         tasksProcessed: agent.tasksProcessed || 0,
-        lastHeartbeat: new Date().toISOString(),
+        lastHeartbeat: new Date().toISOString()
       };
 
       callback(null, status);
     } catch (error) {
       callback({
         code: grpc.status.NOT_FOUND,
-        message: error.message,
+        message: error.message
       });
     }
   }
@@ -264,7 +264,7 @@ class gRPCGateway extends EventEmitter {
     return new Promise((resolve, reject) => {
       if (this.server) {
         this.server.tryShutdown((error) => {
-          if (error) reject(error);
+          if (error) {reject(error);}
           else {
             console.log('[gRPCGateway] Server shutdown complete');
             this.emit('server:shutdown');
@@ -285,7 +285,7 @@ class gRPCGateway extends EventEmitter {
       successRate: (this.metrics.requestsProcessed - this.metrics.errorsEncountered) / this.metrics.requestsProcessed || 0,
       activeConnections: this.connections.size,
       registeredAgents: this.agents.size,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 }

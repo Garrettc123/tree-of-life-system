@@ -60,7 +60,7 @@ async function activateTITAN() {
   }
   
   console.log(chalk.yellow('\n' + '━'.repeat(50)));
-  console.log(chalk.cyan(`\n📊 ACTIVATION SUMMARY:\n`));
+  console.log(chalk.cyan('\n📊 ACTIVATION SUMMARY:\n'));
   console.log(chalk.green(`✅ Active Systems:  ${activeCount}/${systems.length}`));
   console.log(chalk.red(`❌ Failed Systems:  ${failedCount}/${systems.length}`));
   

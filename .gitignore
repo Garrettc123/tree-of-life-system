@@ -19,6 +19,9 @@ typechain-types/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
+!.env.template
 
 # IDE
 .vscode/

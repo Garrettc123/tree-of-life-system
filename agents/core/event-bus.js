@@ -61,7 +61,7 @@ class EventBus extends EventEmitter {
    */
   unsubscribe(handlerId) {
     const handlerInfo = this.handlers.get(handlerId);
-    if (!handlerInfo) return false;
+    if (!handlerInfo) {return false;}
 
     this.off(handlerInfo.eventType, handlerInfo.handler);
     this.handlers.delete(handlerId);

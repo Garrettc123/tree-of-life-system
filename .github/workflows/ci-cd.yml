@@ -1,10 +1,9 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline (DEPRECATED)
+# This workflow is superseded by ci.yml, cd.yml, security.yml, and health.yml.
+# It is kept here for historical reference only and will not trigger.
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -34,7 +33,7 @@ jobs:
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: testpass123
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD || 'testpass' }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
