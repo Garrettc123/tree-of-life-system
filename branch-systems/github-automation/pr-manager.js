@@ -3,7 +3,7 @@
  * Auto-create, review, merge PRs with AI
  */
 
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
 // PR Queue
@@ -11,23 +11,23 @@ const prQueue = [];
 const reviewQueue = [];
 
 // Auto-create PR from branch
-router.post('/pr/auto-create', async (req, res) => {
-  const { branch, base = 'main', title, body } = req.body;
+router.post("/pr/auto-create", async (req, res) => {
+  const { branch, base = "main", title, body } = req.body;
 
   const pr = {
     id: `pr_${Date.now()}`,
     branch,
     base,
     title: title || `Auto PR: ${branch}`,
-    body: body || 'Automated pull request created by Tree of Life system',
-    status: 'open',
+    body: body || "Automated pull request created by Tree of Life system",
+    status: "open",
     checks: {
-      tests: 'pending',
-      lint: 'pending',
-      security: 'pending',
-      ai_review: 'pending'
+      tests: "pending",
+      lint: "pending",
+      security: "pending",
+      ai_review: "pending",
     },
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   prQueue.push(pr);
@@ -38,12 +38,12 @@ router.post('/pr/auto-create', async (req, res) => {
     success: true,
     pr,
     url: `https://github.com/${process.env.GITHUB_USERNAME}/tree-of-life-system/pull/new/${branch}`,
-    message: 'PR created and queued for automated review'
+    message: "PR created and queued for automated review",
   });
 });
 
 // AI-Powered Code Review
-router.post('/pr/ai-review', async (req, res) => {
+router.post("/pr/ai-review", async (req, res) => {
   const { prNumber, files } = req.body;
 
   console.log(`[PR AI Review] Analyzing PR #${prNumber}`);
@@ -56,37 +56,37 @@ router.post('/pr/ai-review', async (req, res) => {
       codeQuality: {
         score: 85,
         issues: [
-          'Consider extracting complex logic into separate functions',
-          'Add error handling for async operations'
-        ]
+          "Consider extracting complex logic into separate functions",
+          "Add error handling for async operations",
+        ],
       },
       security: {
         score: 95,
         vulnerabilities: [],
-        recommendations: ['Use environment variables for sensitive data']
+        recommendations: ["Use environment variables for sensitive data"],
       },
       performance: {
         score: 90,
         suggestions: [
-          'Consider caching frequently accessed data',
-          'Optimize database queries'
-        ]
+          "Consider caching frequently accessed data",
+          "Optimize database queries",
+        ],
       },
       testCoverage: {
         percentage: 78,
-        missing: ['Error handling paths', 'Edge cases']
-      }
+        missing: ["Error handling paths", "Edge cases"],
+      },
     },
     overallScore: 87,
-    recommendation: 'approve_with_suggestions',
+    recommendation: "approve_with_suggestions",
     aiComments: [
       {
-        file: 'index.js',
+        file: "index.js",
         line: 42,
-        suggestion: 'Add input validation here',
-        severity: 'medium'
-      }
-    ]
+        suggestion: "Add input validation here",
+        severity: "medium",
+      },
+    ],
   };
 
   reviewQueue.push(review);
@@ -94,22 +94,22 @@ router.post('/pr/ai-review', async (req, res) => {
   res.json({
     success: true,
     review,
-    action: review.overallScore >= 80 ? 'approve' : 'request_changes'
+    action: review.overallScore >= 80 ? "approve" : "request_changes",
   });
 });
 
 // Auto-merge when approved
-router.post('/pr/auto-merge', async (req, res) => {
-  const { prNumber, method = 'squash' } = req.body;
+router.post("/pr/auto-merge", async (req, res) => {
+  const { prNumber, method = "squash" } = req.body;
 
   const conditions = {
     approved: true,
     testsPass: true,
     conflictsFree: true,
-    minReviews: 1
+    minReviews: 1,
   };
 
-  if (Object.values(conditions).every(v => v)) {
+  if (Object.values(conditions).every((v) => v)) {
     console.log(`[PR] Auto-merging PR #${prNumber} using ${method}`);
 
     res.json({
@@ -117,7 +117,7 @@ router.post('/pr/auto-merge', async (req, res) => {
       merged: true,
       method,
       sha: `sha_${Date.now()}`,
-      message: 'PR successfully auto-merged'
+      message: "PR successfully auto-merged",
     });
   } else {
     res.json({
@@ -126,14 +126,14 @@ router.post('/pr/auto-merge', async (req, res) => {
       blockers: Object.entries(conditions)
         .filter(([k, v]) => !v)
         .map(([k]) => k),
-      message: 'PR not ready for auto-merge'
+      message: "PR not ready for auto-merge",
     });
   }
 });
 
 // Conflict resolution
-router.post('/pr/resolve-conflicts', async (req, res) => {
-  const { prNumber, strategy = 'ours' } = req.body;
+router.post("/pr/resolve-conflicts", async (req, res) => {
+  const { prNumber, strategy = "ours" } = req.body;
 
   console.log(`[PR] Resolving conflicts in PR #${prNumber}`);
 
@@ -141,24 +141,24 @@ router.post('/pr/resolve-conflicts', async (req, res) => {
     success: true,
     conflictsResolved: true,
     strategy,
-    filesResolved: ['README.md', 'package.json'],
-    message: 'Conflicts automatically resolved'
+    filesResolved: ["README.md", "package.json"],
+    message: "Conflicts automatically resolved",
   });
 });
 
 // PR Status
-router.get('/pr/status', (req, res) => {
+router.get("/pr/status", (req, res) => {
   res.json({
     queue: prQueue.length,
     reviews: reviewQueue.length,
     autoMergeEnabled: true,
     features: [
-      'Auto-create PRs',
-      'AI code reviews',
-      'Auto-merge on approval',
-      'Conflict resolution',
-      'Status checks'
-    ]
+      "Auto-create PRs",
+      "AI code reviews",
+      "Auto-merge on approval",
+      "Conflict resolution",
+      "Status checks",
+    ],
   });
 });
 
