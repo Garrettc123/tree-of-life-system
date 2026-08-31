@@ -19,6 +19,7 @@ You don't need Railway, OpenAI, or any manual API tokens to get started. GitHub 
 5. **Done!** Your site deploys to: `https://garrettc123.github.io/tree-of-life-system`
 
 **What you get:**
+
 - ✅ Automatic deployment
 - ✅ Free hosting forever
 - ✅ Global CDN
@@ -44,6 +45,7 @@ All of these platforms connect via **OAuth** - no manual API tokens!
 6. **Done!** No API tokens needed
 
 **Features:**
+
 - Serverless functions included
 - Automatic HTTPS
 - Global CDN
@@ -63,6 +65,7 @@ All of these platforms connect via **OAuth** - no manual API tokens!
 6. **Done!** No API tokens needed
 
 **Features:**
+
 - Serverless functions included
 - Form handling
 - Split testing
@@ -82,6 +85,7 @@ All of these platforms connect via **OAuth** - no manual API tokens!
 6. **Done!** No API tokens needed
 
 **Features:**
+
 - Persistent storage
 - Background workers
 - Cron jobs
@@ -97,13 +101,14 @@ GitHub Actions automatically provides a special token called `GITHUB_TOKEN`:
 
 ```yaml
 permissions:
-  contents: write      # Push code
-  pages: write         # Deploy to GitHub Pages
-  id-token: write      # For OAuth with other services
-  deployments: write   # Track deployments
+  contents: write # Push code
+  pages: write # Deploy to GitHub Pages
+  id-token: write # For OAuth with other services
+  deployments: write # Track deployments
 ```
 
 **Benefits:**
+
 - ✅ Automatically created for every workflow run
 - ✅ Expires after the job completes (secure!)
 - ✅ No manual setup required
@@ -125,13 +130,13 @@ Vercel, Netlify, and Render use OAuth to connect:
 
 ## 💰 Cost Comparison
 
-| Platform | Cost | Bandwidth | Build Minutes | Storage |
-|----------|------|-----------|---------------|----------|
-| **GitHub Pages** | **FREE** | Unlimited | 2,000/mo | Unlimited |
-| **Vercel** | **FREE** | 100GB/mo | 6,000/mo | 1GB |
-| **Netlify** | **FREE** | 100GB/mo | 300/mo | 100GB |
-| **Render** | **FREE** | N/A | 750hrs/mo | 512MB |
-| Railway | $5-20 | Varies | N/A | Varies |
+| Platform         | Cost     | Bandwidth | Build Minutes | Storage   |
+| ---------------- | -------- | --------- | ------------- | --------- |
+| **GitHub Pages** | **FREE** | Unlimited | 2,000/mo      | Unlimited |
+| **Vercel**       | **FREE** | 100GB/mo  | 6,000/mo      | 1GB       |
+| **Netlify**      | **FREE** | 100GB/mo  | 300/mo        | 100GB     |
+| **Render**       | **FREE** | N/A       | 750hrs/mo     | 512MB     |
+| Railway          | $5-20    | Varies    | N/A           | Varies    |
 
 **Winner:** GitHub Pages (completely unlimited!)
 
@@ -211,6 +216,7 @@ gh workflow run zero-token-deploy.yml \
 ### 1. Start with GitHub Pages
 
 **Why?**
+
 - Simplest setup
 - Truly unlimited
 - No quotas or limits
@@ -219,6 +225,7 @@ gh workflow run zero-token-deploy.yml \
 ### 2. Graduate to Vercel/Netlify Later
 
 **When?**
+
 - When you need serverless functions
 - When you need form handling
 - When you need higher bandwidth
@@ -226,6 +233,7 @@ gh workflow run zero-token-deploy.yml \
 ### 3. Add API Keys Only When Needed
 
 **Start basic, scale up:**
+
 1. Launch with zero tokens ✅
 2. Test and validate ✅
 3. Add OpenAI when you need AI ✅
@@ -239,6 +247,7 @@ gh workflow run zero-token-deploy.yml \
 ### After Deploying to GitHub Pages:
 
 **Your site URL:**
+
 ```
 https://garrettc123.github.io/tree-of-life-system
 ```
@@ -274,24 +283,31 @@ https://garrettc123.github.io/tree-of-life-system
 ## ❓ FAQ
 
 ### Q: Do I really need ZERO manual tokens?
+
 **A:** Yes! GitHub's `GITHUB_TOKEN` is automatically provided. Other platforms use OAuth (one-click authorization).
 
 ### Q: What about the OpenAI/Railway tokens in the other workflows?
+
 **A:** Those are only needed for advanced features. The zero-token workflow works without them!
 
 ### Q: Can I add API keys later?
+
 **A:** Absolutely! Start free, add features as you grow.
 
 ### Q: Which free platform is best?
+
 **A:** GitHub Pages for static sites. Vercel/Netlify for serverless. Render for full backend.
 
 ### Q: Is this production-ready?
+
 **A:** Yes! All these platforms serve production traffic for major companies.
 
 ### Q: What if I hit free tier limits?
+
 **A:** Unlikely for starting out. GitHub Pages has no limits. Others have generous quotas.
 
 ### Q: Can I use a custom domain?
+
 **A:** Yes! All platforms support custom domains for free.
 
 ---
@@ -323,18 +339,22 @@ https://garrettc123.github.io/tree-of-life-system
 ## 🚀 Next Steps
 
 ### 1. Deploy Now (2 minutes)
+
 ```bash
 # Click here and click "Run workflow":
 https://github.com/Garrettc123/tree-of-life-system/actions/workflows/zero-token-deploy.yml
 ```
 
 ### 2. Customize Your Site
+
 Edit `gh-pages/index.html` to personalize your landing page
 
 ### 3. Add Features Gradually
+
 Start with basic features, add API keys as needed
 
 ### 4. Scale When Ready
+
 Upgrade to paid tiers only when you need more resources
 
 ---
