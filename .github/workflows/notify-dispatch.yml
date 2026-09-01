@@ -3,21 +3,37 @@ name: Notify dispatch
 on:
   push:
     branches: [main]
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
 
 jobs:
-  notify:
+  notify-push:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    if: vars.DISPATCH_URL != ''
-    steps:
-      - name: Emit push event to garcar-dispatch
-        run: |
-          curl -sf -X POST "${{ vars.DISPATCH_URL }}/dispatch" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg et 'github.push' \
-              --arg repo '${{ github.repository }}' \
-              --arg branch '${{ github.ref_name }}' \
-              --arg sha '${{ github.sha }}' \
-              --arg actor '${{ github.actor }}' \
-              '{event_type:$et,source_system:"github-actions",repo:$repo,branch:$branch,commit_sha:$sha,actor:$actor}')" \
-            || true
+    uses: ./.github/workflows/event-spine-dispatch.yml
+    with:
+      event_type: github.push
+      status: success
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      payload_json: >-
+        {"event":"push","ref":"${{ github.ref }}","before":"${{ github.event.before }}","after":"${{ github.event.after }}"}
+    secrets:
+      dispatch_url: ${{ secrets.DISPATCH_URL }}
+      dispatch_secret: ${{ secrets.DISPATCH_SECRET }}
+
+  notify-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    uses: ./.github/workflows/event-spine-dispatch.yml
+    with:
+      event_type: github.pr_${{ github.event.action }}
+      status: ${{ github.event.pull_request.merged && 'merged' || (github.event.pull_request.state == 'closed' && 'closed' || 'open') }}
+      run_url: ${{ github.event.pull_request.html_url }}
+      branch: ${{ github.event.pull_request.head.ref }}
+      commit_sha: ${{ github.event.pull_request.head.sha }}
+      actor: ${{ github.event.pull_request.user.login }}
+      payload_json: >-
+        {"event":"pull_request","action":"${{ github.event.action }}","number":${{ github.event.pull_request.number }},"base":"${{ github.event.pull_request.base.ref }}","head":"${{ github.event.pull_request.head.ref }}","merged":${{ github.event.pull_request.merged }}}
+    secrets:
+      dispatch_url: ${{ secrets.DISPATCH_URL }}
+      dispatch_secret: ${{ secrets.DISPATCH_SECRET }}

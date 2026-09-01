@@ -8,31 +8,16 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    steps:
-      - name: Emit CI result to garcar-dispatch
-        env:
-          DISPATCH_URL: ${{ secrets.DISPATCH_URL }}
-          DISPATCH_SECRET: ${{ secrets.DISPATCH_SECRET }}
-        run: |
-          if [ -z "$DISPATCH_URL" ]; then
-            echo "DISPATCH_URL not set — skipping"
-            exit 0
-          fi
-          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
-          EVENT_TYPE="github.ci_${CONCLUSION}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
-          BODY=$(printf '{"event_type":"%s","source_system":"github-actions","status":"%s","repo":"%s","branch":"%s","run_url":"%s","commit_sha":"%s","payload":{"workflow":"%s","run_id":"%s","actor":"%s"}}' \
-            "$EVENT_TYPE" \
-            "$CONCLUSION" \
-            "${{ github.repository }}" \
-            "${{ github.event.workflow_run.head_branch }}" \
-            "$RUN_URL" \
-            "${{ github.event.workflow_run.head_sha }}" \
-            "${{ github.event.workflow_run.name }}" \
-            "${{ github.event.workflow_run.id }}" \
-            "${{ github.event.workflow_run.triggering_actor.login }}")
-          SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "${DISPATCH_SECRET:-placeholder}" -hex | awk '{print $2}')
-          curl -sf -X POST "$DISPATCH_URL/dispatch" \
-            -H "Content-Type: application/json" \
-            -H "X-Dispatch-Sig: $SIG" \
-            -d "$BODY" || echo "Dispatch notify skipped"
+    uses: ./.github/workflows/event-spine-dispatch.yml
+    with:
+      event_type: github.ci_${{ github.event.workflow_run.conclusion }}
+      status: ${{ github.event.workflow_run.conclusion }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+      commit_sha: ${{ github.event.workflow_run.head_sha }}
+      actor: ${{ github.event.workflow_run.triggering_actor.login }}
+      payload_json: >-
+        {"event":"workflow_run","workflow":"${{ github.event.workflow_run.name }}","run_id":"${{ github.event.workflow_run.id }}","conclusion":"${{ github.event.workflow_run.conclusion }}","trigger":"${{ github.event.workflow_run.event }}"}
+    secrets:
+      dispatch_url: ${{ secrets.DISPATCH_URL }}
+      dispatch_secret: ${{ secrets.DISPATCH_SECRET }}

@@ -1,0 +1,116 @@
+name: Event Spine Dispatch (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      event_type:
+        required: true
+        type: string
+      status:
+        required: false
+        type: string
+        default: ""
+      payload_json:
+        required: false
+        type: string
+        default: "{}"
+      run_url:
+        required: false
+        type: string
+        default: ""
+      branch:
+        required: false
+        type: string
+        default: ""
+      commit_sha:
+        required: false
+        type: string
+        default: ""
+      actor:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      dispatch_url:
+        required: false
+      dispatch_secret:
+        required: false
+
+permissions: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate dispatch configuration
+        id: config
+        env:
+          DISPATCH_URL: ${{ secrets.dispatch_url }}
+          DISPATCH_SECRET: ${{ secrets.dispatch_secret }}
+        run: |
+          if [ -z "$DISPATCH_URL" ] || [ -z "$DISPATCH_SECRET" ]; then
+            echo "Event spine not configured (DISPATCH_URL or DISPATCH_SECRET missing) — skipping safely"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Emit signed event to spine
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          DISPATCH_URL: ${{ secrets.dispatch_url }}
+          DISPATCH_SECRET: ${{ secrets.dispatch_secret }}
+          EVENT_TYPE: ${{ inputs.event_type }}
+          EVENT_STATUS: ${{ inputs.status }}
+          PAYLOAD_JSON: ${{ inputs.payload_json }}
+          RUN_URL: ${{ inputs.run_url }}
+          BRANCH_INPUT: ${{ inputs.branch }}
+          SHA_INPUT: ${{ inputs.commit_sha }}
+          ACTOR_INPUT: ${{ inputs.actor }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+        run: |
+          set -euo pipefail
+
+          EVENT_TYPE_NORMALIZED="$(echo "$EVENT_TYPE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/_/g')"
+          BRANCH="${BRANCH_INPUT:-$REF_NAME}"
+          COMMIT_SHA="${SHA_INPUT:-$SHA}"
+          EVENT_ACTOR="${ACTOR_INPUT:-$ACTOR}"
+          TRACE_ID="gh_${REPOSITORY_ID}_${RUN_ID}_${RUN_ATTEMPT}"
+          PAYLOAD_COMPACT="$(echo "${PAYLOAD_JSON:-{}}" | jq -c . 2>/dev/null || echo '{}')"
+
+          BODY="$(jq -cn \
+            --arg event_type "$EVENT_TYPE_NORMALIZED" \
+            --arg source_system "github-actions" \
+            --arg status "$EVENT_STATUS" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg commit_sha "$COMMIT_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg actor "$EVENT_ACTOR" \
+            --arg trace_id "$TRACE_ID" \
+            --argjson payload "$PAYLOAD_COMPACT" \
+            '{
+              event_type: $event_type,
+              source_system: $source_system,
+              trace_id: $trace_id,
+              status: (if $status == "" then null else $status end),
+              repo: $repo,
+              branch: $branch,
+              commit_sha: $commit_sha,
+              run_url: $run_url,
+              actor: $actor,
+              payload: $payload
+            }')"
+
+          SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$DISPATCH_SECRET" -hex | awk '{print $2}')"
+
+          curl -fsS -X POST "$DISPATCH_URL/dispatch" \
+            -H "Content-Type: application/json" \
+            -H "X-Dispatch-Sig: $SIG" \
+            -d "$BODY"

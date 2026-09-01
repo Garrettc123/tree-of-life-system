@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -38,6 +39,8 @@ app.add_middleware(
 )
 
 event_log = EventLog(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+EVENT_TYPE_PATTERN = re.compile(r"^[a-z0-9]+(?:\.[a-z0-9_]+)+$")
+GITHUB_REQUIRED_FIELDS = ("repo", "branch", "commit_sha", "actor", "run_url")
 
 
 def _verify_sig(body: bytes, sig: Optional[str]) -> bool:
@@ -49,6 +52,29 @@ def _verify_sig(body: bytes, sig: Optional[str]) -> bool:
         DISPATCH_SECRET.encode(), body, hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(expected, sig)
+
+
+def _validate_event_contract(event: dict):
+    event_type = event.get("event_type")
+    if not isinstance(event_type, str) or not event_type:
+        raise HTTPException(400, "missing event_type")
+    if not EVENT_TYPE_PATTERN.match(event_type):
+        raise HTTPException(400, "invalid event_type format")
+
+    source_system = event.get("source_system")
+    if not isinstance(source_system, str) or not source_system:
+        raise HTTPException(400, "missing source_system")
+
+    payload = event.get("payload")
+    if payload is not None and not isinstance(payload, dict):
+        raise HTTPException(400, "payload must be an object")
+
+    if event_type.startswith("github."):
+        if source_system != "github-actions":
+            raise HTTPException(400, "github events must use source_system=github-actions")
+        missing = [field for field in GITHUB_REQUIRED_FIELDS if not event.get(field)]
+        if missing:
+            raise HTTPException(400, f"missing github metadata: {', '.join(missing)}")
 
 
 @app.get("/health")
@@ -77,9 +103,8 @@ async def dispatch(
     except json.JSONDecodeError:
         raise HTTPException(400, "invalid JSON")
 
+    _validate_event_contract(event)
     event_type = event.get("event_type")
-    if not event_type:
-        raise HTTPException(400, "missing event_type")
 
     if "trace_id" not in event:
         event["trace_id"] = f"trc_{uuid.uuid4().hex[:12]}"

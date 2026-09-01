@@ -2,7 +2,7 @@
 # Deploy on Railway alongside garcar-dispatch.
 # pip install fastapi uvicorn supabase httpx python-dotenv pydantic
 
-import asyncio, os, httpx
+import asyncio, hashlib, hmac, json, os, httpx
 from datetime import datetime, timezone
 from typing import List
 from fastapi import FastAPI, HTTPException, Security, Depends
@@ -17,6 +17,7 @@ sb: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERV
 ATLAS_API_KEY = os.environ["ATLAS_API_KEY"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "garcar-alerts")
 DISPATCH_URL = os.environ.get("DISPATCH_URL", "")
+DISPATCH_SECRET = os.environ.get("DISPATCH_SECRET", "")
 
 def verify(creds: HTTPAuthorizationCredentials = Security(security)):
     if creds.credentials != ATLAS_API_KEY:
@@ -35,14 +36,21 @@ async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, re
     if not DISPATCH_URL:
         return
     try:
+        normalized_event_type = f"{source}.{event_type}".lower().replace(" ", "_").replace("-", "_").replace(":", "_")
+        body = {
+            "event_type": normalized_event_type,
+            "source_system": "atlas-dispatch",
+            "trace_id": f"atlas_{webhook_event_id[:12]}",
+            "payload": {"webhook_event_id": webhook_event_id, "source": source,
+                        "event_type": event_type, "results": results},
+        }
+        headers = {"Content-Type": "application/json"}
+        if DISPATCH_SECRET:
+            raw = json.dumps(body, separators=(",", ":"), sort_keys=True)
+            sig = hmac.new(DISPATCH_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+            headers["X-Dispatch-Sig"] = f"sha256={sig}"
         async with httpx.AsyncClient(timeout=5.0) as c:
-            await c.post(f"{DISPATCH_URL}/dispatch", json={
-                "event_type": f"{source}.{event_type}".replace(".", "_"),
-                "source_system": "atlas-dispatch",
-                "trace_id": f"atlas_{webhook_event_id[:12]}",
-                "payload": {"webhook_event_id": webhook_event_id, "source": source,
-                            "event_type": event_type, "results": results},
-            })
+            await c.post(f"{DISPATCH_URL}/dispatch", json=body, headers=headers)
     except Exception:
         pass
 
