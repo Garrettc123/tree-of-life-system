@@ -9,7 +9,6 @@ on:
 jobs:
   notify-push:
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/event-spine-dispatch.yml
     with:
       event_type: github.push
@@ -23,7 +22,6 @@ jobs:
 
   notify-pr:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/event-spine-dispatch.yml
     with:
       event_type: github.pr_${{ github.event.action }}

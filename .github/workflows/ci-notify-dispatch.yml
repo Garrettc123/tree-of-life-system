@@ -7,7 +7,6 @@ on:
 
 jobs:
   notify:
-    runs-on: ubuntu-latest
     uses: ./.github/workflows/event-spine-dispatch.yml
     with:
       event_type: github.ci_${{ github.event.workflow_run.conclusion }}
