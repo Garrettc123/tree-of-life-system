@@ -5,6 +5,8 @@ on:
     types: [completed]
     branches: [main]
 
+permissions: {}
+
 jobs:
   notify:
     uses: ./.github/workflows/event-spine-dispatch.yml
