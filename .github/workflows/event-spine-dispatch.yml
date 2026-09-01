@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          EVENT_TYPE_NORMALIZED="$(echo "$EVENT_TYPE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/_/g')"
+          EVENT_TYPE_NORMALIZED="$(echo "$EVENT_TYPE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._]+/_/g')"
           BRANCH="${BRANCH_INPUT:-$REF_NAME}"
           COMMIT_SHA="${SHA_INPUT:-$SHA}"
           EVENT_ACTOR="${ACTOR_INPUT:-$ACTOR}"

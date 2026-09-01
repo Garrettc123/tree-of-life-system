@@ -45,12 +45,12 @@ async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, re
                         "event_type": event_type, "results": results},
         }
         headers = {"Content-Type": "application/json"}
+        raw = json.dumps(body, separators=(",", ":"), sort_keys=True)
         if DISPATCH_SECRET:
-            raw = json.dumps(body, separators=(",", ":"), sort_keys=True)
             sig = hmac.new(DISPATCH_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
             headers["X-Dispatch-Sig"] = f"sha256={sig}"
         async with httpx.AsyncClient(timeout=5.0) as c:
-            await c.post(f"{DISPATCH_URL}/dispatch", json=body, headers=headers)
+            await c.post(f"{DISPATCH_URL}/dispatch", content=raw, headers=headers)
     except Exception:
         pass
 
