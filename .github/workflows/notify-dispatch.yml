@@ -24,7 +24,7 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/event-spine-dispatch.yml
     with:
-      event_type: github.pr_${{ github.event.action }}
+      event_type: github.pr_${{ github.event.action || 'unknown' }}
       status: ${{ github.event.pull_request.merged && 'merged' || (github.event.pull_request.state == 'closed' && 'closed' || 'open') }}
       run_url: ${{ github.event.pull_request.html_url }}
       branch: ${{ github.event.pull_request.head.ref }}
