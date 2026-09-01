@@ -2,7 +2,7 @@
 # Deploy on Railway alongside garcar-dispatch.
 # pip install fastapi uvicorn supabase httpx python-dotenv pydantic
 
-import asyncio, hashlib, hmac, json, os, httpx
+import asyncio, hashlib, hmac, json, os, re, httpx
 from datetime import datetime, timezone
 from typing import List
 from fastapi import FastAPI, HTTPException, Security, Depends
@@ -36,7 +36,9 @@ async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, re
     if not DISPATCH_URL:
         return
     try:
-        normalized_event_type = f"{source}.{event_type}".lower().replace(" ", "_").replace("-", "_").replace(":", "_")
+        source_clean = re.sub(r"[^a-z0-9_]", "_", str(source).lower())
+        event_type_clean = re.sub(r"[^a-z0-9_]", "_", str(event_type).lower())
+        normalized_event_type = f"{source_clean}.{event_type_clean}"
         body = {
             "event_type": normalized_event_type,
             "source_system": "atlas-dispatch",
