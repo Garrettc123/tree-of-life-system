@@ -77,7 +77,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          EVENT_TYPE_NORMALIZED="$(echo "$EVENT_TYPE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._]+/_/g')"
+          EVENT_TYPE_NORMALIZED="$(echo "$EVENT_TYPE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._]+/_/g; s/\.+/./g; s/^\.+//; s/\.+$//')"
+          if ! echo "$EVENT_TYPE_NORMALIZED" | grep -Eq '^[a-z0-9]+(\.[a-z0-9_]+)+$'; then
+            echo "Invalid normalized event_type: $EVENT_TYPE_NORMALIZED"
+            exit 1
+          fi
           BRANCH="${BRANCH_INPUT:-$REF_NAME}"
           COMMIT_SHA="${SHA_INPUT:-$SHA}"
           EVENT_ACTOR="${ACTOR_INPUT:-$ACTOR}"
