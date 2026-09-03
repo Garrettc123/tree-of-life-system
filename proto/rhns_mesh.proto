@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package garcar.rhns.v1;
+
+// RHNS-shaped mesh contract. Not yet bound by grpc-gateway.js.
+// Transport = gRPC. Application protocol for tools remains MCP.
+// Fan-out / replay remains Kafka. Do not collapse the three layers.
+
+enum Layer {
+  LAYER_UNSPECIFIED = 0;
+  REASON = 1;
+  HARMONY = 2;
+  NAVIGATION = 3;
+  STANDARDS = 4;
+}
+
+enum TaskState {
+  TASK_UNSPECIFIED = 0;
+  QUEUED = 1;
+  RUNNING = 2;
+  SEALED = 3;
+  REJECTED = 4;
+  FAILED = 5;
+}
+
+message TraceContext {
+  string trace_id = 1;
+  string span_id = 2;
+  string causation_id = 3;
+  string correlation_id = 4;
+}
+
+message AgentIdentity {
+  string agent_id = 1;
+  string repo = 2;
+  Layer layer = 3;
+  string capability = 4;
+}
+
+message Envelope {
+  string task_id = 1;
+  AgentIdentity from = 2;
+  AgentIdentity to = 3;
+  TraceContext trace = 4;
+  bytes payload = 5;
+  map<string, string> meta = 6;
+}
+
+message Result {
+  string task_id = 1;
+  TaskState state = 2;
+  string proof_hash = 3;
+  bytes payload = 4;
+  string reject_reason = 5;
+}
+
+message Event {
+  string event_id = 1;
+  string type = 2;
+  int64 ts_unix_ms = 3;
+  bytes payload = 4;
+}
+
+message FollowRequest {
+  string task_id = 1;
+  repeated string types = 2;
+}
+
+message CancelRequest {
+  string task_id = 1;
+  string reason = 2;
+}
+
+message Health {
+  bool ok = 1;
+  int64 inflight = 2;
+  string version = 3;
+}
+
+message SessionMsg {
+  oneof body {
+    Envelope open = 1;
+    Event event = 2;
+    Result close = 3;
+    CancelRequest cancel = 4;
+  }
+}
+
+service AgentMesh {
+  rpc Dispatch (Envelope) returns (Result);
+  rpc Follow (FollowRequest) returns (stream Event);
+  rpc Session (stream SessionMsg) returns (stream SessionMsg);
+  rpc Heartbeat (AgentIdentity) returns (Health);
+  rpc Cancel (CancelRequest) returns (Result);
+}
