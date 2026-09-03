@@ -3,20 +3,20 @@
  * Replaces the inert {id, role, type} stubs that made executeTask throw.
  */
 
-const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const EventEmitter = require("events");
+const { v4: uuidv4 } = require("uuid");
 
 class RuntimeAgent extends EventEmitter {
   constructor(spec = {}) {
     super();
     this.id = spec.id;
-    this.role = spec.role || 'executor';
-    this.type = spec.type || 'Runtime';
+    this.role = spec.role || "executor";
+    this.type = spec.type || "Runtime";
     this.capabilities = spec.capabilities || [this.role];
     this.startTime = Date.now();
     this.tasksProcessed = 0;
     this.lastHeartbeat = new Date().toISOString();
-    this.status = 'active';
+    this.status = "active";
   }
 
   getStatus() {
@@ -27,8 +27,8 @@ class RuntimeAgent extends EventEmitter {
     this.tasksProcessed += 1;
     this.lastHeartbeat = new Date().toISOString();
     const body = Buffer.isBuffer(payload)
-      ? payload.toString('utf8')
-      : (payload || '');
+      ? payload.toString("utf8")
+      : payload || "";
     const result = {
       agentId: this.id,
       role: this.role,
@@ -38,9 +38,9 @@ class RuntimeAgent extends EventEmitter {
       echo: body.slice(0, 2048),
       sealed: true,
     };
-    this.emit('event', {
+    this.emit("event", {
       id: uuidv4(),
-      type: 'task.completed',
+      type: "task.completed",
       timestamp: this.lastHeartbeat,
       payload: Buffer.from(JSON.stringify({ taskId, taskType })),
     });
@@ -62,9 +62,9 @@ class RuntimeAgent extends EventEmitter {
       agentId: this.id,
       steps: [
         {
-          id: 'step-1',
-          agentId: 'execution-agent',
-          action: 'execute',
+          id: "step-1",
+          agentId: "execution-agent",
+          action: "execute",
           input: task,
         },
       ],
