@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package agentservice;
+
+// Canonical v0 contract for tree-of-life-system AgentService.
+// Field names are camelCase so @grpc/proto-loader keepCase:true matches
+// agents/grpc-gateway.js request destructuring.
+
+service AgentService {
+  rpc ExecuteTask (ExecuteTaskRequest) returns (ExecuteTaskResponse);
+  rpc StreamEvents (StreamEventsRequest) returns (stream AgentEvent);
+  rpc GetStatus (GetStatusRequest) returns (AgentStatus);
+}
+
+message ExecuteTaskRequest {
+  string agentId = 1;
+  string taskId = 2;
+  string taskType = 3;
+  bytes payload = 4;
+}
+
+message ExecuteTaskResponse {
+  bool success = 1;
+  string taskId = 2;
+  string requestId = 3;
+  bytes result = 4;
+  int64 latency = 5;
+}
+
+message StreamEventsRequest {
+  string agentId = 1;
+  repeated string eventTypes = 2;
+}
+
+message AgentEvent {
+  string eventId = 1;
+  string type = 2;
+  string timestamp = 3;
+  bytes payload = 4;
+}
+
+message GetStatusRequest {
+  string agentId = 1;
+}
+
+message AgentStatus {
+  string agentId = 1;
+  string status = 2;
+  int64 uptime = 3;
+  int64 tasksProcessed = 4;
+  string lastHeartbeat = 5;
+}
