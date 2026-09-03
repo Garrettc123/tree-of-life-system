@@ -1,19 +1,16 @@
 /**
  * gRPC Gateway for Inter-Agent Communication
- * Replaces REST with gRPC for 7-10x faster communication
- * 
- * Performance:
- * - 10ms latency vs 100ms REST
- * - 32% smaller message size (Protobuf vs JSON)
- * - Bidirectional streaming support
- * - Connection pooling and multiplexing
+ *
+ * Contract: proto/agent-service.proto (package agentservice).
+ * Insecure credentials are intentional for local/dev. Do not claim mTLS.
  */
 
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const EventEmitter = require('events');
-const uuid = require('uuid');
+const { v4: uuidv4 } = require('uuid');
+const RuntimeAgent = require('./runtime-agent');
 
 class gRPCGateway extends EventEmitter {
   constructor(config = {}) {
@@ -31,7 +28,6 @@ class gRPCGateway extends EventEmitter {
     };
 
     this.server = null;
-    this.client = null;
     this.serviceDef = null;
     this.agents = new Map();
     this.connections = new Map();
@@ -54,7 +50,28 @@ class gRPCGateway extends EventEmitter {
 
     const proto = grpc.loadPackageDefinition(packageDefinition);
     this.serviceDef = proto.agentservice;
+    if (!this.serviceDef || !this.serviceDef.AgentService) {
+      throw new Error(`AgentService missing from ${this.config.protoPath}`);
+    }
     console.log('[gRPCGateway] Proto loaded from:', this.config.protoPath);
+  }
+
+  wrapAgent(agentId, agent) {
+    if (!agent) {
+      return new RuntimeAgent({ id: agentId });
+    }
+    if (typeof agent.handleTask === 'function') {
+      if (!agent.startTime) agent.startTime = Date.now();
+      if (typeof agent.tasksProcessed !== 'number') agent.tasksProcessed = 0;
+      return agent;
+    }
+    const runtime = new RuntimeAgent({
+      id: agentId || agent.id,
+      role: agent.role,
+      type: agent.type,
+      capabilities: agent.capabilities,
+    });
+    return runtime;
   }
 
   async startServer() {
@@ -66,7 +83,6 @@ class gRPCGateway extends EventEmitter {
         'grpc.max_send_message_length': this.config.maxSendMessageLength,
       });
 
-      // Add service implementations
       this.server.addService(this.serviceDef.AgentService.service, {
         executeTask: this.executeTask.bind(this),
         streamEvents: this.streamEvents.bind(this),
@@ -98,7 +114,9 @@ class gRPCGateway extends EventEmitter {
 
   async createClientConnection(agentId, host, port) {
     try {
-      await this.loadProto();
+      if (!this.serviceDef) {
+        await this.loadProto();
+      }
 
       const credentials = grpc.ChannelCredentials.createInsecure();
       const channelOptions = {
@@ -135,20 +153,18 @@ class gRPCGateway extends EventEmitter {
 
   async executeTask(call, callback) {
     const startTime = Date.now();
-    const requestId = uuid.v4();
+    const requestId = uuidv4();
 
     try {
       const { agentId, taskId, taskType, payload } = call.request;
 
       console.log(`[gRPCGateway] Executing task ${taskId} on agent ${agentId}`);
 
-      // Get agent handler
       const agent = this.agents.get(agentId);
       if (!agent) {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      // Execute task
       const result = await agent.handleTask({
         taskId,
         taskType,
@@ -163,7 +179,7 @@ class gRPCGateway extends EventEmitter {
         success: true,
         taskId,
         requestId,
-        result,
+        result: Buffer.isBuffer(result) ? result : Buffer.from(JSON.stringify(result)),
         latency,
       });
 
@@ -177,7 +193,7 @@ class gRPCGateway extends EventEmitter {
       callback({
         code: grpc.status.INTERNAL,
         message: error.message,
-        details: { requestId, latency },
+        details: JSON.stringify({ requestId, latency }),
       });
 
       this.emit('task:failed', { requestId, error: error.message });
@@ -186,32 +202,45 @@ class gRPCGateway extends EventEmitter {
 
   async streamEvents(call) {
     const { agentId, eventTypes } = call.request;
-    const streamId = uuid.v4();
+    const types = Array.isArray(eventTypes) ? eventTypes : [];
 
-    console.log(`[gRPCGateway] Stream opened for agent ${agentId}, events: ${eventTypes.join(',')}`);
+    console.log(`[gRPCGateway] Stream opened for agent ${agentId}`);
 
     const agent = this.agents.get(agentId);
-    if (!agent) {
-      call.emit('error', new Error(`Agent not found: ${agentId}`));
+    if (!agent || typeof agent.on !== 'function') {
+      call.emit('error', {
+        code: grpc.status.NOT_FOUND,
+        message: `Agent not found: ${agentId}`,
+      });
       return;
     }
 
-    // Subscribe to events
-    const unsubscribe = agent.on('event', (event) => {
-      if (eventTypes.includes(event.type)) {
+    const onEvent = (event) => {
+      if (types.length === 0 || types.includes(event.type)) {
         call.write({
           eventId: event.id,
           type: event.type,
           timestamp: event.timestamp,
-          payload: event.payload,
+          payload: event.payload || Buffer.alloc(0),
         });
       }
-    });
+    };
 
-    call.on('end', () => {
-      unsubscribe();
-      call.end();
+    agent.on('event', onEvent);
+
+    const cleanup = () => {
+      if (typeof agent.off === 'function') {
+        agent.off('event', onEvent);
+      } else if (typeof agent.removeListener === 'function') {
+        agent.removeListener('event', onEvent);
+      }
       console.log(`[gRPCGateway] Stream closed for agent ${agentId}`);
+    };
+
+    call.on('cancelled', cleanup);
+    call.on('end', () => {
+      cleanup();
+      call.end();
     });
   }
 
@@ -226,10 +255,10 @@ class gRPCGateway extends EventEmitter {
 
       const status = {
         agentId,
-        status: agent.getStatus?.() || 'active',
-        uptime: Date.now() - agent.startTime || 0,
+        status: (typeof agent.getStatus === 'function' ? agent.getStatus() : agent.status) || 'active',
+        uptime: Date.now() - (agent.startTime || Date.now()),
         tasksProcessed: agent.tasksProcessed || 0,
-        lastHeartbeat: new Date().toISOString(),
+        lastHeartbeat: agent.lastHeartbeat || new Date().toISOString(),
       };
 
       callback(null, status);
@@ -242,20 +271,20 @@ class gRPCGateway extends EventEmitter {
   }
 
   registerAgent(agentId, agent) {
-    this.agents.set(agentId, agent);
+    const wrapped = this.wrapAgent(agentId, agent);
+    this.agents.set(agentId, wrapped);
     console.log(`[gRPCGateway] Registered agent: ${agentId}`);
+    return wrapped;
   }
 
   recordMetric(latency) {
     this.metrics.requestsProcessed++;
     this.metrics.latencyHistory.push(latency);
 
-    // Keep only last 1000 measurements
     if (this.metrics.latencyHistory.length > 1000) {
       this.metrics.latencyHistory.shift();
     }
 
-    // Update average latency
     const sum = this.metrics.latencyHistory.reduce((a, b) => a + b, 0);
     this.metrics.averageLatency = sum / this.metrics.latencyHistory.length;
   }
@@ -282,7 +311,11 @@ class gRPCGateway extends EventEmitter {
       requestsProcessed: this.metrics.requestsProcessed,
       errorsEncountered: this.metrics.errorsEncountered,
       averageLatency: Math.round(this.metrics.averageLatency),
-      successRate: (this.metrics.requestsProcessed - this.metrics.errorsEncountered) / this.metrics.requestsProcessed || 0,
+      successRate:
+        this.metrics.requestsProcessed === 0
+          ? 0
+          : (this.metrics.requestsProcessed - this.metrics.errorsEncountered) /
+            this.metrics.requestsProcessed,
       activeConnections: this.connections.size,
       registeredAgents: this.agents.size,
       timestamp: new Date().toISOString(),
