@@ -5,22 +5,25 @@
  * Insecure credentials are intentional for local/dev. Do not claim mTLS.
  */
 
-const grpc = require('@grpc/grpc-js');
-const protoLoader = require('@grpc/proto-loader');
-const path = require('path');
-const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
-const RuntimeAgent = require('./runtime-agent');
+const grpc = require("@grpc/grpc-js");
+const protoLoader = require("@grpc/proto-loader");
+const path = require("path");
+const EventEmitter = require("events");
+const { v4: uuidv4 } = require("uuid");
+const RuntimeAgent = require("./runtime-agent");
 
 class gRPCGateway extends EventEmitter {
   constructor(config = {}) {
     super();
 
     this.config = {
-      host: config.host || 'localhost',
+      host: config.host || "localhost",
       port: config.port || 50051,
-      protoPath: config.protoPath || path.join(__dirname, '../proto/agent-service.proto'),
-      maxReceiveMessageLength: config.maxReceiveMessageLength || 4 * 1024 * 1024,
+      protoPath:
+        config.protoPath ||
+        path.join(__dirname, "../proto/agent-service.proto"),
+      maxReceiveMessageLength:
+        config.maxReceiveMessageLength || 4 * 1024 * 1024,
       maxSendMessageLength: config.maxSendMessageLength || 4 * 1024 * 1024,
       keepaliveTime: config.keepaliveTime || 30000,
       keepaliveTimeout: config.keepaliveTimeout || 10000,
@@ -53,16 +56,16 @@ class gRPCGateway extends EventEmitter {
     if (!this.serviceDef || !this.serviceDef.AgentService) {
       throw new Error(`AgentService missing from ${this.config.protoPath}`);
     }
-    console.log('[gRPCGateway] Proto loaded from:', this.config.protoPath);
+    console.log("[gRPCGateway] Proto loaded from:", this.config.protoPath);
   }
 
   wrapAgent(agentId, agent) {
     if (!agent) {
       return new RuntimeAgent({ id: agentId });
     }
-    if (typeof agent.handleTask === 'function') {
+    if (typeof agent.handleTask === "function") {
       if (!agent.startTime) agent.startTime = Date.now();
-      if (typeof agent.tasksProcessed !== 'number') agent.tasksProcessed = 0;
+      if (typeof agent.tasksProcessed !== "number") agent.tasksProcessed = 0;
       return agent;
     }
     const runtime = new RuntimeAgent({
@@ -79,8 +82,8 @@ class gRPCGateway extends EventEmitter {
       await this.loadProto();
 
       this.server = new grpc.Server({
-        'grpc.max_receive_message_length': this.config.maxReceiveMessageLength,
-        'grpc.max_send_message_length': this.config.maxSendMessageLength,
+        "grpc.max_receive_message_length": this.config.maxReceiveMessageLength,
+        "grpc.max_send_message_length": this.config.maxSendMessageLength,
       });
 
       this.server.addService(this.serviceDef.AgentService.service, {
@@ -95,19 +98,21 @@ class gRPCGateway extends EventEmitter {
           grpc.ServerCredentials.createInsecure(),
           (error) => {
             if (error) {
-              console.error('[gRPCGateway] Bind error:', error.message);
+              console.error("[gRPCGateway] Bind error:", error.message);
               reject(error);
             } else {
               this.server.start();
-              console.log(`[gRPCGateway] Server started on ${this.config.host}:${this.config.port}`);
-              this.emit('server:started');
+              console.log(
+                `[gRPCGateway] Server started on ${this.config.host}:${this.config.port}`,
+              );
+              this.emit("server:started");
               resolve();
             }
-          }
+          },
         );
       });
     } catch (error) {
-      console.error('[gRPCGateway] Start server error:', error.message);
+      console.error("[gRPCGateway] Start server error:", error.message);
       throw error;
     }
   }
@@ -120,17 +125,17 @@ class gRPCGateway extends EventEmitter {
 
       const credentials = grpc.ChannelCredentials.createInsecure();
       const channelOptions = {
-        'grpc.max_receive_message_length': this.config.maxReceiveMessageLength,
-        'grpc.max_send_message_length': this.config.maxSendMessageLength,
-        'grpc.keepalive_time_ms': this.config.keepaliveTime,
-        'grpc.keepalive_timeout_ms': this.config.keepaliveTimeout,
-        'grpc.http2.max_pings_without_data': 0,
+        "grpc.max_receive_message_length": this.config.maxReceiveMessageLength,
+        "grpc.max_send_message_length": this.config.maxSendMessageLength,
+        "grpc.keepalive_time_ms": this.config.keepaliveTime,
+        "grpc.keepalive_timeout_ms": this.config.keepaliveTimeout,
+        "grpc.http2.max_pings_without_data": 0,
       };
 
       const client = new this.serviceDef.AgentService(
         `${host}:${port}`,
         credentials,
-        channelOptions
+        channelOptions,
       );
 
       this.connections.set(agentId, {
@@ -141,12 +146,14 @@ class gRPCGateway extends EventEmitter {
         createdAt: new Date().toISOString(),
       });
 
-      console.log(`[gRPCGateway] Client connection created for ${agentId} at ${host}:${port}`);
-      this.emit('client:connected', { agentId, host, port });
+      console.log(
+        `[gRPCGateway] Client connection created for ${agentId} at ${host}:${port}`,
+      );
+      this.emit("client:connected", { agentId, host, port });
 
       return client;
     } catch (error) {
-      console.error('[gRPCGateway] Client connection error:', error.message);
+      console.error("[gRPCGateway] Client connection error:", error.message);
       throw error;
     }
   }
@@ -179,16 +186,18 @@ class gRPCGateway extends EventEmitter {
         success: true,
         taskId,
         requestId,
-        result: Buffer.isBuffer(result) ? result : Buffer.from(JSON.stringify(result)),
+        result: Buffer.isBuffer(result)
+          ? result
+          : Buffer.from(JSON.stringify(result)),
         latency,
       });
 
-      this.emit('task:executed', { taskId, agentId, latency });
+      this.emit("task:executed", { taskId, agentId, latency });
     } catch (error) {
       const latency = Date.now() - startTime;
       this.metrics.errorsEncountered++;
 
-      console.error('[gRPCGateway] Task execution error:', error.message);
+      console.error("[gRPCGateway] Task execution error:", error.message);
 
       callback({
         code: grpc.status.INTERNAL,
@@ -196,7 +205,7 @@ class gRPCGateway extends EventEmitter {
         details: JSON.stringify({ requestId, latency }),
       });
 
-      this.emit('task:failed', { requestId, error: error.message });
+      this.emit("task:failed", { requestId, error: error.message });
     }
   }
 
@@ -207,8 +216,8 @@ class gRPCGateway extends EventEmitter {
     console.log(`[gRPCGateway] Stream opened for agent ${agentId}`);
 
     const agent = this.agents.get(agentId);
-    if (!agent || typeof agent.on !== 'function') {
-      call.emit('error', {
+    if (!agent || typeof agent.on !== "function") {
+      call.emit("error", {
         code: grpc.status.NOT_FOUND,
         message: `Agent not found: ${agentId}`,
       });
@@ -226,19 +235,19 @@ class gRPCGateway extends EventEmitter {
       }
     };
 
-    agent.on('event', onEvent);
+    agent.on("event", onEvent);
 
     const cleanup = () => {
-      if (typeof agent.off === 'function') {
-        agent.off('event', onEvent);
-      } else if (typeof agent.removeListener === 'function') {
-        agent.removeListener('event', onEvent);
+      if (typeof agent.off === "function") {
+        agent.off("event", onEvent);
+      } else if (typeof agent.removeListener === "function") {
+        agent.removeListener("event", onEvent);
       }
       console.log(`[gRPCGateway] Stream closed for agent ${agentId}`);
     };
 
-    call.on('cancelled', cleanup);
-    call.on('end', () => {
+    call.on("cancelled", cleanup);
+    call.on("end", () => {
       cleanup();
       call.end();
     });
@@ -255,7 +264,10 @@ class gRPCGateway extends EventEmitter {
 
       const status = {
         agentId,
-        status: (typeof agent.getStatus === 'function' ? agent.getStatus() : agent.status) || 'active',
+        status:
+          (typeof agent.getStatus === "function"
+            ? agent.getStatus()
+            : agent.status) || "active",
         uptime: Date.now() - (agent.startTime || Date.now()),
         tasksProcessed: agent.tasksProcessed || 0,
         lastHeartbeat: agent.lastHeartbeat || new Date().toISOString(),
@@ -295,8 +307,8 @@ class gRPCGateway extends EventEmitter {
         this.server.tryShutdown((error) => {
           if (error) reject(error);
           else {
-            console.log('[gRPCGateway] Server shutdown complete');
-            this.emit('server:shutdown');
+            console.log("[gRPCGateway] Server shutdown complete");
+            this.emit("server:shutdown");
             resolve();
           }
         });

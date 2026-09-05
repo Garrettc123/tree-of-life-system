@@ -14,7 +14,7 @@ class TaskGenerator {
    */
   generateTasks(gaps) {
     console.log(`[TaskGenerator] Generating tasks from ${gaps.length} gaps...`);
-    
+
     const tasks = [];
 
     for (const gap of gaps) {
@@ -26,7 +26,7 @@ class TaskGenerator {
 
     this.taskQueue = tasks;
     console.log(`[TaskGenerator] Generated ${tasks.length} tasks`);
-    
+
     return tasks;
   }
 
@@ -35,12 +35,12 @@ class TaskGenerator {
    */
   _createTaskFromGap(gap) {
     const taskMap = {
-      'missing_readme': this._createReadmeTask,
-      'missing_license': this._createLicenseTask,
-      'missing_cicd': this._createCICDTask,
-      'empty_project': this._createProjectIssuesTask,
-      'incomplete_description': this._createDescriptionTask,
-      'integration_sync': this._createIntegrationTask
+      missing_readme: this._createReadmeTask,
+      missing_license: this._createLicenseTask,
+      missing_cicd: this._createCICDTask,
+      empty_project: this._createProjectIssuesTask,
+      incomplete_description: this._createDescriptionTask,
+      integration_sync: this._createIntegrationTask,
     };
 
     const taskCreator = taskMap[gap.type];
@@ -58,104 +58,110 @@ class TaskGenerator {
   _createReadmeTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'create_file',
-      agent: 'development',
-      priority: 'medium',
+      type: "create_file",
+      agent: "development",
+      priority: "medium",
       title: `Create README for ${gap.repo}`,
       description: gap.description,
       params: {
         repo: gap.repo,
-        file: 'README.md',
-        template: 'readme_template'
+        file: "README.md",
+        template: "readme_template",
       },
       dependencies: [],
-      estimatedDuration: '15m'
+      estimatedDuration: "15m",
     };
   }
 
   _createLicenseTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'create_file',
-      agent: 'development',
-      priority: 'low',
+      type: "create_file",
+      agent: "development",
+      priority: "low",
       title: `Add LICENSE to ${gap.repo}`,
       description: gap.description,
       params: {
         repo: gap.repo,
-        file: 'LICENSE',
-        template: 'mit_license'
+        file: "LICENSE",
+        template: "mit_license",
       },
       dependencies: [],
-      estimatedDuration: '5m'
+      estimatedDuration: "5m",
     };
   }
 
   _createCICDTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'setup_cicd',
-      agent: 'development',
-      priority: 'high',
+      type: "setup_cicd",
+      agent: "development",
+      priority: "high",
       title: `Setup CI/CD for ${gap.repo}`,
       description: gap.description,
       params: {
         repo: gap.repo,
-        workflows: ['test', 'lint', 'deploy']
+        workflows: ["test", "lint", "deploy"],
       },
       dependencies: [],
-      estimatedDuration: '30m'
+      estimatedDuration: "30m",
     };
   }
 
   _createProjectIssuesTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'create_issues',
-      agent: 'project-management',
-      priority: 'high',
+      type: "create_issues",
+      agent: "project-management",
+      priority: "high",
       title: `Generate issues for ${gap.project}`,
       description: gap.description,
       params: {
         project: gap.project,
         issueCount: 5,
-        categories: ['setup', 'implementation', 'testing', 'documentation', 'deployment']
+        categories: [
+          "setup",
+          "implementation",
+          "testing",
+          "documentation",
+          "deployment",
+        ],
       },
       dependencies: [],
-      estimatedDuration: '20m'
+      estimatedDuration: "20m",
     };
   }
 
   _createDescriptionTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'enhance_description',
-      agent: 'documentation',
-      priority: 'low',
+      type: "enhance_description",
+      agent: "documentation",
+      priority: "low",
       title: `Enhance description for ${gap.project}`,
       description: gap.description,
       params: {
         project: gap.project,
-        minLength: 200
+        minLength: 200,
       },
       dependencies: [],
-      estimatedDuration: '10m'
+      estimatedDuration: "10m",
     };
   }
 
   _createIntegrationTask(gap) {
     return {
       id: this._generateTaskId(),
-      type: 'sync_integration',
-      agent: 'planning',
-      priority: 'medium',
-      title: 'Synchronize platform integrations',
+      type: "sync_integration",
+      agent: "planning",
+      priority: "medium",
+      title: "Synchronize platform integrations",
       description: gap.description,
       params: {
-        platforms: ['github', 'linear', 'notion']
+        platforms: ["github", "linear", "notion"],
       },
       dependencies: [],
-      estimatedDuration: '45m'
+      estimatedDuration: "45m",
     };
   }
 
@@ -163,24 +169,24 @@ class TaskGenerator {
    * Get tasks for a specific agent
    */
   getTasksForAgent(agentName) {
-    return this.taskQueue.filter(task => task.agent === agentName);
+    return this.taskQueue.filter((task) => task.agent === agentName);
   }
 
   /**
    * Get tasks by priority
    */
   getTasksByPriority(priority) {
-    return this.taskQueue.filter(task => task.priority === priority);
+    return this.taskQueue.filter((task) => task.priority === priority);
   }
 
   /**
    * Mark task as completed
    */
   completeTask(taskId, result) {
-    const taskIndex = this.taskQueue.findIndex(t => t.id === taskId);
+    const taskIndex = this.taskQueue.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) return false;
 
-    this.taskQueue[taskIndex].status = 'completed';
+    this.taskQueue[taskIndex].status = "completed";
     this.taskQueue[taskIndex].completedAt = new Date();
     this.taskQueue[taskIndex].result = result;
 

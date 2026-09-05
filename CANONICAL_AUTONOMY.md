@@ -11,14 +11,14 @@ This file is the source of truth for what the autonomy stack **is**, not what ti
 
 ## Layers (do not collapse)
 
-| Layer | Live surface | Not this layer |
-|---|---|---|
-| Transport | gRPC `AgentService` on `:50051` (`proto/agent-service.proto`) | JSON REST between agents |
-| RHNS contract (next) | `proto/rhns_mesh.proto` — **not bound yet** | Claiming A2A/MCP federation |
-| In-process bus | `agents/core/mcp-coordinator.js` EventEmitter | MCP-over-gRPC |
-| Async fabric | Kafka topics if brokers exist; skipped if not | Required for unary ping |
-| Orchestration | ReWOO three-stage + RuntimeAgent |
-| Proofs | GitHub commit/run hashes | Invented 332-agent catalog |
+| Layer                | Live surface                                                  | Not this layer              |
+| -------------------- | ------------------------------------------------------------- | --------------------------- |
+| Transport            | gRPC `AgentService` on `:50051` (`proto/agent-service.proto`) | JSON REST between agents    |
+| RHNS contract (next) | `proto/rhns_mesh.proto` — **not bound yet**                   | Claiming A2A/MCP federation |
+| In-process bus       | `agents/core/mcp-coordinator.js` EventEmitter                 | MCP-over-gRPC               |
+| Async fabric         | Kafka topics if brokers exist; skipped if not                 | Required for unary ping     |
+| Orchestration        | ReWOO three-stage + RuntimeAgent                              |
+| Proofs               | GitHub commit/run hashes                                      | Invented 332-agent catalog  |
 
 ## What this branch actually fixed
 
