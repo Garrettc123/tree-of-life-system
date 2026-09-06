@@ -29,7 +29,10 @@
     "metrics": "node scripts/metrics-collector.js"
   },
   "jest": {
-    "testPathIgnorePatterns": ["/node_modules/", "/blockchain/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/blockchain/"
+    ]
   },
   "keywords": [
     "autonomous-agents",

@@ -11,7 +11,7 @@ The Immutable Logger now supports automatic cloud backup replication to AWS S3 a
 ✅ **Server-Side Encryption**: AES-256 encryption at rest  
 ✅ **Disaster Recovery**: Restore complete blockchain from cloud  
 ✅ **Integrity Verification**: Verify cloud sync status  
-✅ **Auto-Rotation Backup**: Archives uploaded to cloud on rotation  
+✅ **Auto-Rotation Backup**: Archives uploaded to cloud on rotation
 
 ---
 
@@ -89,18 +89,18 @@ logger.revenue('Payment received', {'amount': 9900, 'currency': 'USD'})
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `enable_cloud_backup` | bool | `False` | Enable cloud backup |
-| `backup_provider` | str | `'s3'` | Cloud provider: `'s3'` or `'gcs'` |
-| `backup_async` | bool | `True` | Async batch uploads |
-| `backup_batch_size` | int | `100` | Blocks per batch upload |
-| `s3_bucket` | str | `'immutable-logs-backup'` | S3 bucket name |
-| `s3_region` | str | `'us-east-1'` | AWS region |
-| `aws_access_key_id` | str | `None` | AWS access key (or use env) |
-| `aws_secret_access_key` | str | `None` | AWS secret (or use env) |
-| `gcs_bucket` | str | `'immutable-logs-backup'` | GCS bucket name |
-| `gcs_project_id` | str | `None` | GCP project ID |
+| Option                  | Type | Default                   | Description                       |
+| ----------------------- | ---- | ------------------------- | --------------------------------- |
+| `enable_cloud_backup`   | bool | `False`                   | Enable cloud backup               |
+| `backup_provider`       | str  | `'s3'`                    | Cloud provider: `'s3'` or `'gcs'` |
+| `backup_async`          | bool | `True`                    | Async batch uploads               |
+| `backup_batch_size`     | int  | `100`                     | Blocks per batch upload           |
+| `s3_bucket`             | str  | `'immutable-logs-backup'` | S3 bucket name                    |
+| `s3_region`             | str  | `'us-east-1'`             | AWS region                        |
+| `aws_access_key_id`     | str  | `None`                    | AWS access key (or use env)       |
+| `aws_secret_access_key` | str  | `None`                    | AWS secret (or use env)           |
+| `gcs_bucket`            | str  | `'immutable-logs-backup'` | GCS bucket name                   |
+| `gcs_project_id`        | str  | `None`                    | GCP project ID                    |
 
 ---
 
@@ -255,11 +255,11 @@ Each block uploaded to S3/GCS includes metadata:
 
 ### Recommendations
 
-| Workload | Config |
-|----------|--------|
+| Workload                   | Config                                |
+| -------------------------- | ------------------------------------- |
 | High volume (>1K logs/min) | `backup_async=True`, `batch_size=100` |
-| Critical audit logs | `backup_async=False` |
-| Low volume (<100 logs/min) | `backup_async=True`, `batch_size=10` |
+| Critical audit logs        | `backup_async=False`                  |
+| Low volume (<100 logs/min) | `backup_async=True`, `batch_size=10`  |
 
 ---
 
@@ -268,11 +268,13 @@ Each block uploaded to S3/GCS includes metadata:
 ### AWS S3 Pricing (us-east-1)
 
 **Assumptions**:
+
 - 1M logs/month
 - 500 bytes/log average
 - 500 MB total storage
 
 **Costs**:
+
 - Storage: $0.012/month (500 MB × $0.023/GB)
 - PUT requests: $5.00/month (1M × $0.005/1K)
 - GET requests: $0.40/month (1K × $0.0004/1K)
@@ -283,6 +285,7 @@ Each block uploaded to S3/GCS includes metadata:
 **Same assumptions**:
 
 **Costs**:
+
 - Storage: $0.01/month (500 MB × $0.020/GB)
 - Class A operations: $5.00/month (1M × $0.05/10K)
 - Class B operations: $0.04/month (1K × $0.004/10K)
@@ -314,11 +317,7 @@ Each block uploaded to S3/GCS includes metadata:
       "Principal": {
         "AWS": "arn:aws:iam::123456789012:role/ImmutableLoggerRole"
       },
-      "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:ListBucket"
-      ],
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
       "Resource": [
         "arn:aws:s3:::my-logs-bucket/*",
         "arn:aws:s3:::my-logs-bucket"
@@ -381,6 +380,7 @@ series.metric.type = 'custom.googleapis.com/immutable_logger/upload_latency'
 **Cause**: Missing credentials or invalid bucket name
 
 **Solution**:
+
 ```bash
 # For S3
 export AWS_ACCESS_KEY_ID="..."
@@ -395,6 +395,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/key.json"
 **Cause**: Process terminated before `shutdown()` called
 
 **Solution**:
+
 ```python
 import atexit
 
@@ -407,6 +408,7 @@ atexit.register(logger.shutdown)  # Auto-flush on exit
 **Cause**: Too many small uploads
 
 **Solution**:
+
 ```python
 # Increase batch size to reduce PUT requests
 logger = ImmutableLogger(
@@ -423,12 +425,13 @@ logger = ImmutableLogger(
 ### 1. Use Lifecycle Policies
 
 **S3 Lifecycle Rule**:
+
 ```json
 {
   "Rules": [
     {
       "Id": "ArchiveOldLogs",
-      "Filter": {"Prefix": "blocks/"},
+      "Filter": { "Prefix": "blocks/" },
       "Status": "Enabled",
       "Transitions": [
         {
@@ -472,7 +475,7 @@ def test_disaster_recovery():
         enable_cloud_backup=True,
         s3_bucket='production-logs'
     )
-    
+
     restored = temp_logger.restore_from_cloud()
     assert len(restored) > 0, "Restore failed!"
     print(f"✅ DR test passed: {len(restored)} blocks restored")
@@ -485,7 +488,7 @@ def test_disaster_recovery():
 ### Docker Compose
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   app:
     image: myapp:latest
@@ -519,6 +522,7 @@ data:
 ## Support
 
 For issues or questions:
+
 - GitHub Issues: https://github.com/Garrettc123/tree-of-life-system/issues
 - Documentation: https://github.com/Garrettc123/tree-of-life-system/docs
 
