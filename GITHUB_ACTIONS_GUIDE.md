@@ -27,6 +27,7 @@ SENDGRID_API_KEY      = Your SendGrid API Key
 ### Step 2: Get Your API Tokens
 
 #### GitHub Token
+
 1. Go to: https://github.com/settings/tokens
 2. Click "Generate new token (classic)"
 3. Select scopes: `repo`, `workflow`, `admin:org`
@@ -34,6 +35,7 @@ SENDGRID_API_KEY      = Your SendGrid API Key
 5. Copy the token (starts with `ghp_`)
 
 #### Railway Token
+
 ```bash
 # Install Railway CLI
 npm install -g @railway/cli
@@ -46,6 +48,7 @@ railway whoami --token
 ```
 
 #### OpenAI API Key
+
 1. Go to: https://platform.openai.com/api-keys
 2. Click "Create new secret key"
 3. Copy the key (starts with `sk-`)
@@ -86,6 +89,7 @@ gh workflow run deploy-autonomous-business.yml \
 **Option C: Automatic on Push**
 
 The deployment workflow automatically runs when you push changes to:
+
 - `scripts/deploy-autonomous-business.sh`
 - `scripts/deploy-*.sh`
 - `.github/workflows/deploy-autonomous-business.yml`
@@ -95,17 +99,20 @@ The deployment workflow automatically runs when you push changes to:
 ## 📊 Available Workflows
 
 ### 1. Deploy Autonomous Business
+
 **File:** `.github/workflows/deploy-autonomous-business.yml`
 
 **Purpose:** Deploys all 17 autonomous systems
 
 **Triggers:**
+
 - ✅ Manual button click
 - ✅ Push to main (when deployment files change)
 
 **Duration:** ~10-15 minutes
 
 **What it does:**
+
 1. Installs Railway CLI and GitHub CLI
 2. Configures authentication
 3. Runs deployment scripts
@@ -118,11 +125,13 @@ The deployment workflow automatically runs when you push changes to:
 ---
 
 ### 2. CI/CD Pipeline
+
 **File:** `.github/workflows/ci-cd.yml`
 
 **Purpose:** Tests and validates code on every push
 
 **Triggers:**
+
 - ✅ Push to main or develop
 - ✅ Pull requests to main
 - ✅ Manual run
@@ -130,6 +139,7 @@ The deployment workflow automatically runs when you push changes to:
 **Duration:** ~5 minutes
 
 **What it does:**
+
 1. Installs dependencies
 2. Runs linter
 3. Runs tests
@@ -143,11 +153,13 @@ The deployment workflow automatically runs when you push changes to:
 ---
 
 ### 3. Security Scan
+
 **File:** `.github/workflows/security-scan.yml`
 
 **Purpose:** Scans for vulnerabilities and leaked secrets
 
 **Triggers:**
+
 - ✅ Push to main or develop
 - ✅ Pull requests
 - ✅ Daily at 2 AM UTC
@@ -156,6 +168,7 @@ The deployment workflow automatically runs when you push changes to:
 **Duration:** ~3-5 minutes
 
 **What it does:**
+
 1. Runs Trivy vulnerability scanner
 2. Scans for leaked API keys
 3. Checks for sensitive files
@@ -168,17 +181,20 @@ The deployment workflow automatically runs when you push changes to:
 ---
 
 ### 4. Health Check
+
 **File:** `.github/workflows/health-check.yml`
 
 **Purpose:** Monitors system health 24/7
 
 **Triggers:**
+
 - ✅ Every hour (automated)
 - ✅ Manual run
 
 **Duration:** ~2 minutes
 
 **What it does:**
+
 1. Checks repository status
 2. Monitors collaborators
 3. Tracks forks and stars
@@ -190,17 +206,20 @@ The deployment workflow automatically runs when you push changes to:
 ---
 
 ### 5. Auto Update Dependencies
+
 **File:** `.github/workflows/auto-update-dependencies.yml`
 
 **Purpose:** Keeps dependencies up-to-date automatically
 
 **Triggers:**
+
 - ✅ Weekly (Monday at 3 AM UTC)
 - ✅ Manual run
 
 **Duration:** ~3-5 minutes
 
 **What it does:**
+
 1. Updates npm packages
 2. Applies security fixes
 3. Creates pull request
@@ -217,51 +236,61 @@ The deployment workflow automatically runs when you push changes to:
 **Common issues and fixes:**
 
 #### 1. Authentication Failed
+
 ```
 Error: Failed to authenticate with Railway/GitHub
 ```
 
 **Fix:**
+
 - Verify tokens are added to repository secrets
 - Check token hasn't expired
 - Ensure token has correct permissions
 
 #### 2. Missing Dependencies
+
 ```
 Error: Cannot find module 'express'
 ```
 
 **Fix:**
+
 - Ensure `package.json` exists
 - Run `npm install` locally first
 - Push `package-lock.json` to repository
 
 #### 3. Script Permission Denied
+
 ```
 Error: Permission denied: scripts/deploy-autonomous-business.sh
 ```
 
 **Fix:**
+
 - Workflows now automatically fix permissions
 - Or manually: `git update-index --chmod=+x scripts/*.sh`
 
 #### 4. Railway Deployment Failed
+
 ```
 Error: Railway deployment failed
 ```
 
 **Fix:**
+
 - Check Railway dashboard for errors
 - Verify RAILWAY_TOKEN is valid
 - Ensure Railway project exists
 - Check Railway service logs
 
 #### 5. Timeout
+
 ```
 Error: Job was cancelled because maximum execution time was exceeded
 ```
 
 **Fix:**
+
 - Increase timeout in workflow file
 - Deploy fewer systems at once
 - Use `free` tier for testing
@@ -273,11 +302,13 @@ Error: Job was cancelled because maximum execution time was exceeded
 ### View Workflow Runs
 
 **Via Web:**
+
 1. Go to: [Actions Tab](https://github.com/Garrettc123/tree-of-life-system/actions)
 2. Click on any workflow
 3. View real-time logs
 
 **Via CLI:**
+
 ```bash
 # List recent runs
 gh run list --limit 10
@@ -323,10 +354,12 @@ Enable debug logging for workflows:
 ### GitHub Actions Usage
 
 **Free tier:**
+
 - 2,000 minutes/month (public repos)
 - 500 MB artifact storage
 
 **After free tier:**
+
 - $0.008/minute for private repos
 - $0.25/GB for storage
 
@@ -336,6 +369,7 @@ https://github.com/settings/billing
 ### Railway Costs
 
 **Current deployment:**
+
 - Estimated: $85-170/month
 - Pay-as-you-go pricing
 - First $5 free each month
@@ -363,6 +397,7 @@ Before deploying, ensure:
 ## 🎉 Next Steps After Deployment
 
 ### 1. Verify Deployment
+
 ```bash
 # Check Railway services
 railway status
@@ -375,18 +410,22 @@ railway logs
 ```
 
 ### 2. Configure Webhooks
+
 ```bash
 # Run webhook setup
 node scripts/setup-webhooks.js
 ```
 
 ### 3. Monitor Health
+
 - Check hourly health reports in Actions
 - Monitor Railway dashboard
 - Review security scan results
 
 ### 4. Scale Up
+
 Once revenue starts flowing:
+
 ```bash
 # Run scaling script
 bash scripts/scale-after-revenue.sh

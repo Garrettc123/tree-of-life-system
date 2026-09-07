@@ -4,49 +4,53 @@
  * Uses MCP authenticated connection for API operations
  */
 
-const express = require('express');
-const crypto = require('crypto');
+const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 
 // Webhook signature verification
 const verifyGitHubSignature = (req) => {
-  const signature = req.get('X-Hub-Signature-256');
+  const signature = req.get("X-Hub-Signature-256");
   if (!signature) return false;
-  
-  const secret = process.env.GITHUB_WEBHOOK_SECRET || 'development';
+
+  const secret = process.env.GITHUB_WEBHOOK_SECRET || "development";
   const payload = JSON.stringify(req.body);
-  const hash = 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  
+  const hash =
+    "sha256=" +
+    crypto.createHmac("sha256", secret).update(payload).digest("hex");
+
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(hash));
 };
 
 // GitHub Webhook Endpoint
-router.post('/webhooks/github', (req, res) => {
+router.post("/webhooks/github", (req, res) => {
   try {
     // Verify webhook signature
     if (!verifyGitHubSignature(req)) {
-      console.warn('Invalid GitHub webhook signature');
-      return res.status(401).json({ error: 'Unauthorized' });
+      console.warn("Invalid GitHub webhook signature");
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const event = req.get('X-GitHub-Event');
+    const event = req.get("X-GitHub-Event");
     const payload = req.body;
 
     console.log(`[GitHub Webhook] Event: ${event}`);
-    console.log(`[GitHub Webhook] Repository: ${payload.repository?.full_name}`);
+    console.log(
+      `[GitHub Webhook] Repository: ${payload.repository?.full_name}`,
+    );
 
     // Handle different GitHub events
     switch (event) {
-      case 'push':
+      case "push":
         handlePushEvent(payload);
         break;
-      case 'pull_request':
+      case "pull_request":
         handlePullRequestEvent(payload);
         break;
-      case 'issues':
+      case "issues":
         handleIssueEvent(payload);
         break;
-      case 'issue_comment':
+      case "issue_comment":
         handleIssueCommentEvent(payload);
         break;
       default:
@@ -55,15 +59,16 @@ router.post('/webhooks/github', (req, res) => {
 
     res.status(200).json({ success: true, event });
   } catch (error) {
-    console.error('[GitHub Webhook] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("[GitHub Webhook] Error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Handle push events (commits)
 function handlePushEvent(payload) {
-  const { repository, pusher, commits, ref, created, deleted, forced } = payload;
-  const branch = ref.split('/').pop();
+  const { repository, pusher, commits, ref, created, deleted, forced } =
+    payload;
+  const branch = ref.split("/").pop();
 
   console.log(`[GitHub Push] Branch: ${branch}`);
   console.log(`[GitHub Push] Commits: ${commits.length}`);
@@ -74,11 +79,11 @@ function handlePushEvent(payload) {
     commitQueue.push({
       repo: repository.full_name,
       branch,
-      commits: commits.map(c => ({
+      commits: commits.map((c) => ({
         message: c.message,
         author: c.author.name,
-        timestamp: c.timestamp
-      }))
+        timestamp: c.timestamp,
+      })),
     });
   }
 }
@@ -92,7 +97,7 @@ function handlePullRequestEvent(payload) {
   console.log(`[GitHub PR] PR #${number}: ${title}`);
   console.log(`[GitHub PR] Author: ${user.login}`);
 
-  if (action === 'opened' || action === 'synchronize') {
+  if (action === "opened" || action === "synchronize") {
     // Queue for code review
     prQueue.push({
       number,
@@ -100,7 +105,7 @@ function handlePullRequestEvent(payload) {
       body,
       author: user.login,
       from: head.ref,
-      to: base.ref
+      to: base.ref,
     });
   }
 }
@@ -135,10 +140,12 @@ setInterval(async () => {
     const commit = commitQueue.shift();
     try {
       // Create Linear issue from commit
-      console.log(`[Process] Creating Linear issue from commit: ${commit.commits[0]?.message}`);
+      console.log(
+        `[Process] Creating Linear issue from commit: ${commit.commits[0]?.message}`,
+      );
       // Linear sync handled via Notion integration
     } catch (error) {
-      console.error('[Process] Error creating Linear issue:', error);
+      console.error("[Process] Error creating Linear issue:", error);
     }
   }
 
@@ -149,26 +156,26 @@ setInterval(async () => {
       console.log(`[Process] Queued code review for PR #${pr.number}`);
       // Code review handled by AI engine via orchestrator
     } catch (error) {
-      console.error('[Process] Error processing PR:', error);
+      console.error("[Process] Error processing PR:", error);
     }
   }
 }, 5000);
 
 // Health check endpoint
-router.get('/github/status', (req, res) => {
+router.get("/github/status", (req, res) => {
   res.json({
-    status: 'connected',
+    status: "connected",
     webhooks: {
-      push: 'listening',
-      pull_request: 'listening',
-      issues: 'listening',
-      issue_comment: 'listening'
+      push: "listening",
+      pull_request: "listening",
+      issues: "listening",
+      issue_comment: "listening",
     },
     queued: {
       commits: commitQueue.length,
-      prs: prQueue.length
+      prs: prQueue.length,
     },
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
