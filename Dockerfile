@@ -16,7 +16,6 @@ WORKDIR /app
 RUN apk add --no-cache \
     curl \
     dumb-init \
-    grpc_cli \
     protobuf-dev
 
 # Copy built dependencies from builder
