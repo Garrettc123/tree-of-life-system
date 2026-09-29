@@ -2,6 +2,23 @@
 
 Implemented as Governance organ `titan-governance` on Tree of Life.
 
+## npm install
+
+```bash
+cd tree-of-life-system
+npm install
+# peer conflicts:
+npm install --legacy-peer-deps
+```
+
+Optional older agents package:
+
+```bash
+cd agents && npm install && cd ..
+```
+
+Requires Node >= 20. Full instructions: [INSTALL.md](INSTALL.md).
+
 ## What TITAN is now
 
 Supervisor over systems that exist:
@@ -16,7 +33,7 @@ The old activator pinged 17 Express routes and printed ACTIVE if status 200. Tha
 
 TITAN now probes files, attaches MARS, runs one walking-skeleton lead through CMC, and reports booked_cash_usd: 0 until Stripe paid=true last4 != 4242.
 
-## Run
+## Run (after npm install)
 
 ```bash
 node scripts/titan-activate.js
