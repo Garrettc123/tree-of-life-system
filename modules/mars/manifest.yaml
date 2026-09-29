@@ -1,0 +1,108 @@
+id: mars-revenue
+family: Revenue
+version: 0.2.0
+display_name: MARS Revenue Organ
+purpose: Attach Metacognitive AI Reasoning System as a snap-on Revenue organ that branches Tree-of-Life strategy trees, routes live SKUs, and only side-effects after RHNS CMC commit.
+
+ports:
+  requires:
+    - core.identity
+    - core.events
+    - core.audit
+    - rhns.cmc
+    - rhns.rgt
+    - rhns.mesh
+  provides:
+    - revenue.intake
+    - revenue.offer
+    - revenue.opportunity
+    - mars.reason
+
+events:
+  in:
+    - name: lead.captured
+      schema: LeadCaptured
+    - name: nwu.opportunity
+      schema: NwuHandshake
+  out:
+    - name: lead.enriched
+      schema: LeadEnriched
+    - name: revenue_opportunity
+      schema: RevenueOpportunity
+    - name: checkout.intent
+      schema: CheckoutIntent
+    - name: mars.sealed
+      schema: SealedTrace
+
+schema:
+  objects:
+    - Lead
+    - StrategyBranch
+    - Offer
+    - LedgerRow
+  migrations: []
+
+policy:
+  scope:
+    - leads.read
+    - leads.write
+    - offers.propose
+    - ledger.append
+  forbidden:
+    - billing.charge.live_without_cmc
+    - stripe.test_card_4242
+    - outbound.unapproved_blast
+
+health:
+  probes:
+    - liveness
+    - readiness
+  signals:
+    degraded: mesh heartbeat missing or confidence below 0.72
+    blocked: rhns.cmc or core.audit port missing
+
+rhns:
+  planner: rgt+hrm
+  gate: cmc
+  commit_required_for:
+    - checkout.intent
+    - outreach.send
+    - stripe.payment_link.emit
+  memory: federated-kg
+  audit: ledger
+  layers:
+    reason: score branches
+    harmony: constraint + contradiction check
+    navigation: select SKU path
+    standards: seal proof_hash
+
+detach:
+  order:
+    - deactivate subscriptions
+    - freeze writes
+    - export owned schema
+    - drop routes
+  retains:
+    - audit ledger rows
+  rollback: restore last certified schema version
+
+pricing:
+  sku: MARS-750
+  pack: Revenue
+  model: snap-module
+  interval: monthly
+  live_links:
+    MARS-750: https://buy.stripe.com/4gM7sL6UR3u29aX4lB43S2r
+    MARS-1500: https://buy.stripe.com/7sY4gz1Ax3u20Er6tJ43S2s
+    LLA-47: https://buy.stripe.com/3cI00j7YV0hQgDp8BR43S2v
+    AI-AUDIT-299: https://buy.stripe.com/14A5kD3IF9Sqdrd05l43S2l
+    ENT-AUDIT-3500: https://buy.stripe.com/4gMfZh1Ax2pYbj5dWb43S2t
+
+skeleton_hops:
+  - intake
+  - enrichment
+  - outreach
+  - proposal
+  - checkout
+  - fulfillment
+  - reporting
