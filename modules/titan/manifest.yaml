@@ -1,0 +1,87 @@
+id: titan-governance
+family: Governance
+version: 0.1.0
+display_name: TITAN
+purpose: Total Autonomous Intelligence Network supervisor. Boots real Tree-of-Life systems, attaches MARS, gates side effects through RHNS CMC, and never reports invented cash.
+
+ports:
+  requires:
+    - core.identity
+    - core.events
+    - core.audit
+    - rhns.cmc
+    - rhns.rgt
+    - mars.revenue
+  provides:
+    - titan.activate
+    - titan.health
+    - governance.supervise
+
+events:
+  in:
+    - name: titan.activate.requested
+      schema: TitanActivate
+    - name: lead.captured
+      schema: LeadCaptured
+  out:
+    - name: titan.activated
+      schema: TitanReport
+    - name: revenue_opportunity
+      schema: RevenueOpportunity
+
+schema:
+  objects:
+    - SystemRecord
+    - TitanReport
+  migrations: []
+
+policy:
+  scope:
+    - systems.read
+    - systems.activate
+    - ledger.append
+  forbidden:
+    - fabricated.metrics
+    - fabricated.customers
+    - billing.charge.live_without_cmc
+    - stripe.test_card_4242
+
+health:
+  probes:
+    - liveness
+    - readiness
+  signals:
+    degraded: required organ healthy but mesh unbound
+    blocked: mars or rhns.cmc missing
+
+rhns:
+  planner: rgt+hrm
+  gate: cmc
+  commit_required_for:
+    - checkout.intent
+    - outreach.send
+  memory: federated-kg
+  audit: ledger
+
+detach:
+  order:
+    - deactivate subscriptions
+    - freeze writes
+    - export owned schema
+    - drop routes
+  retains:
+    - audit ledger rows
+  rollback: restore last certified schema version
+
+pricing:
+  sku: MARS-750
+  pack: Enterprise Intelligence
+  model: services
+  interval: monthly
+
+skeleton_hops:
+  - intake
+  - enrichment
+  - proposal
+  - checkout
+  - reporting
