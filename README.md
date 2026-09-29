@@ -1,27 +1,22 @@
-# 🌳 Tree of Life System
+# Tree of Life System
 
-<div align="left">
-  <a href="https://github.com/sponsors/Garrettc123"><img src="https://img.shields.io/badge/Sponsor-Garrett%20Carroll-red?style=for-the-badge&logo=github"></a>
-</div>
+**Status:** ACTIVE — MARS organ + RHNS mesh bound
 
-**Status:** 🚀 ACTIVE
+Hierarchical AI decision orchestration — branching strategy trees for complex business logic. RHNS is the reasoning substrate. MARS is the Revenue organ.
 
-Hierarchical AI decision orchestration — branching strategy trees for complex business logic.
+```bash
+npm test -- tests/mars-rhns.test.js
+node scripts/install-mars.js
+```
 
----
+Live wedges: LLA-47 · AI-AUDIT-299 · MARS-750 · MARS-1500 · ENT-AUDIT-3500
 
-## 💼 Commercial Licensing & Customization
+See `MARS_RHNS_INSTALL.md`.
 
-An enterprise-grade orchestration solution.
+## Commercial Licensing & Customization
 
-- **Enterprise License:** Commercial licensing available.
-- **Custom Solutions:** Need to integrate complex decision trees into your business logic? Contact Garrett Carroll.
-- **Support the Development:** [Sponsor the project on GitHub](https://github.com/sponsors/Garrettc123).
+- Enterprise License: Commercial licensing available.
+- Custom Solutions: Contact Garrett Carroll.
+- Sponsor: https://github.com/sponsors/Garrettc123
 
----
-
-## 🛠️ Built By
-
-**Garrett Carroll**  
-Founder, Zero-Human Enterprise  
-[GitHub](https://github.com/Garrettc123)
+Built by Garrett Carroll, Founder, Zero-Human Enterprise.
