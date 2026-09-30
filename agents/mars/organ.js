@@ -40,6 +40,15 @@ class MarsOrgan {
   }
 
   attach(ports = []) {
+    if (this.ledger.frozenWrites) {
+      this.attached = false;
+      this.state = 'blocked';
+      return {
+        state: this.state,
+        organ: this.id,
+        reason: 'ledger_frozen',
+      };
+    }
     const check = this.validate(ports);
     if (!check.ok) {
       this.state = 'blocked';
