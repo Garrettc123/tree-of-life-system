@@ -1,6 +1,6 @@
 # MARS × RHNS install on Tree of Life
 
-Status: installed on branch `feature/mars-rhns-install` (TITAN stacks on `feature/titan-implement`).
+Status: installed. TITAN governance stacks on this organ in `TITAN.md` / PR #146.
 
 ## npm install
 

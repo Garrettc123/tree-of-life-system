@@ -8,10 +8,6 @@ Node **>= 20** and npm **>= 10** required (`package.json` engines).
 git clone https://github.com/Garrettc123/tree-of-life-system.git
 cd tree-of-life-system
 
-# Use the stack that has MARS + TITAN until PRs merge
-git fetch origin
-git checkout feature/titan-implement
-
 node -v    # expect v20+
 npm -v     # expect 10+
 

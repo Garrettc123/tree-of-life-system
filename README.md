@@ -9,7 +9,6 @@ Hierarchical AI decision orchestration. RHNS is the reasoning substrate. MARS is
 ```bash
 git clone https://github.com/Garrettc123/tree-of-life-system.git
 cd tree-of-life-system
-git checkout feature/titan-implement   # until PR #146 merges
 npm install
 # if peer conflicts:
 npm install --legacy-peer-deps
