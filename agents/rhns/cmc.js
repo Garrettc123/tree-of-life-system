@@ -35,10 +35,11 @@ function decide(input = {}) {
   }
 
   if (stalls >= DEFAULTS.stallLimit || (sideEffect && confidence < DEFAULTS.commitConfidence)) {
+    const decision = sideEffect ? 'escalate' : 'continue';
     return {
-      decision: sideEffect ? 'escalate' : 'continue',
+      decision,
       reason: stalls >= DEFAULTS.stallLimit ? 'stall_limit' : 'confidence_below_commit',
-      proof_hash: hashProof({ input, decision: 'escalate' }),
+      proof_hash: hashProof({ input, decision }),
     };
   }
 

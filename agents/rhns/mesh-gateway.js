@@ -14,10 +14,10 @@ class RhnsMeshGateway extends EventEmitter {
   constructor(config = {}) {
     super();
     this.config = {
-      host: config.host || '127.0.0.1',
-      port: config.port || 50052,
-      protoPath: config.protoPath || path.join(__dirname, '../../proto/rhns_mesh.proto'),
       ...config,
+      host: config.host || '127.0.0.1',
+      port: Number(config.port) || 50052,
+      protoPath: config.protoPath || path.join(__dirname, '../../proto/rhns_mesh.proto'),
     };
     this.inflight = 0;
     this.version = '0.2.0-mars';
