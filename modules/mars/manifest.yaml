@@ -17,6 +17,7 @@ ports:
     - revenue.offer
     - revenue.opportunity
     - mars.reason
+    - mars.revenue
 
 events:
   in:

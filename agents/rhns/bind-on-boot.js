@@ -2,7 +2,6 @@
  * Optional boot hook. Startup can call attachMars(handles).
  * Does not replace AgentService on :50051.
  */
-const RhnsMeshGateway = require('./mesh-gateway');
 const { MarsOrgan } = require('../mars');
 
 async function attachMars(handles = {}) {
@@ -10,6 +9,7 @@ async function attachMars(handles = {}) {
   let mesh = null;
   if (bindMesh) {
     try {
+      const RhnsMeshGateway = require('./mesh-gateway');
       mesh = new RhnsMeshGateway({
         host: process.env.RHNS_HOST || '127.0.0.1',
         port: parseInt(process.env.RHNS_PORT || '50052', 10),

@@ -1,6 +1,17 @@
 # MARS × RHNS install on Tree of Life
 
-Status: installed on branch `feature/mars-rhns-install`.
+Status: installed. TITAN governance stacks on this organ in `TITAN.md`.
+
+## npm install
+
+```bash
+cd tree-of-life-system
+npm install
+# if peer conflicts:
+npm install --legacy-peer-deps
+```
+
+Node >= 20, npm >= 10. Mesh bind needs `@grpc/grpc-js` from that install. Full steps: [INSTALL.md](INSTALL.md).
 
 ## What changed
 
@@ -14,7 +25,7 @@ Unprecedented capability that did not exist in this repo before:
 4. **Detach-safe ledger** — committed proof hashes survive organ detach.
 5. **Walking skeleton** — intake → enrich → branch → proposal → gated checkout intent → report. No silent webhook.
 
-## Run
+## Run (after npm install)
 
 ```bash
 npm test -- tests/mars-rhns.test.js
