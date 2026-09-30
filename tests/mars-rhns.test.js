@@ -82,6 +82,16 @@ describe('MARS organ walking skeleton', () => {
     expect(detached.retained[0].retained_on_detach).toBe(true);
   });
 
+  test('reattach after detach stays blocked while ledger is frozen', () => {
+    const organ = new MarsOrgan({ ledger: new Ledger() });
+    organ.attach(['core.identity', 'core.events', 'core.audit', 'rhns.cmc']);
+    organ.run({ subject: 'Grandview shop', vertical: 'hvac', need: 'lead leak-map', budget: 80 });
+    organ.detach();
+    const again = organ.attach(['core.identity', 'core.events', 'core.audit', 'rhns.cmc']);
+    expect(again.state).toBe('blocked');
+    expect(again.reason).toBe('ledger_frozen');
+  });
+
   test('dry-run never emits checkout intent', () => {
     const organ = new MarsOrgan();
     organ.attach(['core.identity', 'core.events', 'core.audit', 'rhns.cmc']);

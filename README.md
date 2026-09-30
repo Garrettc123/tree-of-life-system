@@ -1,17 +1,31 @@
 # Tree of Life System
 
-**Status:** ACTIVE — MARS organ + RHNS mesh bound
+**Status:** ACTIVE — MARS organ + RHNS mesh + TITAN governance
 
-Hierarchical AI decision orchestration — branching strategy trees for complex business logic. RHNS is the reasoning substrate. MARS is the Revenue organ.
+Hierarchical AI decision orchestration. RHNS is the reasoning substrate. MARS is the Revenue organ. TITAN is the Governance supervisor.
+
+## npm install
+
+```bash
+git clone https://github.com/Garrettc123/tree-of-life-system.git
+cd tree-of-life-system
+npm install
+# if peer conflicts:
+npm install --legacy-peer-deps
+```
+
+Node >= 20, npm >= 10. Full steps: [INSTALL.md](INSTALL.md).
 
 ```bash
 npm test -- tests/mars-rhns.test.js
+npm test -- tests/titan.test.js
 node scripts/install-mars.js
+node scripts/titan-activate.js
 ```
 
 Live wedges: LLA-47 · AI-AUDIT-299 · MARS-750 · MARS-1500 · ENT-AUDIT-3500
 
-See `MARS_RHNS_INSTALL.md`.
+See `MARS_RHNS_INSTALL.md` and `TITAN.md`.
 
 ## Commercial Licensing & Customization
 
