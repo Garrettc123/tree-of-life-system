@@ -92,11 +92,14 @@ class MarsOrgan {
       verification_plan: 'Stripe charge paid=true and last4!=4242',
       status: gate.decision === 'commit' ? 'approved' : 'new',
       sku: tree.selected.sku,
-      payment_link: tree.selected.url,
+      payment_link: gate.decision === 'commit' ? tree.selected.url : null,
     };
   }
 
   run(lead = {}, opts = {}) {
+    if (!opts.dryRun && !this.attached) {
+      throw new Error(`mars-revenue not attached (state=${this.state})`);
+    }
     const treeGoals = decompose({
       goal: 'close_paid_loop',
       vertical: lead.vertical,

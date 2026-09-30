@@ -40,7 +40,14 @@ class Titan {
           budget: 80,
         });
 
-    this.state = run.cmc && run.cmc.decision === 'abort' ? 'blocked' : 'healthy';
+    const degraded = systems.some((s) => s.state === 'degraded');
+    if (run.cmc && run.cmc.decision === 'abort') {
+      this.state = 'blocked';
+    } else if (degraded) {
+      this.state = 'degraded';
+    } else {
+      this.state = 'healthy';
+    }
     this.lastReport = this.report(systems, run, attached);
     return this.lastReport;
   }

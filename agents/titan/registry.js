@@ -17,8 +17,14 @@ const SYSTEMS = Object.freeze([
 ]);
 
 function loadSystem(record) {
+  const fs = require('fs');
+  const path = require('path');
   if (record.path.endsWith('.proto')) {
-    return { ok: true, kind: 'contract' };
+    const contractPath = path.join(__dirname, '../..', record.path);
+    if (fs.existsSync(contractPath)) {
+      return { ok: true, kind: 'contract' };
+    }
+    return { ok: false, kind: 'contract', error: `contract file not found: ${record.path}` };
   }
   if (record.id === 'titan.core') {
     return { ok: true, kind: 'module' };

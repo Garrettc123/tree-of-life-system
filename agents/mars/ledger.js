@@ -8,6 +8,9 @@ class Ledger {
   }
 
   append(row) {
+    if (this.frozen) {
+      throw new Error('ledger frozen: writes rejected after detach');
+    }
     const sealed = {
       ...row,
       seq: this.rows.length + 1,
