@@ -1,41 +1,32 @@
 #!/usr/bin/env bash
 # auto-sync-perplexity.sh
-# Host-keyed Perplexity sync. Never prompts. Never prints the key.
-# Refuses contaminated env files (curl/wget/| bash).
+# No simulation. Host apply or a hard stop.
+# Never prompts. Never prints a raw key. Never prints a payment link.
+# proof_hash comes only from the operator zeus.py run-once. This script does not mint one.
+#
 # Usage:
-#   PERPLEXITY_API_KEY=... ./auto-sync-perplexity.sh            # dry-run
-#   PERPLEXITY_API_KEY=... ./auto-sync-perplexity.sh --apply    # write + restart
+#   GARCAR_APPROVED=1 PERPLEXITY_API_KEY=... ./auto-sync-perplexity.sh --apply
 set -euo pipefail
 
 ROOT="${TREE_OF_LIFE_ROOT:-$HOME/tree-of-life-system}"
 APPLY=0
-if [[ "${1:-}" == "--apply" ]]; then
-  APPLY=1
-fi
+[[ "${1:-}" == "--apply" ]] && APPLY=1
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 mask() {
-  local v="$1"
-  local n=${#v}
-  if (( n < 8 )); then
-    printf '***'
-    return
-  fi
+  local v="$1" n=${#v}
+  if (( n < 8 )); then printf '***'; return; fi
   printf '%s***%s' "${v:0:3}" "${v: -4}"
 }
 
 refuse_contaminated() {
   local f="$1"
   [[ -f "$f" ]] || return 0
-  local first
-  first="$(head -n 1 "$f" || true)"
-  case "$first" in
-    curl*|wget*|*\|*bash*|*\|*sh*)
-      die "contaminated env file ($f starts with a fetch/pipe). Recreate from .env.example. Do not source it."
-      ;;
-  esac
+  if grep -E -q '(^|[[:space:]])(curl|wget)[[:space:]]|\|[[:space:]]*(bash|sh)\b|https?://[^[:space:]]+[[:space:]]*\|' "$f"; then
+    die "contaminated env ($f). Recreate from scripts/.env.example. Do not source it."
+  fi
 }
 
 compose() {
@@ -48,92 +39,73 @@ compose() {
   fi
 }
 
-log "Perplexity auto-sync (mode=$([[ $APPLY -eq 1 ]] && echo apply || echo dry-run))"
+upsert() {
+  local key="$1" val="$2" file="$3" tmp
+  tmp="$(mktemp)"
+  awk -v k="$key" -v v="$val" '
+    BEGIN { found=0 }
+    index($0, k "=")==1 { print k "=" v; found=1; next }
+    { print }
+    END { if (!found) print k "=" v }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+  chmod 600 "$file"
+}
 
-[[ -d "$ROOT" ]] || die "Tree of Life root missing: $ROOT"
-cd "$ROOT"
-refuse_contaminated "$ROOT/.env"
-
-if [[ -z "${PERPLEXITY_API_KEY:-}" ]]; then
-  die "PERPLEXITY_API_KEY is not in the host environment. Set it in the host secret store or Termux export. Do not paste it into chat."
+if [[ "$APPLY" -ne 1 || "${GARCAR_APPROVED:-0}" != "1" ]]; then
+  die "hold: pass --apply and GARCAR_APPROVED=1. No dry-run path."
 fi
-
+if [[ -z "${PERPLEXITY_API_KEY:-}" ]]; then
+  die "hold: PERPLEXITY_API_KEY is not in the host environment. Do not paste it into chat."
+fi
 case "$PERPLEXITY_API_KEY" in
   *[$'\n\r']*|*'#'*) die "key contains illegal characters" ;;
 esac
 
-log "key present: $(mask "$PERPLEXITY_API_KEY") model=${PERPLEXITY_MODEL:-sonar-pro}"
+[[ -d "$ROOT" ]] || die "Tree of Life root missing: $ROOT"
+cd "$ROOT"
+refuse_contaminated "$ROOT/.env"
+[[ -f .gitignore ]] || die ".gitignore missing. Refusing to write a secret."
+grep -q -E '(^|/)\.env$|^\.env$' .gitignore || die ".env is not gitignored. Refusing to write a secret."
+
+log "execute: key $(mask "$PERPLEXITY_API_KEY") model=${PERPLEXITY_MODEL:-sonar-pro}"
 
 if ! compose ps --status running 2>/dev/null | grep -q .; then
-  log "stack not running"
-  if [[ $APPLY -eq 1 ]]; then
-    if [[ -x ./deploy.sh ]]; then
-      ./deploy.sh
-    elif [[ -x ./scripts/deploy.sh ]]; then
-      ./scripts/deploy.sh
-    else
-      die "deploy.sh missing at repo root and scripts/"
-    fi
-    sleep 10
+  if [[ -x ./deploy.sh ]]; then
+    ./deploy.sh
+  elif [[ -x ./scripts/deploy.sh ]]; then
+    ./scripts/deploy.sh
   else
-    log "dry-run: would run ./deploy.sh"
+    die "deploy.sh missing at repo root and scripts/"
   fi
+  sleep 10
 fi
 
-ENV_FILE="$ROOT/.env"
-touch "$ENV_FILE"
-chmod 600 "$ENV_FILE"
-
-upsert() {
-  local key="$1" val="$2"
-  if grep -q "^${key}=" "$ENV_FILE"; then
-    local tmp
-    tmp="$(mktemp)"
-    awk -v k="$key" -v v="$val" 'BEGIN{FS=OFS="="} $1==k {$0=k "=" v} {print}' "$ENV_FILE" > "$tmp"
-    mv "$tmp" "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
-  else
-    printf '%s=%s\n' "$key" "$val" >> "$ENV_FILE"
-  fi
-}
-
-if [[ $APPLY -eq 1 ]]; then
-  upsert PERPLEXITY_API_KEY "$PERPLEXITY_API_KEY"
-  upsert PERPLEXITY_MODEL "${PERPLEXITY_MODEL:-sonar-pro}"
-  log "env updated (mode 600). key not echoed."
-  log "restarting compose so the engine reloads env"
-  compose restart
-  sleep 5
-else
-  log "dry-run: would upsert PERPLEXITY_API_KEY and PERPLEXITY_MODEL, then compose restart"
-fi
+touch "$ROOT/.env"
+chmod 600 "$ROOT/.env"
+upsert PERPLEXITY_API_KEY "$PERPLEXITY_API_KEY" "$ROOT/.env"
+upsert PERPLEXITY_MODEL "${PERPLEXITY_MODEL:-sonar-pro}" "$ROOT/.env"
+log "env updated mode 600. key not echoed."
+compose restart
+sleep 5
 
 AI_URL="${AI_ENGINE_URL:-http://127.0.0.1:3002}"
 ORCH_URL="${ORCH_URL:-http://127.0.0.1:3000}"
+RESPONSE="$(curl -fsS --max-time 15 "$AI_URL/api/integrations/perplexity" || true)"
+printf '%s' "$RESPONSE" | grep -q "connected" || {
+  log "probe did not return connected"
+  printf 'probe: %s\n' "$RESPONSE"
+  exit 1
+}
 
-if [[ $APPLY -eq 1 ]]; then
-  RESPONSE="$(curl -fsS --max-time 15 "$AI_URL/api/integrations/perplexity" || true)"
-  if printf '%s' "$RESPONSE" | grep -q "connected"; then
-    log "Perplexity integration ACTIVE"
-  else
-    log "integration probe did not return connected"
-    printf 'probe: %s\n' "$RESPONSE"
-    exit 1
-  fi
-
-  curl -fsS --max-time 20 -X POST "$ORCH_URL/api/orchestrator/start" \
-    -H "Content-Type: application/json" \
-    -d '{"modules":["perplexity_research","trend_monitoring","content_generation"],"schedule":"hourly","auto_heal":true}' \
-    >/dev/null
-  log "orchestrator start sent"
-else
-  log "dry-run: would GET $AI_URL/api/integrations/perplexity"
-  log "dry-run: would POST $ORCH_URL/api/orchestrator/start modules=perplexity_research,trend_monitoring,content_generation schedule=hourly"
-fi
+curl -fsS --max-time 20 -X POST "$ORCH_URL/api/orchestrator/start" \
+  -H "Content-Type: application/json" \
+  -d '{"modules":["perplexity_research","trend_monitoring","content_generation"],"schedule":"hourly","auto_heal":true}' \
+  >/dev/null
 
 mkdir -p "$ROOT/zeus_data/data_room/proofs"
-printf '%s\n' "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"event\":\"perplexity_sync_prepared\",\"mode\":\"$([[ $APPLY -eq 1 ]] && echo apply || echo dry-run)\",\"sku\":\"MARS-750\",\"cash\":false}" \
+printf '%s\n' "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"event\":\"perplexity_sync_apply\",\"verb\":\"execute\",\"sku\":\"MARS-750\",\"estimated_value_usd\":750,\"cash\":false,\"proof_hash\":null}" \
   >> "$ROOT/zeus_data/data_room/proofs/revenue_events.jsonl"
 
-log "done. cash=false until Stripe paid=true. attach MARS-750 after proof."
-log "dashboards: http://127.0.0.1:80  http://127.0.0.1:3000  http://127.0.0.1:3002"
+log "apply finished. cash=false. proof_hash still null until operator zeus.py run-once."
+log "not a live claim."
