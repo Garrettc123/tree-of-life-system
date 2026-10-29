@@ -45,17 +45,6 @@ class GapAnalyzer {
       const repoAnalysisPromises = repos.map(async (repo) => {
         const repoGaps = [];
 
-        // Check for missing README
-        if (!repo.has_readme) {
-          repoGaps.push({
-            type: 'missing_readme',
-            severity: 'medium',
-            repo: repo.name,
-            description: `Repository ${repo.name} is missing README documentation`,
-            action: 'create_readme'
-          });
-        }
-
         try {
           // Check for missing LICENSE and CI/CD
           const { data: contents } = await this.github.repos.getContent({
@@ -64,7 +53,22 @@ class GapAnalyzer {
             path: ''
           });
 
-          const hasLicense = contents.some(file => file.name.toLowerCase().includes('license'));
+          // Determine README presence from actual root contents instead of the
+          // non-standard repo.has_readme field, which is absent from this API response.
+          const hasReadme = Array.isArray(contents)
+            && contents.some((file) => /^README(?:\\..+)?$/i.test(file.name));
+          if (!hasReadme) {
+            repoGaps.push({
+              type: 'missing_readme',
+              severity: 'medium',
+              repo: repo.name,
+              description: `Repository ${repo.name} is missing README documentation`,
+              action: 'create_readme'
+            });
+          }
+
+          const hasLicense = Array.isArray(contents)
+            && contents.some((file) => file.name.toLowerCase().includes('license'));
           if (!hasLicense) {
             repoGaps.push({
               type: 'missing_license',
@@ -197,21 +201,10 @@ class GapAnalyzer {
    * Analyze integration between platforms
    */
   async analyzeIntegration() {
-    const gaps = [];
-
-    // Check for:
-    // - GitHub repos without corresponding Linear issues
-    // - Linear projects without GitHub repos
-    // - Notion pages not linked to projects
-
-    gaps.push({
-      type: 'integration_sync',
-      severity: 'medium',
-      description: 'Some GitHub repositories are not linked to Linear projects',
-      action: 'create_integration_links'
-    });
-
-    return gaps;
+    // Do not emit a missing-linkage finding until GitHub↔Linear/Notion
+    // relationships are actually queried and compared. An unconditional
+    // finding would create unsupported tasks in every planning cycle.
+    return [];
   }
 
   /**
