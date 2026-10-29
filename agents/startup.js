@@ -16,6 +16,7 @@
 
 const path = require('path');
 const EventEmitter = require('events');
+const { createHealthServer } = require('./health-server');
 
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
@@ -32,6 +33,7 @@ class StartupSequence extends EventEmitter {
     this.startTime = Date.now();
     this.results = {};
     this.handles = {};
+    this.healthServer = null;
   }
 
   log(phase, message, type = 'info') {
@@ -46,6 +48,57 @@ class StartupSequence extends EventEmitter {
 
     console.log(`${prefix} [${timestamp}] [${phase}] ${message}`);
     this.emit('log', { phase, message, type, timestamp });
+  }
+
+  getStatusSnapshot() {
+    const registered = this.results.phase4?.agents || [];
+    const operational = registered.filter((agent) => agent.status === 'active').length;
+    const kafkaPhase = this.results.phase2;
+    const kafkaStatus = !kafkaPhase
+      ? 'starting'
+      : kafkaPhase.success
+        ? 'connected'
+        : kafkaPhase.skipped
+          ? 'optional_unavailable'
+          : 'failed';
+
+    return {
+      service: 'tree-of-life-agent-runtime',
+      status: this.status,
+      startup_completed: ['ready', 'degraded'].includes(this.status),
+      uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000),
+      grpc: { status: this.results.phase3?.success ? 'listening' : 'starting', ...(this.results.phase3 || {}) },
+      dependencies: {
+        kafka: { status: kafkaStatus, required: process.env.KAFKA_REQUIRED === 'true' },
+      },
+      agents: {
+        registered: registered.length,
+        operational,
+        list: registered,
+      },
+      execution_mode: operational > 0 ? 'configured_handlers' : 'safe_scaffold_no_handlers',
+    };
+  }
+
+  async startHealthServer() {
+    const rawPort = process.env.PORT || process.env.HEALTH_PORT || '3000';
+    const port = Number.parseInt(rawPort, 10);
+    const host = process.env.HEALTH_HOST || '0.0.0.0';
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      throw new Error('PORT/HEALTH_PORT must be an integer from 0 to 65535');
+    }
+
+    this.healthServer = createHealthServer(() => this.getStatusSnapshot());
+    await new Promise((resolve, reject) => {
+      const onError = (error) => reject(error);
+      this.healthServer.once('error', onError);
+      this.healthServer.listen(port, host, () => {
+        this.healthServer.removeListener('error', onError);
+        const address = this.healthServer.address();
+        this.log('HEALTH', `HTTP health server listening on ${host}:${address && address.port}`, 'success');
+        resolve();
+      });
+    });
   }
 
   async phase1_loadEnvironment() {
@@ -171,11 +224,12 @@ class StartupSequence extends EventEmitter {
     this.results.phase4 = {
       success: true,
       agentsRegistered: agents.length,
-      agents: agents.map((a) => ({ id: a.id, type: a.type })),
+      agents: agents.map((a) => ({ id: a.id, type: a.type, status: a.getStatus() })),
       duration: Date.now() - this.startTime,
     };
 
-    this.log('PHASE 4', `✅ ${agents.length} agents registered`, 'success');
+    const operational = agents.filter((agent) => agent.getStatus() === 'active').length;
+    this.log('PHASE 4', `Registered ${agents.length} agents; ${operational} have task handlers configured`, operational === agents.length ? 'success' : 'warn');
     return agents;
   }
 
@@ -204,6 +258,7 @@ class StartupSequence extends EventEmitter {
     const phaseStartTime = Date.now();
 
     const config = await this.phase1_loadEnvironment();
+    await this.startHealthServer();
     const kafkaCoordinator = await this.phase2_connectKafka(config);
     const grpcGateway = await this.phase3_initializeGRPC(config);
     const rewooExecutor = new ReWOOExecutor(config.rewoo);
@@ -211,7 +266,9 @@ class StartupSequence extends EventEmitter {
     await this.phase5_startReWOO(rewooExecutor);
 
     const totalDuration = Date.now() - phaseStartTime;
-    this.status = 'ready';
+    const registered = this.results.phase4?.agents || [];
+    const operational = registered.filter((agent) => agent.status === 'active').length;
+    this.status = registered.length > 0 && operational === registered.length ? 'ready' : 'degraded';
     this.handles = { config, kafkaCoordinator, grpcGateway, rewooExecutor };
 
     console.log('\nSTARTUP COMPLETE');
@@ -219,11 +276,13 @@ class StartupSequence extends EventEmitter {
     console.log(`grpc=${config.grpc.host}:${config.grpc.port}`);
     console.log(`kafka=${this.results.phase2.success ? 'up' : 'skipped'}`);
     console.log('agents=planning-agent,execution-agent,reflexion-agent');
+    console.log(`execution_readiness=${this.status}; configured_agents=${operational}/${registered.length}`);
     console.log('keep_alive=true (SIGINT/SIGTERM to stop)');
     console.log('\n');
 
     this.emit('startup:complete', {
       duration: totalDuration,
+      status: this.status,
       results: this.results,
     });
 
@@ -243,6 +302,10 @@ class StartupSequence extends EventEmitter {
     }
     if (this.handles.grpcGateway) {
       await this.handles.grpcGateway.shutdown();
+    }
+    if (this.healthServer && this.healthServer.listening) {
+      await new Promise((resolve) => this.healthServer.close(resolve));
+      this.healthServer = null;
     }
   }
 }
@@ -264,6 +327,7 @@ if (require.main === module) {
       process.on('SIGTERM', stop);
     })
     .catch((error) => {
+      startup.status = 'failed';
       console.error('Fatal startup error:', error);
       process.exit(1);
     });
