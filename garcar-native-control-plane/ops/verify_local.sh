@@ -32,7 +32,9 @@ def request(path, *, authorized=True):
     if authorized:
         headers["X-Operator-Token"] = token
     req = urllib.request.Request(base_url + path, headers=headers)
-    with urllib.request.urlopen(req, timeout=4) as response:
+    # Do not allow environment proxy settings to forward localhost requests or the operator token.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(req, timeout=4) as response:
         return json.loads(response.read().decode("utf-8"))
 
 try:
