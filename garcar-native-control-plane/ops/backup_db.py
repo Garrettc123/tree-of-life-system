@@ -50,7 +50,7 @@ def main() -> int:
         destination.unlink(missing_ok=True)
         raise
 
-    print(f"SQLite integrity check: ok")
+    print("SQLite integrity check: ok")
     print(f"Backup created: {destination}")
     print("This verifies SQLite file integrity; run /api/audit/verify to check the event hash chain.")
     return 0
