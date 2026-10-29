@@ -73,9 +73,31 @@ class PlanningAgent {
         tasks
       }, 'planning');
 
-      // Step 3: Distribute tasks to agents
+      // Step 3: Distribute tasks to registered agents.
       this.state = 'coordinating';
-      await this._distributeTasks(tasks);
+      const distribution = await this._distributeTasks(tasks);
+      const blocked = distribution.filter((item) => item.status !== 'assigned');
+      const tasksAssigned = distribution
+        .filter((item) => item.status === 'assigned')
+        .reduce((count, item) => count + item.taskIds.length, 0);
+
+      if (blocked.length > 0) {
+        const errorMessage = `${blocked.length} task group(s) could not be assigned to a registered agent`;
+        this.state = 'error';
+        this.eventBus.publish('agent:error', {
+          agent: 'planning',
+          error: errorMessage,
+          blockedAssignments: blocked,
+        }, 'planning');
+        return {
+          success: false,
+          error: errorMessage,
+          gapsFound: gaps.length,
+          tasksGenerated: tasks.length,
+          tasksAssigned,
+          distribution,
+        };
+      }
 
       console.log('[PlanningAgent] Execution cycle complete');
       this.state = 'idle';
@@ -83,7 +105,9 @@ class PlanningAgent {
       return {
         success: true,
         gapsFound: gaps.length,
-        tasksGenerated: tasks.length
+        tasksGenerated: tasks.length,
+        tasksAssigned,
+        distribution,
       };
 
     } catch (error) {
@@ -138,34 +162,78 @@ class PlanningAgent {
    * Distribute tasks to appropriate agents
    */
   async _distributeTasks(tasks) {
-    const agentTasks = {
-      development: [],
-      'project-management': [],
-      documentation: []
-    };
+    const grouped = new Map();
+    const outcomes = [];
+    const registered = new Set(
+      typeof this.mcp.getAgentStatus === 'function'
+        ? this.mcp.getAgentStatus().filter((agent) => agent.status === 'active').map((agent) => agent.id)
+        : [],
+    );
 
-    // Group tasks by agent
     for (const task of tasks) {
-      if (agentTasks[task.agent]) {
-        agentTasks[task.agent].push(task);
+      if (!task || typeof task.agent !== 'string' || !task.agent.trim()) {
+        outcomes.push({
+          agent: null,
+          status: 'blocked',
+          taskIds: task && task.id ? [task.id] : [],
+          reason: 'task_missing_target_agent',
+        });
+        continue;
       }
+
+      if (!grouped.has(task.agent)) grouped.set(task.agent, []);
+      grouped.get(task.agent).push(task);
     }
 
-    // Send tasks to each agent
-    for (const [agent, tasks] of Object.entries(agentTasks)) {
-      if (tasks.length === 0) continue;
+    for (const [agent, agentTasks] of grouped.entries()) {
+      const taskIds = agentTasks.map((task) => task.id).filter(Boolean);
+
+      if (agent === 'planning') {
+        outcomes.push({
+          agent,
+          status: 'blocked',
+          taskIds,
+          reason: 'planning_agent_has_no_self-execution_adapter',
+        });
+        continue;
+      }
+
+      if (registered.size > 0 && !registered.has(agent)) {
+        outcomes.push({
+          agent,
+          status: 'blocked',
+          taskIds,
+          reason: 'target_agent_not_registered',
+        });
+        console.warn(`[PlanningAgent] Cannot assign ${agentTasks.length} task(s): agent is not registered`);
+        continue;
+      }
 
       try {
-        await this.mcp.sendMessage('planning', agent, {
+        const response = await this.mcp.sendMessage('planning', agent, {
           type: 'task-assignment',
-          tasks
+          tasks: agentTasks,
         });
-        
-        console.log(`[PlanningAgent] Assigned ${tasks.length} tasks to ${agent}`);
+
+        outcomes.push({
+          agent,
+          status: 'assigned',
+          taskIds,
+          response,
+        });
+        console.log(`[PlanningAgent] Assigned ${agentTasks.length} task(s) to ${agent}`);
       } catch (error) {
+        outcomes.push({
+          agent,
+          status: 'failed',
+          taskIds,
+          reason: error instanceof Error ? error.message : 'Unknown assignment failure',
+        });
         console.error(`[PlanningAgent] Failed to assign tasks to ${agent}:`, error);
       }
     }
+
+    return outcomes;
   }
 
   /**
