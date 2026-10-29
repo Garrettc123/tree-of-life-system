@@ -104,6 +104,68 @@ class SupabaseRhnsStore {
     return { ok: true, storage: 'supabase-rest', tables: ['rhns_action_approvals', 'rhns_proposals'] };
   }
 
+  async recoverStaleRun(tenantId, runId, expectedStatus, reason = 'Run recovered after runtime restart') {
+    requireUuid(tenantId, 'run tenantId');
+    requireUuid(runId, 'run id');
+    const nextStatus = ['executing', 'verifying'].includes(expectedStatus)
+      ? 'unknown_outcome'
+      : 'failed';
+    const data = await this._request('rpc/rhns_recover_stale_run', {
+      method: 'POST',
+      body: {
+        p_tenant_id: tenantId,
+        p_run_id: runId,
+        p_expected_status: expectedStatus,
+        p_next_status: nextStatus,
+        p_error: {
+          code: 'stale_run_recovery',
+          message: String(reason),
+          recovered_at: new Date().toISOString(),
+        },
+      },
+    });
+    return data === true;
+  }
+
+  async recoverStaleRuns(tenantId, { olderThanMs = 10 * 60 * 1000, limit = 100 } = {}) {
+    requireUuid(tenantId, 'run tenantId');
+    if (!Number.isInteger(olderThanMs) || olderThanMs < 60_000) {
+      throw new TypeError('olderThanMs must be at least 60000');
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      throw new TypeError('Stale-run recovery limit must be from 1 to 500');
+    }
+    const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+    const rows = await this._request('rhns_runs', {
+      query: {
+        tenant_id: 'eq.' + tenantId,
+        status: 'in.(created,planning,executing,verifying)',
+        updated_at: 'lt.' + cutoff,
+        select: 'id,status,updated_at',
+        order: 'updated_at.asc',
+        limit,
+      },
+    });
+    const recovered = [];
+    for (const run of Array.isArray(rows) ? rows : []) {
+      const didRecover = await this.recoverStaleRun(
+        tenantId,
+        run.id,
+        run.status,
+        'Stale run exceeded the configured recovery age',
+      );
+      recovered.push({
+        runId: run.id,
+        previousStatus: run.status,
+        recovered: didRecover,
+        status: didRecover
+          ? (['executing', 'verifying'].includes(run.status) ? 'unknown_outcome' : 'failed')
+          : 'unchanged_concurrent_transition',
+      });
+    }
+    return { scanned: Array.isArray(rows) ? rows.length : 0, recovered: recovered.filter(x => x.recovered).length, runs: recovered };
+  }
+
   async createRun(run) {
     requireUuid(run && run.id, 'run id');
     requireUuid(run && run.tenantId, 'run tenantId');
