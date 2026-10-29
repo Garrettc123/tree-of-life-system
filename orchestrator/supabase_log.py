@@ -1,4 +1,5 @@
 """Event persistence with Supabase support and a durable local SQLite fallback."""
+import asyncio
 import json
 import logging
 import os
@@ -7,6 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -22,6 +24,21 @@ class EventLog:
     def __init__(self, url: str, key: str):
         self.url = url.rstrip("/") if url else ""
         self.key = key
+        if self.url and self.key:
+            try:
+                parsed_url = urlsplit(self.url)
+                valid_secure_url = (
+                    parsed_url.scheme == "https"
+                    and bool(parsed_url.hostname)
+                    and not parsed_url.username
+                    and not parsed_url.password
+                    and not parsed_url.query
+                    and not parsed_url.fragment
+                )
+            except ValueError:
+                valid_secure_url = False
+            if not valid_secure_url:
+                raise ValueError("SUPABASE_URL must be a valid HTTPS base URL when SUPABASE_SERVICE_KEY is configured")
         self._h = {**_HEADERS_BASE, "apikey": key, "Authorization": f"Bearer {key}"}
         default_path = Path(__file__).resolve().parent / "data" / "garcar-events.sqlite3"
         self.db_path = Path(os.getenv("GARCAR_EVENT_DB_PATH", str(default_path))).expanduser()
@@ -101,9 +118,18 @@ class EventLog:
         finally:
             connection.close()
 
+    def release_dispatch_request(self, body_hash: str) -> None:
+        """Release a replay claim only if persistence failed before accepting the event."""
+        connection = self._connect_local()
+        try:
+            connection.execute("DELETE FROM dispatch_requests WHERE body_hash = ?", (body_hash,))
+            connection.commit()
+        finally:
+            connection.close()
+
     async def write(self, event: dict) -> str:
         if not self._ok():
-            return self._write_local(event, "Supabase is not configured; saved locally.")
+            return await asyncio.to_thread(self._write_local, event, "Supabase is not configured; saved locally.")
         row = {
             "event_type": event.get("event_type"),
             "source_system": event.get("source_system", "unknown"),
@@ -123,10 +149,10 @@ class EventLog:
                 if data and data[0].get("id") is not None:
                     return str(data[0]["id"])
                 log.warning("Supabase write returned no event identifier; saving locally")
-                return self._write_local(event, "Supabase write returned no event identifier.")
+                return await asyncio.to_thread(self._write_local, event, "Supabase write returned no event identifier.")
         except Exception as exc:
             log.warning("Supabase write failed; saving locally (%s)", type(exc).__name__)
-            return self._write_local(event, f"Supabase write failed: {type(exc).__name__}")
+            return await asyncio.to_thread(self._write_local, event, f"Supabase write failed: {type(exc).__name__}")
 
     def _update_local(self, event_id: str, status: str, error: str = "") -> None:
         connection = self._connect_local()
@@ -141,7 +167,7 @@ class EventLog:
 
     async def mark_processed(self, event_id: str):
         if event_id.startswith("local-"):
-            self._update_local(event_id, "processed")
+            await asyncio.to_thread(self._update_local, event_id, "processed")
             return
         if not self._ok():
             return
@@ -158,7 +184,7 @@ class EventLog:
 
     async def mark_failed(self, event_id: str, error: str):
         if event_id.startswith("local-"):
-            self._update_local(event_id, "failed", error)
+            await asyncio.to_thread(self._update_local, event_id, "failed", error)
             return
         if not self._ok():
             return
@@ -204,7 +230,7 @@ class EventLog:
     async def fetch(self, limit: int = 50, source: Optional[str] = None) -> list[dict]:
         safe_limit = max(1, min(int(limit), 200))
         if not self._ok():
-            return self._fetch_local(safe_limit, source)
+            return await asyncio.to_thread(self._fetch_local, safe_limit, source)
         params: dict[str, object] = {"select": "*", "limit": safe_limit, "order": "created_at.desc"}
         if source:
             params["source_system"] = f"eq.{source}"
@@ -219,7 +245,7 @@ class EventLog:
                 result = response.json()
                 if isinstance(result, list):
                     # Keep local fallback records visible after the remote store recovers.
-                    local_events = self._fetch_local(safe_limit, source)
+                    local_events = await asyncio.to_thread(self._fetch_local, safe_limit, source)
                     combined = result + local_events
                     combined.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
                     seen: set[str] = set()
@@ -232,7 +258,7 @@ class EventLog:
                         unique.append(item)
                     return unique[:safe_limit]
                 log.warning("Supabase fetch returned an unexpected shape; using local events")
-                return self._fetch_local(safe_limit, source)
+                return await asyncio.to_thread(self._fetch_local, safe_limit, source)
         except Exception as exc:
             log.warning("Supabase fetch failed; using local events (%s)", type(exc).__name__)
-            return self._fetch_local(safe_limit, source)
+            return await asyncio.to_thread(self._fetch_local, safe_limit, source)
