@@ -208,6 +208,7 @@ class ReWOOExecutor extends EventEmitter {
       return {
         success: true,
         executionId,
+        durableStatus: execution.durableRunStatus,
         result: execution.stages.synthesis.result,
         stages: execution.stages,
       };
@@ -242,6 +243,8 @@ class ReWOOExecutor extends EventEmitter {
       return {
         success: false,
         executionId,
+        durableStatus: execution.durableRunStatus,
+        persistenceError: execution.persistenceError || execution.taskPersistenceError || null,
         error: error.message,
         stages: execution.stages,
       };
