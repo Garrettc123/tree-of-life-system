@@ -74,7 +74,12 @@ def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_p
         "source_system": "unit_test",
         "trace_id": "trace-123",
         "api_key": "should-not-persist",
-        "payload": {"client_secret": "also-should-not-persist", "label": "safe"},
+        "customer_email": "private@example.com",
+        "payload": {
+            "client_secret": "also-should-not-persist",
+            "email": "nested@example.com",
+            "label": "safe",
+        },
     }
     body = json.dumps(event, separators=(",", ":")).encode("utf-8")
     response = client.post(
@@ -88,7 +93,9 @@ def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_p
     assert response.status_code == 200
     assert response.json()["accepted"] is True
     assert captured["api_key"] == "[REDACTED]"
+    assert captured["customer_email"] == "[REDACTED]"
     assert captured["payload"]["client_secret"] == "[REDACTED]"
+    assert captured["payload"]["email"] == "[REDACTED]"
     assert captured["payload"]["label"] == "safe"
 
     replay = client.post(
