@@ -84,3 +84,22 @@ def test_short_operator_token_is_rejected_before_request(monkeypatch):
     monkeypatch.setenv("GARCAR_OPERATOR_TOKEN", "short")
     with pytest.raises(RuntimeError, match="shorter than 32 bytes"):
         mcp_server._operator_token()
+
+
+
+@pytest.mark.anyio
+async def test_mcp_surface_has_no_approval_or_execution_tools():
+    async with Client(mcp_server.mcp, raise_exceptions=True) as client:
+        result = await client.list_tools()
+    names = {tool.name for tool in result.tools}
+    assert {
+        "get_control_plane_health",
+        "get_control_plane_status",
+        "list_services",
+        "get_recent_audit_events",
+        "verify_audit_chain",
+        "create_work_plan",
+        "get_work_plan",
+    } <= names
+    assert "approve_plan" not in names
+    assert "execute_work" not in names
