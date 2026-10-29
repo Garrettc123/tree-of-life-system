@@ -175,7 +175,9 @@ class ReWOOExecutor extends EventEmitter {
         this.timeout(this.config.planningTimeout),
       ]);
 
-      if (!plan || plan.success === false || plan.ok === false || !Array.isArray(plan.steps)) {
+      if (!plan || plan.success === false || plan.ok === false
+        || (typeof plan.error === 'string' && plan.success !== true && plan.ok !== true)
+        || !Array.isArray(plan.steps)) {
         throw new Error(plan && plan.error ? String(plan.error) : 'Planning agent returned an invalid or unsuccessful plan');
       }
 
@@ -232,7 +234,8 @@ class ReWOOExecutor extends EventEmitter {
           ]);
 
           if (output === false || (output && typeof output === 'object'
-            && (output.success === false || output.ok === false))) {
+            && (output.success === false || output.ok === false
+              || (typeof output.error === 'string' && output.success !== true && output.ok !== true)))) {
             const detail = output && typeof output === 'object' && output.error
               ? String(output.error)
               : 'Agent reported an unsuccessful step result';
@@ -314,8 +317,10 @@ class ReWOOExecutor extends EventEmitter {
       const result = synthesis && synthesis.result;
       if (!synthesis || typeof synthesis !== 'object' || result === undefined || result === null || result === false
         || synthesis.success === false || synthesis.ok === false
+        || (typeof synthesis.error === 'string' && synthesis.success !== true && synthesis.ok !== true)
         || (result && typeof result === 'object'
-          && (result.success === false || result.ok === false))) {
+          && (result.success === false || result.ok === false
+            || (typeof result.error === 'string' && result.success !== true && result.ok !== true))) {
         throw new Error(synthesis && synthesis.error
           ? String(synthesis.error)
           : 'Reflexion agent returned a missing or unsuccessful synthesis result');
