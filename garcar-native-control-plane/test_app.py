@@ -116,8 +116,10 @@ def test_sensitive_plan_parameters_are_redacted_before_storage(tmp_path, monkeyp
             "action": "send_customer_email",
             "parameters": {
                 "recipient": "customer@example.com",
+                "customer_email": "private@example.com",
+                "phone": "+1-555-0100",
                 "api_key": "never-store-this",
-                "nested": {"client_secret": "also-secret"},
+                "nested": {"client_secret": "also-secret", "email": "nested@example.com"},
             },
         },
         headers=headers,
@@ -125,7 +127,10 @@ def test_sensitive_plan_parameters_are_redacted_before_storage(tmp_path, monkeyp
     assert plan.status_code == 200
     payload = plan.json()
     assert payload["parameters"]["api_key"] == "[REDACTED]"
+    assert payload["parameters"]["customer_email"] == "[REDACTED]"
+    assert payload["parameters"]["phone"] == "[REDACTED]"
     assert payload["parameters"]["nested"]["client_secret"] == "[REDACTED]"
+    assert payload["parameters"]["nested"]["email"] == "[REDACTED]"
     assert "never-store-this" not in str(payload)
     assert "also-secret" not in str(payload)
 
