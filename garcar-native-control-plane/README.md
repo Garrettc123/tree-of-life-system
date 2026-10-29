@@ -37,7 +37,7 @@ bash ops/run_termux_stack.sh install
 bash ops/run_termux_stack.sh test
 ```
 
-The secret bootstrap writes random operator and dispatch secrets to the ignored local `.env` file. It does not print their values. The install command creates separate local Python environments for the control plane and orchestrator and installs the required packages. A test command does not start the services.
+The secret bootstrap writes random operator and dispatch secrets to the ignored local `.env` file. It does not print their values. The install command creates separate local Python environments for the control plane and orchestrator and installs the required packages. On Termux, it requires Python 3.14 and pre-installs the matching `pydantic-core==2.50.0` Android wheel before resolving the pinned requirements. That wheel is provided by the third-party [Android Pydantic Core project](https://github.com/Eutalix/android-pydantic-core), which documents its supported Termux ABIs and Python version; inspect that dependency source if you prefer to build it yourself. If your Termux Python is older, the script stops with a message instead of trying an on-device Rust compilation. A test command does not start the services.
 
 When the tests finish, start the local stack:
 
@@ -198,6 +198,8 @@ To verify the control-plane audit chain, use the console or make a local request
 
 ## Tests
 
+The pinned runtime dependencies are FastAPI 0.162.0, Uvicorn 0.54.0, HTTPX 0.28.1, and Pydantic 2.14.0. Pydantic 2.14.0 pins `pydantic-core==2.50.0`, which is why the Termux runner installs that Android wheel before installing the runtime requirements.
+
 Control plane:
 
 ```bash
@@ -209,7 +211,7 @@ python -m pytest -q
 Orchestrator (from `../orchestrator`):
 
 ```bash
-python -m pip install -r requirements.txt pytest==8.3.5
+python -m pip install -r requirements.txt pytest==9.2.0
 python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py handlers/stripe_payment.py handlers/github_ci.py handlers/rhns_alert.py handlers/generic.py
 python -m pytest -q test_main.py
 ```
