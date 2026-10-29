@@ -104,14 +104,30 @@ install_runtime() {
     python3 -m venv "$ORCH_VENV"
   fi
 
+  local is_termux="false"
+  if [[ -n "${TERMUX_VERSION:-}" || -d /data/data/com.termux ]]; then
+    is_termux="true"
+    local py_minor
+    py_minor="$("$CONTROL_VENV/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    if [[ "$py_minor" != "3.14" ]]; then
+      echo "This Termux bootstrap expects Python 3.14 so it can use the matching Android pydantic-core wheel. Run 'pkg update && pkg upgrade python', then rerun install." >&2
+      exit 1
+    fi
+    echo "Installing the Termux Python 3.14 pydantic-core wheel..."
+    "$CONTROL_VENV/bin/python" -m pip install --disable-pip-version-check --no-deps --only-binary=:all: --index-url https://eutalix.github.io/android-pydantic-core/ pydantic-core==2.50.0
+    "$ORCH_VENV/bin/python" -m pip install --disable-pip-version-check --no-deps --only-binary=:all: --index-url https://eutalix.github.io/android-pydantic-core/ pydantic-core==2.50.0
+  fi
+
   echo "Installing control-plane packages..."
   "$CONTROL_VENV/bin/python" -m pip install --disable-pip-version-check -r "$CONTROL_DIR/requirements.txt"
-  "$CONTROL_VENV/bin/python" -m pip install --disable-pip-version-check pytest==8.3.5
+  "$CONTROL_VENV/bin/python" -m pip install --disable-pip-version-check pytest==9.2.0
 
   echo "Installing event-orchestrator packages..."
   "$ORCH_VENV/bin/python" -m pip install --disable-pip-version-check -r "$ORCH_DIR/requirements.txt"
-  "$ORCH_VENV/bin/python" -m pip install --disable-pip-version-check pytest==8.3.5
+  "$ORCH_VENV/bin/python" -m pip install --disable-pip-version-check pytest==9.2.0
 
+  "$CONTROL_VENV/bin/python" -c 'import fastapi, httpx, pydantic, pydantic_core, uvicorn; print("Control dependencies: OK", fastapi.__version__, pydantic.__version__, pydantic_core.__version__)'
+  "$ORCH_VENV/bin/python" -c 'import fastapi, httpx, pydantic, pydantic_core, uvicorn; print("Orchestrator dependencies: OK", fastapi.__version__, pydantic.__version__, pydantic_core.__version__)'
   echo "PASS: Python environments prepared locally. No server was started."
 }
 
