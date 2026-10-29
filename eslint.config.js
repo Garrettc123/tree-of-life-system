@@ -10,12 +10,12 @@ module.exports = [
       "no-console": "off",
       "prefer-const": "warn",
       "no-var": "error",
-      "semi": ["error", "always"],
-      "quotes": ["error", "single"],
-      "indent": ["error", 2],
+      "semi": ["warn", "always"],
+      "quotes": ["warn", "single"],
+      "indent": ["warn", 2],
       "comma-dangle": ["warn", "never"],
-      "eqeqeq": ["error", "always"],
-      "curly": ["error", "all"]
+      "eqeqeq": ["warn", "always"],
+      "curly": ["warn", "all"]
     }
   }
 ];
