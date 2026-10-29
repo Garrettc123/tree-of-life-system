@@ -14,9 +14,9 @@ A small self-hosted control-plane foundation intended to reduce dependency on ho
 - It does not deploy or restart the existing Garcar web, worker, or scheduler.
 - It does not execute arbitrary shell commands, contact Stripe, send emails, or run payments.
 - It does not create a public internet endpoint or provide an always-on host by itself.
-- It does not yet include a browser console, remote agent runtime, or production-grade identity provider.
+- The included browser console is a prototype, not a production-grade identity provider or remote agent runtime.
 
-## Run locally (Python 3.12+)
+## Browser console prototype\nOpen `console/index.html` in a browser. Enter the base URL of a separately running control-plane server and the operator token when needed. The token remains in page memory and is not persisted. For cross-origin use, configure the server's CORS policy deliberately; no CORS middleware is enabled by default.\n\n## Run locally (Python 3.12+)
 ```bash
 cd garcar-native-control-plane
 python -m venv .venv
