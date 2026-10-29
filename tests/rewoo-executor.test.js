@@ -124,6 +124,7 @@ describe('ReWOO execution status is evidence-based', () => {
     const tenantId = '11111111-1111-4111-8111-111111111111';
     const durableStore = {
       createRun: jest.fn(async (run) => ({ id: run.id, status: run.status })),
+      getRun: jest.fn(async (id, tenant) => ({ id, tenant_id: tenant, status: 'succeeded' })),
       transitionRun: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
       createTask: jest.fn(async (task) => ({ id: task.id, status: task.status })),
       transitionTask: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
@@ -165,7 +166,7 @@ describe('ReWOO execution status is evidence-based', () => {
       entityType: 'rhns_run',
       evidenceType: 'read_only_run_synthesis_result',
     }));
-    expect(executor.getDurableRun(result.executionId)).toBeDefined();
+    await expect(executor.getDurableRun(result.executionId)).resolves.toMatchObject({ status: 'succeeded' });
   });
 
   test('does not start planning when durable run creation fails', async () => {
