@@ -4,6 +4,9 @@
  * It receives planning assignments and creates reviewable proposals in memory.
  * It never writes to GitHub, Linear, Notion, or a deployment target.
  */
+const PolicyEngine = require('../core/policy-engine');
+const { validateTask, TASK_TYPES } = require('../core/contracts');
+
 class ProposalAgent {
   constructor({ id, name, capabilities = [] } = {}, coordinator) {
     if (!id || typeof id !== 'string') throw new TypeError('ProposalAgent id is required');
@@ -14,6 +17,7 @@ class ProposalAgent {
     this.name = name || id;
     this.coordinator = coordinator;
     this.capabilities = capabilities;
+    this.policy = new PolicyEngine();
     this.state = 'initializing';
     this.proposals = new Map();
     this.lastAssignmentAt = null;
@@ -22,28 +26,16 @@ class ProposalAgent {
   }
 
   _prepareProposal(task) {
-    if (!task || typeof task !== 'object' || Array.isArray(task)) {
-      return { accepted: false, error: 'Task must be an object' };
+    const validation = validateTask(task);
+    if (!validation.valid) {
+      return { accepted: false, error: validation.error, taskId: task && task.id };
     }
-    if (typeof task.id !== 'string' || !task.id.trim()) {
-      return { accepted: false, error: 'Task id is required' };
+    if (!TASK_TYPES.has(task.type)) {
+      return { accepted: false, error: `Unsupported proposal type: ${task.type}`, taskId: task.id };
     }
-    if (typeof task.type !== 'string' || !task.type.trim()) {
-      return { accepted: false, error: 'Task type is required' };
-    }
-
-    const supportedTypes = new Set([
-      'create_file',
-      'setup_cicd',
-      'create_issues',
-      'enhance_description',
-    ]);
-    if (!supportedTypes.has(task.type)) {
-      return {
-        accepted: false,
-        error: `Unsupported proposal type: ${task.type}`,
-        taskId: task.id,
-      };
+    const decision = this.policy.evaluateTask(task, { effect: 'proposal', taskCount: 1 });
+    if (!decision.allowed) {
+      return { accepted: false, error: `Policy denied task: ${decision.reason}`, taskId: task.id };
     }
 
     const params = task.params && typeof task.params === 'object' ? task.params : {};
@@ -66,6 +58,9 @@ class ProposalAgent {
       case 'enhance_description':
         reviewNotes = 'Draft only from verified project facts. Do not invent integrations, metrics, readiness, customers, or deployment state.';
         break;
+      case 'sync_integration':
+        reviewNotes = 'Prepare a proposed integration inventory and reconciliation plan only. Do not connect accounts, rotate secrets, or write to external systems.';
+        break;
       default:
         reviewNotes = 'Human review is required before any external change.';
     }
@@ -83,6 +78,8 @@ class ProposalAgent {
       sideEffectsPerformed: false,
       requiresHumanApproval: requiresApproval,
       policyLevel: 3,
+      policyMode: decision.mode,
+      policyDecision: decision.reason,
       reviewNotes,
       createdAt: new Date().toISOString(),
     };
