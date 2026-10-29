@@ -46,7 +46,10 @@ jobs:
         run: python -m compileall -q app.py ops/backup_db.py
 
       - name: Validate local shell scripts
-        run: bash -n ops/*.sh
+        run: |
+          for script in ops/*.sh; do
+            bash -n "$script"
+          done
 
       - name: Run control-plane tests
         run: python -m pytest -q --junitxml=test-results.xml
