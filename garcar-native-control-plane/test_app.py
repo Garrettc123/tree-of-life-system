@@ -3,7 +3,7 @@ import importlib
 from fastapi.testclient import TestClient
 
 
-def build_client(tmp_path, monkeypatch, token="ci-test-token"):
+def build_client(tmp_path, monkeypatch, token="ci-test-token-that-is-at-least-32-chars"):
     monkeypatch.setenv("GARCAR_DB_PATH", str(tmp_path / "test.sqlite3"))
     monkeypatch.delenv("GARCAR_ORCHESTRATOR_HEALTH_URL", raising=False)
     if token is None:
@@ -44,7 +44,7 @@ def test_protected_api_rejects_wrong_token(tmp_path, monkeypatch):
 
 def test_read_only_action_can_execute_and_is_audited(tmp_path, monkeypatch):
     client, _ = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     response = client.post("/api/work/execute", json={"action": "health_check"}, headers=headers)
     assert response.status_code == 200
     assert response.json()["executed"] is True
@@ -58,7 +58,7 @@ def test_mutating_or_unknown_action_is_blocked(tmp_path, monkeypatch):
     response = client.post(
         "/api/work/execute",
         json={"action": "deploy_production"},
-        headers={"X-Operator-Token": "ci-test-token"},
+        headers={"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"},
     )
     assert response.status_code == 403
     assert "no action was executed" in response.json()["detail"]
@@ -66,7 +66,7 @@ def test_mutating_or_unknown_action_is_blocked(tmp_path, monkeypatch):
 
 def test_plan_requires_confirmation_and_never_enables_mutation(tmp_path, monkeypatch):
     client, _ = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     plan = client.post(
         "/api/work/plan",
         json={"action": "deploy_production", "parameters": {"environment": "production"}},
@@ -108,7 +108,7 @@ def test_plan_requires_confirmation_and_never_enables_mutation(tmp_path, monkeyp
 
 def test_sensitive_plan_parameters_are_redacted_before_storage(tmp_path, monkeypatch):
     client, _ = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     plan = client.post(
         "/api/work/plan",
         json={
@@ -135,7 +135,7 @@ def test_sensitive_plan_parameters_are_redacted_before_storage(tmp_path, monkeyp
 
 def test_status_reports_database_and_local_mode(tmp_path, monkeypatch):
     client, _ = build_client(tmp_path, monkeypatch)
-    response = client.get("/api/status", headers={"X-Operator-Token": "ci-test-token"})
+    response = client.get("/api/status", headers={"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"})
     assert response.status_code == 200
     assert response.json()["database"] == "available"
     assert response.json()["mode"] == "local_self_hosted"
@@ -145,7 +145,7 @@ def test_status_reports_database_and_local_mode(tmp_path, monkeypatch):
 
 def test_audit_hash_chain_verifies(tmp_path, monkeypatch):
     client, _ = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     assert client.get("/api/status", headers=headers).status_code == 200
     response = client.get("/api/audit/verify", headers=headers)
     assert response.status_code == 200
@@ -155,7 +155,7 @@ def test_audit_hash_chain_verifies(tmp_path, monkeypatch):
 
 def test_audit_hash_chain_detects_record_tampering(tmp_path, monkeypatch):
     client, app_module = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     assert client.get("/api/status", headers=headers).status_code == 200
 
     with app_module.connect_db() as db:
@@ -176,7 +176,7 @@ def test_service_inventory_does_not_probe_unapproved_external_url(tmp_path, monk
     monkeypatch.setenv("GARCAR_ORCHESTRATOR_HEALTH_URL", "https://example.com/health")
     importlib.reload(app_module)
     client = TestClient(app_module.app)
-    response = client.get("/api/services", headers={"X-Operator-Token": "ci-test-token"})
+    response = client.get("/api/services", headers={"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"})
     assert response.status_code == 200
     services = {item["name"]: item for item in response.json()["services"]}
     assert services["orchestrator"]["status"] == "invalid_health_url_config"
@@ -185,7 +185,7 @@ def test_service_inventory_does_not_probe_unapproved_external_url(tmp_path, monk
 
 def test_audit_verifier_does_not_repair_a_deleted_hash(tmp_path, monkeypatch):
     client, app_module = build_client(tmp_path, monkeypatch)
-    headers = {"X-Operator-Token": "ci-test-token"}
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
     assert client.get("/api/status", headers=headers).status_code == 200
 
     with app_module.connect_db() as db:
@@ -196,3 +196,13 @@ def test_audit_verifier_does_not_repair_a_deleted_hash(tmp_path, monkeypatch):
     response = client.get("/api/audit/verify", headers=headers)
     assert response.status_code == 200
     assert response.json()["valid"] is False
+
+
+
+def test_protected_api_rejects_weak_configured_operator_token(tmp_path, monkeypatch):
+    client, _ = build_client(tmp_path, monkeypatch, token="short-token")
+    response = client.get(
+        "/api/status",
+        headers={"X-Operator-Token": "short-token"},
+    )
+    assert response.status_code == 503
