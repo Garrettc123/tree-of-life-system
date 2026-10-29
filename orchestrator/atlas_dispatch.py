@@ -10,7 +10,12 @@ from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from supabase import create_client, Client
-from dispatch_signing import sign_json_payload
+try:
+    # Works when imported as orchestrator.atlas_dispatch from the repository root.
+    from .dispatch_signing import sign_json_payload
+except ImportError:
+    # Also supports direct execution from the orchestrator directory.
+    from dispatch_signing import sign_json_payload
 
 app = FastAPI(title="ATLAS Dispatch Engine", version="1.0.0")
 log = logging.getLogger("atlas_dispatch")
