@@ -1,0 +1,23 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: garcar-native-control-plane:local
+    restart: unless-stopped
+    environment:
+      GARCAR_OPERATOR_TOKEN: ${GARCAR_OPERATOR_TOKEN:?Set GARCAR_OPERATOR_TOKEN in the local .env file}
+      GARCAR_DB_PATH: /data/garcar-control-plane.sqlite3
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8080}:8080"
+    volumes:
+      - garcar_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  garcar_data:
