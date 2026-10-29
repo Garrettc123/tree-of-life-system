@@ -1,6 +1,7 @@
 """Local-first Garcar control plane with fail-closed execution policy."""
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
@@ -70,7 +71,9 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 actor TEXT NOT NULL,
                 event_type TEXT NOT NULL,
-                detail_json TEXT NOT NULL
+                detail_json TEXT NOT NULL,
+                previous_hash TEXT,
+                event_hash TEXT
             )"""
         )
         db.execute(
@@ -86,6 +89,36 @@ def init_db() -> None:
                 approved_by TEXT
             )"""
         )
+
+        # Upgrade databases created by earlier versions without deleting old audit events.
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(audit_events)").fetchall()}
+        if "previous_hash" not in columns:
+            db.execute("ALTER TABLE audit_events ADD COLUMN previous_hash TEXT")
+        if "event_hash" not in columns:
+            db.execute("ALTER TABLE audit_events ADD COLUMN event_hash TEXT")
+
+        previous_hash = "0" * 64
+        rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+        for row in rows:
+            if row["event_hash"]:
+                previous_hash = row["event_hash"]
+                continue
+            payload = {
+                "id": row["id"],
+                "created_at": row["created_at"],
+                "actor": row["actor"],
+                "event_type": row["event_type"],
+                "detail_json": row["detail_json"],
+                "previous_hash": previous_hash,
+            }
+            digest = hashlib.sha256(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            db.execute(
+                "UPDATE audit_events SET previous_hash = ?, event_hash = ? WHERE id = ?",
+                (previous_hash, digest, row["id"]),
+            )
+            previous_hash = digest
 
 
 def redact_sensitive(value: Any) -> Any:
@@ -104,12 +137,43 @@ def redact_sensitive(value: Any) -> Any:
     return value
 
 
+def event_digest(
+    event_id: str,
+    created_at: str,
+    actor: str,
+    event_type: str,
+    detail_json: str,
+    previous_hash: str,
+) -> str:
+    payload = {
+        "id": event_id,
+        "created_at": created_at,
+        "actor": actor,
+        "event_type": event_type,
+        "detail_json": detail_json,
+        "previous_hash": previous_hash,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
     init_db()
+    event_id = str(uuid.uuid4())
+    created_at = utc_now()
+    detail_json = json.dumps(redact_sensitive(detail), sort_keys=True, separators=(",", ":"))
     with connect_db() as db:
+        # Serialize read-hash-insert so concurrent requests cannot fork the local chain.
+        db.execute("BEGIN IMMEDIATE")
+        latest = db.execute("SELECT event_hash FROM audit_events ORDER BY rowid DESC LIMIT 1").fetchone()
+        previous_hash = latest["event_hash"] if latest and latest["event_hash"] else "0" * 64
+        digest = event_digest(event_id, created_at, actor, event_type, detail_json, previous_hash)
         db.execute(
-            "INSERT INTO audit_events (id, created_at, actor, event_type, detail_json) VALUES (?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), utc_now(), actor, event_type, json.dumps(redact_sensitive(detail), sort_keys=True)),
+            """INSERT INTO audit_events
+               (id, created_at, actor, event_type, detail_json, previous_hash, event_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (event_id, created_at, actor, event_type, detail_json, previous_hash, digest),
         )
 
 
@@ -179,6 +243,7 @@ def list_services(actor: str = Depends(require_operator)) -> dict[str, Any]:
 
 @app.post("/api/work/plan")
 def plan_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
+    init_db()
     action = work.action.strip()
     if not action:
         raise HTTPException(status_code=422, detail="Action cannot be blank")
@@ -211,6 +276,7 @@ def plan_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[st
 
 @app.get("/api/work/{plan_id}")
 def get_plan(plan_id: str, actor: str = Depends(require_operator)) -> dict[str, Any]:
+    init_db()
     with connect_db() as db:
         row = db.execute("SELECT * FROM work_plans WHERE id = ?", (plan_id,)).fetchone()
     if row is None:
@@ -231,6 +297,7 @@ def get_plan(plan_id: str, actor: str = Depends(require_operator)) -> dict[str, 
 @app.post("/api/work/{plan_id}/approve")
 def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(require_operator)) -> dict[str, Any]:
     """Record deliberate operator approval; approval does not enable mutation execution."""
+    init_db()
     expected_confirmation = f"APPROVE {plan_id}"
     if not hmac.compare_digest(approval.confirmation, expected_confirmation):
         raise HTTPException(status_code=400, detail=f"Confirmation must exactly equal: {expected_confirmation}")
@@ -277,12 +344,38 @@ def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict
     return {"executed": True, "action": action, "result": result}
 
 
+def verify_audit_chain() -> dict[str, Any]:
+    init_db()
+    with connect_db() as db:
+        rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+    previous_hash = "0" * 64
+    for index, row in enumerate(rows, start=1):
+        expected = event_digest(
+            row["id"], row["created_at"], row["actor"], row["event_type"],
+            row["detail_json"], previous_hash,
+        )
+        if row["previous_hash"] != previous_hash or row["event_hash"] != expected:
+            return {"valid": False, "events_checked": index, "failed_event_id": row["id"]}
+        previous_hash = expected
+    return {"valid": True, "events_checked": len(rows), "head_hash": previous_hash}
+
+
+@app.get("/api/audit/verify")
+def audit_verify(actor: str = Depends(require_operator)) -> dict[str, Any]:
+    result = verify_audit_chain()
+    audit(actor, "audit_chain_verified", {"valid": result["valid"], "events_checked": result["events_checked"]})
+    # Verify again including the verification event so the returned status reflects the persisted chain.
+    final_result = verify_audit_chain()
+    return final_result
+
+
 @app.get("/api/audit")
 def get_audit(limit: int = 50, actor: str = Depends(require_operator)) -> dict[str, Any]:
     safe_limit = max(1, min(limit, 200))
     with connect_db() as db:
         rows = db.execute(
-            "SELECT id, created_at, actor, event_type, detail_json FROM audit_events ORDER BY created_at DESC LIMIT ?",
+            """SELECT id, created_at, actor, event_type, detail_json, previous_hash, event_hash
+               FROM audit_events ORDER BY created_at DESC LIMIT ?""",
             (safe_limit,),
         ).fetchall()
     return {
@@ -293,6 +386,8 @@ def get_audit(limit: int = 50, actor: str = Depends(require_operator)) -> dict[s
                 "actor": row["actor"],
                 "event_type": row["event_type"],
                 "detail": json.loads(row["detail_json"]),
+                "previous_hash": row["previous_hash"],
+                "event_hash": row["event_hash"],
             }
             for row in rows
         ]
