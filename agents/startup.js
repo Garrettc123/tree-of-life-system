@@ -84,6 +84,7 @@ class StartupSequence extends EventEmitter {
       },
       execution_mode: operational > 0 ? 'configured_handlers' : 'safe_scaffold_no_handlers',
       durable_storage: this.durableStore ? 'configured' : 'disabled',
+      stale_run_recovery: process.env.RHNS_RECOVER_STALE_RUNS === 'true' ? 'enabled' : 'disabled',
       approval_gate: this.approvalGate ? 'configured_not_bound_to_write_adapter' : 'disabled',
     };
   }
@@ -126,14 +127,29 @@ class StartupSequence extends EventEmitter {
     });
     const storage = await this.durableStore.healthCheck();
     this.approvalGate = new ApprovalGate({ store: this.durableStore });
+    let staleRecovery = null;
+    if (process.env.RHNS_RECOVER_STALE_RUNS === 'true') {
+      const rawAge = Number.parseInt(process.env.RHNS_STALE_RUN_AGE_MS || '600000', 10);
+      const olderThanMs = Number.isInteger(rawAge) ? rawAge : 600000;
+      staleRecovery = await this.durableStore.recoverStaleRuns(this.tenantId, { olderThanMs, limit: 100 });
+    }
     await this.durableStore.appendEvent({
       type: 'rhns.runtime.storage.initialized',
       source: 'tree-of-life-agent-runtime',
       severity: 'info',
-      data: { storage: storage.storage, tables: storage.tables },
+      data: {
+        storage: storage.storage,
+        tables: storage.tables,
+        staleRecovery: staleRecovery
+          ? { scanned: staleRecovery.scanned, recovered: staleRecovery.recovered }
+          : { enabled: false },
+      },
     }, this.tenantId);
     this.log('STORAGE', 'Durable RHNS storage verified and startup audit event recorded; exact-action gate initialized (no write adapter attached)', 'success');
-    return { enabled: true, mode: storage.storage, tables: storage.tables };
+    if (staleRecovery) {
+      this.log('RECOVERY', 'Scanned ' + staleRecovery.scanned + ' stale runs; recovered ' + staleRecovery.recovered, 'info');
+    }
+    return { enabled: true, mode: storage.storage, tables: storage.tables, staleRecovery };
   }
 
   async persistRuntimeEvent(type, data = {}, severity = 'info') {
