@@ -156,6 +156,11 @@ async def dispatch(
     elif not isinstance(trace_id, str) or not trace_id.strip() or len(trace_id) > 200 or any(ord(char) < 32 for char in trace_id):
         raise HTTPException(400, "trace_id is invalid or too long")
 
+    # A signed body can be replayed by anyone who captures it. Persist its digest and reject exact repeats.
+    body_hash = hashlib.sha256(body).hexdigest()
+    if not event_log.claim_dispatch_request(body_hash):
+        raise HTTPException(409, "duplicate signed request")
+
     # Persist a redacted copy; dispatch the original event to the internal handler.
     event_id = await event_log.write(_redact_for_storage(event))
     background.add_task(route_event, event, event_id, event_log)
