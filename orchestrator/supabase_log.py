@@ -53,6 +53,12 @@ class EventLog:
                     error_detail TEXT
                 )"""
             )
+            connection.execute(
+                """CREATE TABLE IF NOT EXISTS dispatch_requests (
+                    body_hash TEXT PRIMARY KEY,
+                    first_seen_at TEXT NOT NULL
+                )"""
+            )
             connection.commit()
         finally:
             connection.close()
@@ -81,6 +87,19 @@ class EventLog:
         finally:
             connection.close()
         return event_id
+
+    def claim_dispatch_request(self, body_hash: str) -> bool:
+        """Persist a unique signed-body fingerprint to block exact replays."""
+        connection = self._connect_local()
+        try:
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO dispatch_requests (body_hash, first_seen_at) VALUES (?, ?)",
+                (body_hash, datetime.now(timezone.utc).isoformat()),
+            )
+            connection.commit()
+            return cursor.rowcount == 1
+        finally:
+            connection.close()
 
     async def write(self, event: dict) -> str:
         if not self._ok():
