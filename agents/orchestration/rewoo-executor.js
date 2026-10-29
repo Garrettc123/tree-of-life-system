@@ -271,8 +271,14 @@ class ReWOOExecutor extends EventEmitter {
 
       const successfulSteps = outputs.filter((item) => !item.error).length;
       const failedSteps = outputs.length - successfulSteps;
+      const error = failedSteps > 0
+        ? `${failedSteps} of ${outputs.length} execution steps failed: ${outputs.find((item) => item.error).error}`
+        : outputs.length === 0
+          ? 'No execution steps produced results'
+          : undefined;
       return {
         success: outputs.length > 0 && failedSteps === 0,
+        ...(error ? { error } : {}),
         outputs,
         duration,
         stepsExecuted: successfulSteps,
