@@ -51,7 +51,7 @@ class AgentSystem {
       });
       await this.durableStore.healthCheck();
       this.approvalGate = new ApprovalGate({ store: this.durableStore });
-      console.log('Durable RHNS storage verified; exact-action approval gate initialized.');
+      console.log('Durable RHNS storage verified; exact-action approval gate initialized (no write adapter attached).');
     }
     if (!this.config.githubToken) {
       const warning = 'GITHUB_TOKEN is not configured; repository analysis will remain unavailable.';
