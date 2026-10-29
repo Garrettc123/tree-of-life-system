@@ -325,7 +325,11 @@ class StartupSequence extends EventEmitter {
       phase: 'grpc',
       success: Boolean(this.results.phase3 && this.results.phase3.success),
     });
-    const rewooExecutor = new ReWOOExecutor(config.rewoo);
+    const rewooExecutor = new ReWOOExecutor({
+      ...config.rewoo,
+      durableStore: this.durableStore,
+      tenantId: this.tenantId,
+    });
     await this.phase4_registerAgents(grpcGateway, rewooExecutor);
     await this.persistRuntimeEvent('rhns.runtime.agents.registered', {
       count: (this.results.phase4 && this.results.phase4.agents || []).length,
