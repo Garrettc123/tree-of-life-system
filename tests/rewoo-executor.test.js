@@ -128,6 +128,7 @@ describe('ReWOO execution status is evidence-based', () => {
       transitionRun: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
       createTask: jest.fn(async (task) => ({ id: task.id, status: task.status })),
       transitionTask: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
+      settleOpenTasks: jest.fn().mockResolvedValue({ cancelled: 0, failedOrUnknown: 0 }),
       appendEvidence: jest.fn(async (evidence) => ({ id: 'evidence-row', entityId: evidence.entityId })),
     };
     const executor = track({
@@ -144,6 +145,7 @@ describe('ReWOO execution status is evidence-based', () => {
     const result = await executor.execute({ action: 'agent_inventory' }, { actorId: 'test-operator' });
 
     expect(result.success).toBe(true);
+    expect(result.durableStatus).toBe('succeeded');
     expect(durableStore.createRun).toHaveBeenCalledWith(expect.objectContaining({
       tenantId,
       actorId: 'test-operator',
@@ -175,6 +177,7 @@ describe('ReWOO execution status is evidence-based', () => {
       transitionRun: jest.fn(),
       createTask: jest.fn(),
       transitionTask: jest.fn(),
+      settleOpenTasks: jest.fn().mockResolvedValue({ cancelled: 0, failedOrUnknown: 0 }),
       appendEvidence: jest.fn(),
     };
     const stepHandler = jest.fn(async () => ({ success: true }));
