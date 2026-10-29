@@ -226,6 +226,18 @@ class PlanningAgent {
           tasks: agentTasks,
         });
 
+        if (response && (response.success === false || response.accepted === false)) {
+          outcomes.push({
+            agent,
+            status: 'failed',
+            taskIds,
+            reason: response.error || 'Target agent rejected the assignment',
+            response,
+          });
+          console.warn(`[PlanningAgent] ${agent} rejected ${agentTasks.length} task(s)`);
+          continue;
+        }
+
         outcomes.push({
           agent,
           status: 'assigned',
