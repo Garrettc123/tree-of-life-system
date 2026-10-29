@@ -1,3 +1,4 @@
+.mcp-venv/
 runtime/
 .env
 .env.*
