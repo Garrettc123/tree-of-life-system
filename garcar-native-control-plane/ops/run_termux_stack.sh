@@ -29,10 +29,12 @@ Usage:
   bash ops/run_termux_stack.sh status
   bash ops/run_termux_stack.sh logs [control-plane|orchestrator]
   bash ops/run_termux_stack.sh backup
+  bash ops/run_termux_stack.sh tunnel
   bash ops/run_termux_stack.sh stop
 
-This runs both APIs on 127.0.0.1 only. It does not deploy publicly.
-Start and stop require an exact confirmation phrase.
+This runs both APIs on 127.0.0.1 only by default. The optional tunnel command
+requires a specific email allowlist and a separate explicit confirmation.
+Start, stop, and public tunnel exposure require exact confirmation phrases.
 EOF
 }
 
@@ -270,6 +272,47 @@ confirm_action() {
   }
 }
 
+run_public_tunnel() {
+  need_python
+  load_local_env
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "cloudflared is not installed or not on PATH. Nothing was exposed." >&2
+    exit 1
+  fi
+  if ! health_ok "http://127.0.0.1:$CONTROL_PORT/health" "garcar-native-control-plane"; then
+    echo "The local control plane is not healthy. Start the stack first." >&2
+    exit 1
+  fi
+  if ! health_ok "http://127.0.0.1:$ORCH_PORT/health" "garcar-dispatch"; then
+    echo "The local orchestrator is not healthy. Start the stack first." >&2
+    exit 1
+  fi
+
+  local allowed_mail="${GARCAR_TUNNEL_ALLOWED_MAIL:-}"
+  if [[ -z "$allowed_mail" || "$allowed_mail" == *","* || "$allowed_mail" == *"*"* || ! "$allowed_mail" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
+    echo "Set GARCAR_TUNNEL_ALLOWED_MAIL to one exact email address before starting a tunnel." >&2
+    echo "Example: GARCAR_TUNNEL_ALLOWED_MAIL=you@example.com bash ops/run_termux_stack.sh tunnel" >&2
+    echo "The email gate is mandatory; no public tunnel was started." >&2
+    exit 2
+  fi
+  if ! cloudflared tunnel --help 2>&1 | grep -q -- "--allowed-mail"; then
+    echo "This cloudflared build lacks --allowed-mail, so the script refuses an unauthenticated public tunnel. Update cloudflared first." >&2
+    exit 1
+  fi
+
+  cat <<EOF
+PUBLIC EXPOSURE WARNING
+The temporary tunnel makes the console URL reachable from the internet.
+Cloudflare will restrict access to this exact email address: $allowed_mail
+The operator API still requires the separate local GARCAR_OPERATOR_TOKEN.
+The URL changes on each run. Quick Tunnels are for temporary testing, not production.
+Stop the tunnel with Ctrl+C. The local API remains loopback-only.
+EOF
+  confirm_action "PUBLIC TUNNEL"
+  exec cloudflared tunnel --url "http://127.0.0.1:$CONTROL_PORT" --allowed-mail "$allowed_mail"
+}
+
 show_status() {
   local control="DOWN" orchestrator="DOWN"
   health_ok "http://127.0.0.1:$CONTROL_PORT/health" "garcar-native-control-plane" && control="UP"
@@ -371,6 +414,9 @@ case "$cmd" in
     GARCAR_DB_PATH="$CONTROL_DB" "$CONTROL_VENV/bin/python" "$CONTROL_DIR/ops/backup_db.py" --output "$CONTROL_DIR/backups/garcar-control-plane-$stamp.sqlite3"
     GARCAR_EVENT_DB_PATH="$ORCH_DB" "$ORCH_VENV/bin/python" "$ORCH_DIR/backup_db.py" --output "$CONTROL_DIR/backups/garcar-events-$stamp.sqlite3"
     chmod 600 "$CONTROL_DIR/backups/garcar-control-plane-$stamp.sqlite3" "$CONTROL_DIR/backups/garcar-events-$stamp.sqlite3"
+    ;;
+  tunnel)
+    run_public_tunnel
     ;;
   stop)
     confirm_action STOP
