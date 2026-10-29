@@ -34,6 +34,7 @@ MAX_EVENT_BYTES = 1_000_000
 SENSITIVE_KEY_PARTS = (
     "token", "secret", "password", "credential", "api_key", "apikey",
     "authorization", "private_key", "access_key", "client_secret",
+    "email", "phone", "ssn", "date_of_birth", "dob",
 )
 
 app = FastAPI(title="garcar-dispatch", version="1.1.0")
