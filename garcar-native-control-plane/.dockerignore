@@ -12,3 +12,9 @@ backups
 *.sqlite3
 *.db
 test_app.py
+
+.mcp-venv/
+runtime/
+test_*.py
+mcp_server.py
+requirements-mcp.txt
