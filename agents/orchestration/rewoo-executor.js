@@ -220,6 +220,14 @@ class ReWOOExecutor extends EventEmitter {
           ? 'unknown_outcome'
           : 'failed';
         try {
+          await this.durableStore.settleOpenTasks(execution.id, this.tenantId, error.message, {
+            unknownOutcome: nextStatus === 'unknown_outcome',
+          });
+        } catch (taskPersistenceError) {
+          execution.taskPersistenceError = 'Could not settle open durable tasks: '
+            + (taskPersistenceError instanceof Error ? taskPersistenceError.message : 'unknown storage error');
+        }
+        try {
           await this._transitionRun(execution, nextStatus, {
             error: { message: error.message, stage: execution.durableRunStatus },
           });
