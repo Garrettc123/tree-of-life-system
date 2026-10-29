@@ -6,6 +6,31 @@
 const EventEmitter = require('events');
 const { randomUUID } = require('crypto');
 
+function decodePayload(payload) {
+  if (Buffer.isBuffer(payload)) {
+    const text = payload.toString('utf8');
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+  if (typeof payload === 'string') {
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return payload;
+    }
+  }
+  return payload;
+}
+
+function hasExplicitFailure(result) {
+  return result === false
+    || (result && typeof result === 'object'
+      && (result.success === false || result.ok === false));
+}
+
 class RuntimeAgent extends EventEmitter {
   constructor(spec = {}) {
     super();
@@ -36,12 +61,39 @@ class RuntimeAgent extends EventEmitter {
     return this.isConfigured() ? 'active' : 'unconfigured';
   }
 
-  async handleTask(task) {
-    if (!this.handlers.task) {
-      throw new Error(`Agent ${this.id} is not executable: no task handler is configured`);
+  async handleTask(task = {}) {
+    const payload = decodePayload(task.payload);
+    let result;
+
+    if (this.handlers.task) {
+      result = await this.handlers.task({ ...task, payload });
+    } else if (this.role === 'planner' && this.handlers.plan) {
+      result = await this.handlers.plan(payload ?? task, task.context || {});
+    } else if (this.role === 'executor' && this.handlers.step) {
+      const step = task.step || {
+        id: task.taskId,
+        type: task.taskType || 'execute',
+        input: payload,
+      };
+      result = await this.handlers.step(step, task.context || {});
+    } else if (this.role === 'critic' && this.handlers.synthesis) {
+      const request = payload && typeof payload === 'object' ? payload : {};
+      result = await this.handlers.synthesis(
+        task.outputs ?? request.outputs ?? [],
+        task.plan ?? request.plan ?? {},
+        task.context ?? request.context ?? {},
+      );
+    } else {
+      throw new Error(`Agent ${this.id} is not executable: no handler is configured for role ${this.role}`);
     }
 
-    const result = await this.handlers.task(task);
+    if (hasExplicitFailure(result)) {
+      const detail = result && typeof result === 'object' && result.error
+        ? String(result.error)
+        : 'handler reported failure';
+      throw new Error(`Agent ${this.id} task failed: ${detail}`);
+    }
+
     this.tasksProcessed += 1;
     this.lastHeartbeat = new Date().toISOString();
     this.emit('event', {
@@ -74,6 +126,12 @@ class RuntimeAgent extends EventEmitter {
       throw new Error(`Agent ${this.id} cannot execute: no step handler is configured`);
     }
     const result = await this.handlers.step(step, context);
+    if (hasExplicitFailure(result)) {
+      const detail = result && typeof result === 'object' && result.error
+        ? String(result.error)
+        : 'handler reported failure';
+      throw new Error(`Agent ${this.id} step failed: ${detail}`);
+    }
     this.tasksProcessed += 1;
     this.lastHeartbeat = new Date().toISOString();
     return result;
