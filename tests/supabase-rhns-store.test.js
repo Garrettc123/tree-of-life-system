@@ -243,6 +243,20 @@ describe('SupabaseRhnsStore', () => {
     expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
   });
 
+  test('settles remaining open tasks during run failure without touching terminal tasks', async () => {
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response([{ id: 'a' }, { id: 'b' }]))
+      .mockResolvedValueOnce(response([{ id: 'c' }]));
+    const store = makeStore(fetchImpl);
+    await expect(store.settleOpenTasks(runId, tenantId, 'step timed out', { unknownOutcome: true }))
+      .resolves.toEqual({ cancelled: 2, failedOrUnknown: 1, executingStatus: 'unknown_outcome' });
+    expect(fetchImpl.mock.calls[0][0]).toContain('status=in.%28proposed%2Capproved%29');
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({ status: 'cancelled' });
+    expect(fetchImpl.mock.calls[1][0]).toContain('status=eq.executing');
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({ status: 'unknown_outcome' });
+  });
+
   test('does not persist event or evidence payloads containing credential-like keys', async () => {
     const fetchImpl = jest.fn();
     const store = makeStore(fetchImpl);
