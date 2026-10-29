@@ -12,14 +12,54 @@ A local-first, self-hosted foundation intended to reduce reliance on blocked hos
 - Read-only local health and service inventory operations. When Compose is used, the control plane checks the orchestrator's known-local `/health` endpoint. Web, worker, and scheduler statuses remain unverified.
 - Persistent work plans in SQLite with an explicit approval-recording endpoint for actions outside the read-only allowlist.
 - Fail-closed execution: even an approved mutating plan **cannot** execute in this version.
-- Values under common secret-like parameter keys are redacted before plan persistence and audit logging. Do not submit credentials or private customer data in parameters.
+- Values under common secret-like and common personal-data keys (including email, phone, and date-of-birth fields) are redacted before plan persistence and audit logging. This key-based filter is a safeguard, not a guarantee; do not submit credentials or unnecessary private customer data.
 - Control-plane SQLite audit entries include a SHA-256 hash chain, with `GET /api/audit/verify` to detect unexpected edits to the stored chain.
 - The event orchestrator requires an HMAC signature on `POST /dispatch`; a missing or shorter-than-32-byte `DISPATCH_SECRET` returns HTTP 503 rather than accepting requests.
 - `GET /events` requires operator authentication.
-- Event payloads are redacted for common secret-like keys before persistence. If Supabase is unset or temporarily fails, events fall back to local SQLite; local event data lives in its own Docker volume.
+- Event payloads are redacted for common secret-like and personal-data keys before persistence. If Supabase is unset or temporarily fails, events fall back to local SQLite; local event data lives in its own Docker volume.
 - Existing GitHub/Linear/Notion handlers that can create external records are disabled by default with `GARCAR_ENABLE_EXTERNAL_HANDLERS=false` in Compose. Customer email is not written to payment-event logs, and handler failures log only the exception type. Do not enable external handlers until action-by-action approval and audit controls exist.
 - Local backup utilities for both SQLite databases, including SQLite integrity checks.
 - Docker containers run as non-root users. Only the control-plane port is published, bound to `127.0.0.1`; the orchestrator is private to the Compose network.
+
+## Option 0: run both services directly in Android Termux (no Docker)
+
+This is the mobile-friendly path for a phone that has Termux and Python. It keeps both services bound to loopback on the same device; it does not make the console public or guarantee that Android will keep the processes alive indefinitely.
+
+In Termux, from a clean checkout:
+
+```bash
+pkg update
+pkg install python git coreutils
+git clone --depth 1 -b feat/garcar-native-control-plane https://github.com/Garrettc123/tree-of-life-system.git
+cd tree-of-life-system/garcar-native-control-plane
+bash ops/run_termux_stack.sh init
+bash ops/run_termux_stack.sh install
+bash ops/run_termux_stack.sh test
+```
+
+The secret bootstrap writes random operator and dispatch secrets to the ignored local `.env` file. It does not print their values. The install command creates separate local Python environments for the control plane and orchestrator and installs the required packages. A test command does not start the services.
+
+When the tests finish, start the local stack:
+
+```bash
+bash ops/run_termux_stack.sh start
+```
+
+Type the exact confirmation phrase shown by the script. Then open this address **on the same phone**:
+
+[http://127.0.0.1:8080/console](http://127.0.0.1:8080/console)
+
+Useful follow-up commands:
+
+```bash
+bash ops/run_termux_stack.sh status
+bash ops/run_termux_stack.sh logs control-plane
+bash ops/run_termux_stack.sh logs orchestrator
+bash ops/run_termux_stack.sh backup
+bash ops/run_termux_stack.sh stop
+```
+
+Stop also requires an exact confirmation phrase. The stack saves logs and local databases under the repository's ignored runtime/data/backups directories. If Android kills the processes, run the start command again. A Termux wake lock may reduce sleep-related interruptions but is not a guarantee of continuous operation. Do not expose the API to the internet or forward these ports publicly.
 
 ## Option A: run the control plane by itself (Python 3.12+)
 
@@ -107,7 +147,7 @@ All control-plane protected endpoints require `X-Operator-Token`.
 | GET | `/events` | Read event history; requires `X-Operator-Token` |
 | POST | `/dispatch` | Accept a JSON object only when `X-Dispatch-Sig` matches the HMAC-SHA256 of the exact request bytes |
 
-The dispatch signature format is `sha256=<hex-digest>`. The signing secret must stay in local configuration and be shared only with an authorized event sender. Requests over 1 MB are rejected. CORS has no allowed origins by default.
+The dispatch signature format is `sha256=<hex-digest>`. The signing secret must stay in local configuration and be shared only with an authorized event sender. Requests over 1 MB are rejected. CORS has no allowed origins by default. The API also rejects exact replays of a previously accepted request body.
 
 The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records remain visible alongside remote results, but are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete. The current Compose file deliberately does not pass GitHub, Linear, or Notion API keys into the orchestrator, and sets `GARCAR_ENABLE_EXTERNAL_HANDLERS=false`. Do not add those keys or set that flag to true until explicit per-action approval gates are implemented, because existing event handlers can create external issue/comment/page records when enabled.
 
