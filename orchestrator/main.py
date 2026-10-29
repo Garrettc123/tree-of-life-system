@@ -1,4 +1,5 @@
 """Garcar event orchestrator with fail-closed webhook authentication."""
+import asyncio
 import hashlib
 import hmac
 import json
@@ -159,11 +160,19 @@ async def dispatch(
 
     # A signed body can be replayed by anyone who captures it. Persist its digest and reject exact repeats.
     body_hash = hashlib.sha256(body).hexdigest()
-    if not event_log.claim_dispatch_request(body_hash):
+    if not await asyncio.to_thread(event_log.claim_dispatch_request, body_hash):
         raise HTTPException(409, "duplicate signed request")
 
     # Persist a redacted copy; dispatch the original event to the internal handler.
-    event_id = await event_log.write(_redact_for_storage(event))
+    # Release the replay claim if persistence fails, so a safe retry is possible.
+    try:
+        event_id = await event_log.write(_redact_for_storage(event))
+    except Exception:
+        try:
+            await asyncio.to_thread(event_log.release_dispatch_request, body_hash)
+        except Exception as release_exc:
+            log.error("dispatch_claim_release_failed error_type=%s", type(release_exc).__name__)
+        raise
     background.add_task(route_event, event, event_id, event_log)
 
     log.info(
