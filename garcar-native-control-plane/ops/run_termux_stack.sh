@@ -39,6 +39,10 @@ need_python() {
     echo "Python 3 is required. In Termux, run: pkg install python git" >&2
     exit 1
   }
+  command -v nohup >/dev/null 2>&1 || {
+    echo "nohup is required for background runtime. In Termux, run: pkg install coreutils" >&2
+    exit 1
+  }
   python3 - <<'PY'
 import sys
 if sys.version_info < (3, 11):
@@ -190,7 +194,7 @@ start_service() {
       export DISPATCH_SECRET GARCAR_OPERATOR_TOKEN
       export GARCAR_EVENT_DB_PATH="$ORCH_DB"
       export GARCAR_ENABLE_EXTERNAL_HANDLERS=false
-      exec "$ORCH_VENV/bin/uvicorn" main:app --host 127.0.0.1 --port "$ORCH_PORT" --log-level info
+      exec nohup "$ORCH_VENV/bin/uvicorn" main:app --host 127.0.0.1 --port "$ORCH_PORT" --log-level info
     ) >> "$LOG_DIR/orchestrator.log" 2>&1 < /dev/null &
   else
     (
@@ -198,7 +202,7 @@ start_service() {
       export GARCAR_OPERATOR_TOKEN
       export GARCAR_DB_PATH="$CONTROL_DB"
       export GARCAR_ORCHESTRATOR_HEALTH_URL="http://127.0.0.1:$ORCH_PORT/health"
-      exec "$CONTROL_VENV/bin/uvicorn" app:app --host 127.0.0.1 --port "$CONTROL_PORT" --log-level info
+      exec nohup "$CONTROL_VENV/bin/uvicorn" app:app --host 127.0.0.1 --port "$CONTROL_PORT" --log-level info
     ) >> "$LOG_DIR/control-plane.log" 2>&1 < /dev/null &
   fi
   local pid=$!
