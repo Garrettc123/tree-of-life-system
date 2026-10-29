@@ -320,14 +320,16 @@ show_status() {
   printf 'Control plane: %s (127.0.0.1:%s)\n' "$control" "$CONTROL_PORT"
   printf 'Orchestrator:  %s (127.0.0.1:%s)\n' "$orchestrator" "$ORCH_PORT"
   if [[ "$control" == "UP" ]]; then
-    python3 - "$CONTROL_PORT" "$GARCAR_OPERATOR_TOKEN" <<'PY'
+    GARCAR_OPERATOR_TOKEN="$GARCAR_OPERATOR_TOKEN" python3 - "$CONTROL_PORT" <<'PY'
 import json
+import os
 import sys
 import urllib.request
 url = f"http://127.0.0.1:{sys.argv[1]}/api/status"
-request = urllib.request.Request(url, headers={"X-Operator-Token": sys.argv[2]})
+request = urllib.request.Request(url, headers={"X-Operator-Token": os.environ["GARCAR_OPERATOR_TOKEN"]})
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 try:
-    with urllib.request.urlopen(request, timeout=3) as response:
+    with opener.open(request, timeout=3) as response:
         data = json.loads(response.read().decode("utf-8"))
     print("Control database:", data.get("database", "unknown"))
 except Exception as exc:
@@ -420,8 +422,13 @@ case "$cmd" in
     ;;
   stop)
     confirm_action STOP
-    stop_one control-plane
-    stop_one orchestrator
+    stop_failed=0
+    stop_one control-plane || stop_failed=1
+    stop_one orchestrator || stop_failed=1
+    if (( stop_failed )); then
+      echo "WARNING: one or more services did not stop cleanly; inspect their logs and PID files." >&2
+      exit 1
+    fi
     ;;
   help|-h|--help|"")
     usage
