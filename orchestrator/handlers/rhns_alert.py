@@ -43,8 +43,8 @@ async def _open_issue(service: str, error: str, trace: str):
                 },
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("gh_issue_failed err=%s", e)
+    except Exception as exc:
+        log.warning("gh_issue_failed error_type=%s", type(exc).__name__)
 
 
 async def _create_p0(service: str, error: str, trace: str):
@@ -66,5 +66,5 @@ async def _create_p0(service: str, error: str, trace: str):
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_p0_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_p0_failed error_type=%s", type(exc).__name__)
