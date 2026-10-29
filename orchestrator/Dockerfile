@@ -9,7 +9,7 @@ WORKDIR /app
 
 RUN addgroup --system --gid 10002 garcar \
     && adduser --system --uid 10002 --ingroup garcar garcar \
-    && mkdir -p /data \
+    && mkdir -p /data /app/backups \
     && chown -R garcar:garcar /app /data
 
 COPY requirements.txt ./requirements.txt
