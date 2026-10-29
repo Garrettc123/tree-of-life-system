@@ -17,7 +17,7 @@ ensure_secret() {
   local key="$1"
   local current
   current="$(sed -n "s/^$key=//p" .env | head -n 1)"
-  if [[ -z "$current" || "$current" == *replace-with-* ]]; then
+  if [[ -z "$current" || "$current" == *replace-with-* || ${#current} -lt 32 ]]; then
     local generated
     generated="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
     if grep -q "^$key=" .env; then
