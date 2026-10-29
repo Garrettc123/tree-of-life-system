@@ -87,6 +87,12 @@ class SupabaseRhnsStore {
     return data;
   }
 
+  async healthCheck() {
+    await this._request('rhns_action_approvals', { query: { select: 'id', limit: '1' } });
+    await this._request('rhns_proposals', { query: { select: 'proposal_id', limit: '1' } });
+    return { ok: true, storage: 'supabase-rest', tables: ['rhns_action_approvals', 'rhns_proposals'] };
+  }
+
   async create(record) {
     requireUuid(record && record.id, 'approval id');
     requireUuid(record && record.tenantId, 'approval tenantId');
