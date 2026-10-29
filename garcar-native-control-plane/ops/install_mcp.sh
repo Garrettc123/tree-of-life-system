@@ -26,5 +26,5 @@ fi
 "$VENV/bin/python" -m pip install --disable-pip-version-check -r requirements-mcp.txt
 "$VENV/bin/python" -m pip install --disable-pip-version-check pytest==9.2.0
 
-"$VENV/bin/python" -c 'import httpx, mcp, pydantic, pydantic_core; print("MCP dependencies ready:", mcp.__version__, pydantic.__version__, pydantic_core.__version__)'
+"$VENV/bin/python" -c 'from importlib.metadata import version; import httpx, pydantic, pydantic_core; print("MCP dependencies ready:", version("mcp"), pydantic.__version__, pydantic_core.__version__)'
 echo "PASS: MCP environment installed separately. No server was started."
