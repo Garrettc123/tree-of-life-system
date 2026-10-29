@@ -17,6 +17,9 @@ class PolicyEngine {
     if (context.taskCount !== undefined && context.taskCount > this.limits.maxTasksPerAssignment) {
       return { allowed: false, reason: 'assignment_task_budget_exceeded' };
     }
+    if (context.toolCalls !== undefined && context.toolCalls > this.limits.maxToolCalls) {
+      return { allowed: false, reason: 'tool_call_budget_exceeded' };
+    }
     // The first release can create proposals only. All external writes,
     // deployments, payments and outbound messages are denied by default.
     if (context.effect && context.effect !== 'proposal') {
