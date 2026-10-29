@@ -94,35 +94,35 @@ def init_db() -> None:
             )"""
         )
 
-        # Upgrade databases created by earlier versions without deleting old audit events.
+        # Migrate the legacy v0.1 schema only when hash columns are first introduced.
+        # Never silently rebuild a missing hash on a newer schema: verification must flag it.
         columns = {row["name"] for row in db.execute("PRAGMA table_info(audit_events)").fetchall()}
+        legacy_hash_schema = "previous_hash" not in columns or "event_hash" not in columns
         if "previous_hash" not in columns:
             db.execute("ALTER TABLE audit_events ADD COLUMN previous_hash TEXT")
         if "event_hash" not in columns:
             db.execute("ALTER TABLE audit_events ADD COLUMN event_hash TEXT")
 
-        previous_hash = "0" * 64
-        rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
-        for row in rows:
-            if row["event_hash"]:
-                previous_hash = row["event_hash"]
-                continue
-            payload = {
-                "id": row["id"],
-                "created_at": row["created_at"],
-                "actor": row["actor"],
-                "event_type": row["event_type"],
-                "detail_json": row["detail_json"],
-                "previous_hash": previous_hash,
-            }
-            digest = hashlib.sha256(
-                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest()
-            db.execute(
-                "UPDATE audit_events SET previous_hash = ?, event_hash = ? WHERE id = ?",
-                (previous_hash, digest, row["id"]),
-            )
-            previous_hash = digest
+        if legacy_hash_schema:
+            previous_hash = "0" * 64
+            rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+            for row in rows:
+                payload = {
+                    "id": row["id"],
+                    "created_at": row["created_at"],
+                    "actor": row["actor"],
+                    "event_type": row["event_type"],
+                    "detail_json": row["detail_json"],
+                    "previous_hash": previous_hash,
+                }
+                digest = hashlib.sha256(
+                    json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                ).hexdigest()
+                db.execute(
+                    "UPDATE audit_events SET previous_hash = ?, event_hash = ? WHERE id = ?",
+                    (previous_hash, digest, row["id"]),
+                )
+                previous_hash = digest
 
 
 def redact_sensitive(value: Any) -> Any:
