@@ -1,5 +1,6 @@
 import importlib
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -206,3 +207,19 @@ def test_protected_api_rejects_weak_configured_operator_token(tmp_path, monkeypa
         headers={"X-Operator-Token": "short-token"},
     )
     assert response.status_code == 503
+
+
+
+def test_audit_append_refuses_to_extend_a_corrupted_earlier_record(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
+    assert client.get("/api/status", headers=headers).status_code == 200
+
+    with app_module.connect_db() as db:
+        db.execute(
+            "UPDATE audit_events SET detail_json = ? WHERE rowid = (SELECT MIN(rowid) FROM audit_events)",
+            ('{"changed":true}',),
+        )
+
+    with pytest.raises(RuntimeError, match="Audit chain fails verification"):
+        app_module.audit("operator", "must_not_append", {})
