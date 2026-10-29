@@ -172,8 +172,10 @@ def test_audit_hash_chain_detects_record_tampering(tmp_path, monkeypatch):
 
 
 def test_service_inventory_does_not_probe_unapproved_external_url(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
     monkeypatch.setenv("GARCAR_ORCHESTRATOR_HEALTH_URL", "https://example.com/health")
-    client, _ = build_client(tmp_path, monkeypatch)
+    importlib.reload(app_module)
+    client = TestClient(app_module.app)
     response = client.get("/api/services", headers={"X-Operator-Token": "ci-test-token"})
     assert response.status_code == 200
     services = {item["name"]: item for item in response.json()["services"]}
