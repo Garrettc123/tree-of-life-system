@@ -83,7 +83,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements.txt
 
       - name: Compile Python sources
-        run: python -m compileall -q main.py router.py supabase_log.py test_main.py
+        run: python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py
 
       - name: Run orchestrator tests
         run: python -m pytest -q test_main.py --junitxml=test-results-orchestrator.xml
