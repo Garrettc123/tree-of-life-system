@@ -171,7 +171,9 @@ def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
         # Serialize read-hash-insert so concurrent requests cannot fork the local chain.
         db.execute("BEGIN IMMEDIATE")
         latest = db.execute("SELECT event_hash FROM audit_events ORDER BY rowid DESC LIMIT 1").fetchone()
-        previous_hash = latest["event_hash"] if latest and latest["event_hash"] else "0" * 64
+        if latest and not latest["event_hash"]:
+            raise RuntimeError("Audit chain head has no hash; refusing to append.")
+        previous_hash = latest["event_hash"] if latest else "0" * 64
         digest = event_digest(event_id, created_at, actor, event_type, detail_json, previous_hash)
         db.execute(
             """INSERT INTO audit_events
@@ -431,10 +433,12 @@ def verify_audit_chain() -> dict[str, Any]:
 @app.get("/api/audit/verify")
 def audit_verify(actor: str = Depends(require_operator)) -> dict[str, Any]:
     result = verify_audit_chain()
-    audit(actor, "audit_chain_verified", {"valid": result["valid"], "events_checked": result["events_checked"]})
+    if not result["valid"]:
+        # Do not append to a chain that has failed verification.
+        return result
+    audit(actor, "audit_chain_verified", {"valid": True, "events_checked": result["events_checked"]})
     # Verify again including the verification event so the returned status reflects the persisted chain.
-    final_result = verify_audit_chain()
-    return final_result
+    return verify_audit_chain()
 
 
 @app.get("/api/audit")
