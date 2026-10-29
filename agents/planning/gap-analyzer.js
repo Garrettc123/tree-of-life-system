@@ -56,7 +56,7 @@ class GapAnalyzer {
           // Determine README presence from actual root contents instead of the
           // non-standard repo.has_readme field, which is absent from this API response.
           const hasReadme = Array.isArray(contents)
-            && contents.some((file) => /^README(?:\\..+)?$/i.test(file.name));
+            && contents.some((file) => /^README(?:\..+)?$/i.test(file.name));
           if (!hasReadme) {
             repoGaps.push({
               type: 'missing_readme',
