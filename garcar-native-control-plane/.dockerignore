@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.*
+.venv
+__pycache__
+.pytest_cache
+.coverage
+data
+backups
+*.sqlite
+*.sqlite3
+*.db
+test_app.py
