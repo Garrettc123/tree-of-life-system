@@ -175,6 +175,73 @@ describe('SupabaseRhnsStore', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  test('persists and reads RHNS runs with conditional state transitions', async () => {
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response([{ id: runId, status: 'created' }], 201))
+      .mockResolvedValueOnce(response([{ id: runId, status: 'planning' }]))
+      .mockResolvedValueOnce(response([{ id: runId, tenant_id: tenantId, status: 'planning', goal: { action: 'agent_inventory' } }]));
+    const store = makeStore(fetchImpl);
+    await expect(store.createRun({
+      id: runId,
+      tenantId,
+      runKey: runId,
+      actorId: 'test-operator',
+      executionMode: 'read_only_observation',
+      status: 'created',
+      goal: { action: 'agent_inventory' },
+      metadata: { source: 'test' },
+    })).resolves.toMatchObject({ id: runId, status: 'created' });
+
+    await expect(store.transitionRun(runId, tenantId, 'created', 'planning')).resolves.toMatchObject({ id: runId, status: 'planning' });
+    expect(await store.transitionRun(runId, tenantId, 'created', 'executing')).toBe(false);
+    await expect(store.getRun(runId, tenantId)).resolves.toMatchObject({ id: runId, tenant_id: tenantId });
+    expect(fetchImpl.mock.calls[1][0]).toContain('status=eq.created');
+    expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
+  });
+
+  test('validates run transition state machine and rejects credential-bearing task data', async () => {
+    const fetchImpl = jest.fn();
+    const store = makeStore(fetchImpl);
+    const runId = '33333333-3333-4333-8333-333333333333';
+    await expect(store.transitionRun(runId, tenantId, 'succeeded', 'executing')).rejects.toThrow(/Invalid RHNS run state transition/);
+    await expect(store.createRun({
+      id: runId,
+      tenantId,
+      runKey: runId,
+      actorId: 'test-operator',
+      executionMode: 'read_only_observation',
+      status: 'created',
+      goal: { headers: { authorization: 'Bearer fake' } },
+    })).rejects.toThrow(/Sensitive field/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test('persists tasks and guards state transitions using conditional updates', async () => {
+    const runId = '33333333-3333-4333-8333-333333333333';
+    const taskId = '44444444-4444-4444-8444-444444444444';
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response([{ id: taskId, status: 'proposed' }], 201))
+      .mockResolvedValueOnce(response([{ id: taskId, status: 'executing' }]))
+      .mockResolvedValueOnce(response([]));
+    const store = makeStore(fetchImpl);
+    await expect(store.createTask({
+      id: taskId,
+      tenantId,
+      runId,
+      taskKey: 'inventory-step',
+      agentId: 'execution-agent',
+      taskType: 'runtime_observation',
+      status: 'proposed',
+      input: { action: 'agent_inventory' },
+    })).resolves.toMatchObject({ id: taskId, status: 'proposed' });
+
+    await expect(store.transitionTask(taskId, tenantId, 'proposed', 'executing')).resolves.toMatchObject({ id: taskId, status: 'executing' });
+    expect(await store.transitionTask(taskId, tenantId, 'proposed', 'confirmed')).toBe(false);
+    expect(fetchImpl.mock.calls[1][0]).toContain('status=eq.proposed');
+    expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
+  });
+
   test('does not persist event or evidence payloads containing credential-like keys', async () => {
     const fetchImpl = jest.fn();
     const store = makeStore(fetchImpl);
