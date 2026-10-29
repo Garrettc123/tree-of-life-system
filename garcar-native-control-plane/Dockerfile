@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=garcar:garcar app.py ./app.py
 COPY --chown=garcar:garcar console ./console
-COPY --chown=garcar:garcar ops ./ops
+COPY --chown=garcar:garcar ops/backup_db.py ./ops/backup_db.py
 
 USER garcar
 EXPOSE 8080
