@@ -45,7 +45,7 @@ class AgentSystem {
       console.warn(`⚠️ ${warning}`);
     }
 
-    console.log('✅ Configuration loaded with ${this.configWarnings.length} warning(s)');
+    console.log(`✅ Configuration loaded with ${this.configWarnings.length} warning(s)`);
     console.log(`   Mode: ${this.config.mode}`);
     console.log(`   Owner: ${this.config.githubOwner}\n`);
 
@@ -74,6 +74,11 @@ class AgentSystem {
         name: 'Documentation Proposal Agent',
         capabilities: ['documentation-draft-proposal'],
       },
+      {
+        id: 'integration',
+        name: 'Integration Proposal Agent',
+        capabilities: ['integration-audit-proposal', 'integration-sync-plan'],
+      },
     ];
 
     for (const definition of proposalAgents) {
@@ -82,7 +87,7 @@ class AgentSystem {
       console.log(`✅ ${definition.name} ready (proposal-only; approval required)`);
     }
 
-    console.log('✨ Agent system initialized with one planner and three proposal-only agents.\n');
+    console.log('✨ Agent system initialized with one planner and four proposal-only agents.\n');
   }
 
   async start() {
