@@ -41,8 +41,8 @@ async def _comment_linear(amount: int, currency: str, email: str, trace: str):
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_comment_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_comment_failed error_type=%s", type(exc).__name__)
 
 
 async def _log_notion(amount: int, currency: str, email: str, trace: str):
@@ -66,5 +66,5 @@ async def _log_notion(amount: int, currency: str, email: str, trace: str):
                 },
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("notion_log_failed err=%s", e)
+    except Exception as exc:
+        log.warning("notion_log_failed error_type=%s", type(exc).__name__)
