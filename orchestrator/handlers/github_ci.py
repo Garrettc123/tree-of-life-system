@@ -9,6 +9,7 @@ LINEAR_API_KEY = os.getenv("LINEAR_API_KEY", "")
 LINEAR_TEAM_ID = os.getenv("LINEAR_TEAM_ID", "")
 GITHUB_TOKEN = os.getenv("GITHUB_PAT", "")
 ALERT_REPO = os.getenv("ALERT_GITHUB_REPO", "Garrettc123/garcar-rhns-core")
+EXTERNAL_ACTIONS_ENABLED = os.getenv("GARCAR_ENABLE_EXTERNAL_HANDLERS", "false").lower() in {"1", "true", "yes"}
 
 
 async def handle(event: dict, event_id: str):
@@ -22,9 +23,9 @@ async def handle(event: dict, event_id: str):
     log.info("github_ci repo=%s branch=%s status=%s trace=%s", repo, branch, status, trace)
 
     if status == "failure":
-        if GITHUB_TOKEN:
+        if EXTERNAL_ACTIONS_ENABLED and GITHUB_TOKEN:
             await _open_issue(repo, branch, run_url, sha, trace)
-        if LINEAR_API_KEY and LINEAR_TEAM_ID:
+        if EXTERNAL_ACTIONS_ENABLED and LINEAR_API_KEY and LINEAR_TEAM_ID:
             await _create_linear_incident(repo, branch, run_url, sha, trace)
 
 
