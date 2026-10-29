@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 def build_client(tmp_path, monkeypatch, token="ci-test-token"):
     monkeypatch.setenv("GARCAR_DB_PATH", str(tmp_path / "test.sqlite3"))
+    monkeypatch.delenv("GARCAR_ORCHESTRATOR_HEALTH_URL", raising=False)
     if token is None:
         monkeypatch.delenv("GARCAR_OPERATOR_TOKEN", raising=False)
     else:
@@ -138,7 +139,7 @@ def test_status_reports_database_and_local_mode(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["database"] == "available"
     assert response.json()["mode"] == "local_self_hosted"
-    assert response.json()["external_services_verified"] is False
+    assert response.json()["external_services_checked_by_this_endpoint"] is False
 
 
 
@@ -167,3 +168,13 @@ def test_audit_hash_chain_detects_record_tampering(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["valid"] is False
     assert response.json()["failed_event_id"]
+
+
+
+def test_service_inventory_does_not_probe_unapproved_external_url(tmp_path, monkeypatch):
+    monkeypatch.setenv("GARCAR_ORCHESTRATOR_HEALTH_URL", "https://example.com/health")
+    client, _ = build_client(tmp_path, monkeypatch)
+    response = client.get("/api/services", headers={"X-Operator-Token": "ci-test-token"})
+    assert response.status_code == 200
+    services = {item["name"]: item for item in response.json()["services"]}
+    assert services["orchestrator"]["status"] == "invalid_health_url_config"
