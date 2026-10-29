@@ -14,6 +14,7 @@ describe('RHNS policy and task contracts', () => {
     expect(policy.evaluateTask({ id: 'x' }, { effect: 'write' }).reason).toBe('external_effects_disabled');
     expect(policy.evaluateTask({ id: 'x' }, { depth: 5 }).reason).toBe('depth_budget_exceeded');
     expect(policy.evaluateTask({ id: 'x' }, { taskCount: 4 }).reason).toBe('assignment_task_budget_exceeded');
+    expect(policy.evaluateTask({ id: 'x' }, { toolCalls: 51 }).reason).toBe('tool_call_budget_exceeded');
     expect(policy.getStatus().externalWritesEnabled).toBe(false);
   });
 
