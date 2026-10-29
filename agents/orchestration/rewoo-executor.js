@@ -193,12 +193,12 @@ class ReWOOExecutor extends EventEmitter {
           tenantId: this.tenantId,
           entityType: 'rhns_run',
           entityId: executionId,
-          evidenceType: 'verified_read_only_run_result',
+          evidenceType: 'read_only_run_synthesis_result',
           source: 'rhns-rewoo-executor',
           content: evidenceContent,
         });
         await this._transitionRun(execution, 'succeeded', {
-          output: { result: execution.stages.synthesis.result, evidenceType: 'verified_read_only_run_result' },
+          output: { result: execution.stages.synthesis.result, evidenceType: 'read_only_run_synthesis_result' },
         });
       }
 
@@ -324,6 +324,7 @@ class ReWOOExecutor extends EventEmitter {
   async stageExecution(plan, context, executionId) {
     const startTime = Date.now();
     const outputs = [];
+    const execution = this.executions.get(executionId);
 
     try {
       for (const step of plan.steps) {
