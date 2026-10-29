@@ -9,7 +9,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir --upgrade pip \
     && addgroup --system --gid 10001 garcar \
     && adduser --system --uid 10001 --ingroup garcar garcar \
-    && mkdir -p /data \
+    && mkdir -p /data /app/backups \
     && chown -R garcar:garcar /app /data
 
 COPY requirements.txt ./requirements.txt
@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=garcar:garcar app.py ./app.py
 COPY --chown=garcar:garcar console ./console
+COPY --chown=garcar:garcar ops ./ops
 
 USER garcar
 EXPOSE 8080
