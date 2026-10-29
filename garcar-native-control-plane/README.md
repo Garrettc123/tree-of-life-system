@@ -14,9 +14,10 @@ A local-first, self-hosted foundation intended to reduce reliance on blocked hos
 - Fail-closed execution: even an approved mutating plan **cannot** execute in this version.
 - Values under common secret-like parameter keys are redacted before plan persistence and audit logging. Do not submit credentials or private customer data in parameters.
 - Control-plane SQLite audit entries include a SHA-256 hash chain, with `GET /api/audit/verify` to detect unexpected edits to the stored chain.
-- The event orchestrator requires an HMAC signature on `POST /dispatch`; if `DISPATCH_SECRET` is unset, the endpoint returns HTTP 503 rather than accepting requests.
+- The event orchestrator requires an HMAC signature on `POST /dispatch`; a missing or shorter-than-32-byte `DISPATCH_SECRET` returns HTTP 503 rather than accepting requests.
 - `GET /events` requires operator authentication.
 - Event payloads are redacted for common secret-like keys before persistence. If Supabase is unset or temporarily fails, events fall back to local SQLite; local event data lives in its own Docker volume.
+- Existing GitHub/Linear/Notion handlers that can create external records are disabled by default with `GARCAR_ENABLE_EXTERNAL_HANDLERS=false` in Compose. Customer email is not written to payment-event logs, and handler failures log only the exception type. Do not enable external handlers until action-by-action approval and audit controls exist.
 - Local backup utilities for both SQLite databases, including SQLite integrity checks.
 - Docker containers run as non-root users. Only the control-plane port is published, bound to `127.0.0.1`; the orchestrator is private to the Compose network.
 
@@ -108,7 +109,7 @@ All control-plane protected endpoints require `X-Operator-Token`.
 
 The dispatch signature format is `sha256=<hex-digest>`. The signing secret must stay in local configuration and be shared only with an authorized event sender. Requests over 1 MB are rejected. CORS has no allowed origins by default.
 
-The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records remain visible alongside remote results, but are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete. The current Compose file deliberately does not pass GitHub, Linear, or Notion API keys into the orchestrator. Do not add them until explicit per-action approval gates are implemented, because existing event handlers can create external issue/comment records when those credentials are present.
+The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records remain visible alongside remote results, but are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete. The current Compose file deliberately does not pass GitHub, Linear, or Notion API keys into the orchestrator, and sets `GARCAR_ENABLE_EXTERNAL_HANDLERS=false`. Do not add those keys or set that flag to true until explicit per-action approval gates are implemented, because existing event handlers can create external issue/comment/page records when enabled.
 
 ## Backup and verification
 
