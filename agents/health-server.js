@@ -8,7 +8,14 @@ function createHealthServer(getSnapshot) {
       return;
     }
 
-    const pathname = new URL(request.url || '/', 'http://localhost').pathname;
+    let pathname;
+    try {
+      pathname = new URL(request.url || '/', 'http://localhost').pathname;
+    } catch {
+      response.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+      response.end(JSON.stringify({ error: 'invalid_request_target' }));
+      return;
+    }
     const snapshot = getSnapshot();
 
     if (pathname === '/status') {
