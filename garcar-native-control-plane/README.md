@@ -86,7 +86,7 @@ The script creates a Python virtual environment and a local `.env` file with ran
 Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console). To retrieve the operator token locally for pasting into the console, use:
 
 ```bash
-grep '^GARCAR_OPERATOR_TOKEN=' .env
+sed -n 's/^GARCAR_OPERATOR_TOKEN=//p' .env
 ```
 
 Keep `.env` private. It is excluded from Git. Never put tokens in source code, public issues, chat, or screenshots.
