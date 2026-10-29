@@ -6,7 +6,7 @@ import json
 from fastapi.testclient import TestClient
 
 
-def load_app(tmp_path, monkeypatch, dispatch_secret="test-dispatch-secret", operator_token="operator-test-token"):
+def load_app(tmp_path, monkeypatch, dispatch_secret="test-dispatch-secret-that-is-long-enough-32chars", operator_token="operator-test-token-that-is-long-enough-32chars"):
     monkeypatch.setenv("GARCAR_EVENT_DB_PATH", str(tmp_path / "events.sqlite3"))
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
@@ -82,7 +82,7 @@ def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_p
         content=body,
         headers={
             "Content-Type": "application/json",
-            "X-Dispatch-Sig": sign(body, "test-dispatch-secret"),
+            "X-Dispatch-Sig": sign(body, "test-dispatch-secret-that-is-long-enough-32chars"),
         },
     )
     assert response.status_code == 200
@@ -96,7 +96,7 @@ def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_p
         content=body,
         headers={
             "Content-Type": "application/json",
-            "X-Dispatch-Sig": sign(body, "test-dispatch-secret"),
+            "X-Dispatch-Sig": sign(body, "test-dispatch-secret-that-is-long-enough-32chars"),
         },
     )
     assert replay.status_code == 409
@@ -111,7 +111,7 @@ def test_signed_json_array_is_rejected_as_not_an_event_object(tmp_path, monkeypa
         content=body,
         headers={
             "Content-Type": "application/json",
-            "X-Dispatch-Sig": sign(body, "test-dispatch-secret"),
+            "X-Dispatch-Sig": sign(body, "test-dispatch-secret-that-is-long-enough-32chars"),
         },
     )
     assert response.status_code == 400
@@ -144,3 +144,16 @@ def test_local_event_log_persists_and_updates_status(tmp_path, monkeypatch):
     assert len(events) == 1
     assert events[0]["id"] == event_id
     assert events[0]["status"] == "processed"
+
+
+
+def test_dispatch_rejects_weak_configured_secret(tmp_path, monkeypatch):
+    client, _ = load_app(tmp_path, monkeypatch, dispatch_secret="weak-secret")
+    response = client.post("/dispatch", json={"event_type": "rhns.brief"})
+    assert response.status_code == 503
+
+
+def test_event_history_rejects_weak_configured_operator_token(tmp_path, monkeypatch):
+    client, _ = load_app(tmp_path, monkeypatch, operator_token="short-token")
+    response = client.get("/events", headers={"X-Operator-Token": "short-token"})
+    assert response.status_code == 503
