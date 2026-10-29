@@ -177,6 +177,7 @@ The current PR branch adds a first proposal-only layer:
 - `agents/core/approval-gate.js`: exact-action approval contract requiring an atomic store adapter.
 - `agents/core/supabase-rhns-store.js`: server-only Supabase REST adapter for durable approvals, idempotent proposal persistence, run/task lifecycle records, and the existing CRF event/evidence ledger. Approval and lifecycle transitions use single conditional database updates.
 - `migrations/007_rhns_durable_store.sql`: tenant-scoped exact-action approval and proposal tables with RLS enabled and privileges restricted to `service_role`; applied to `garcar-crf` on 2026-10-29 and read-back verified.
+- `migrations/008_rhns_run_task_ledger.sql`: tenant-scoped run/task state tables with constrained lifecycle states, tenant-consistent foreign key, RLS enabled, and privileges restricted to `service_role`; applied to `garcar-crf` on 2026-10-29 and read-back verified.
 - `migrations/008_rhns_run_task_ledger.sql`: tenant-scoped run/task lifecycle tables with constrained states and row-level access restricted to `service_role`; applied to `garcar-crf` on 2026-10-29 and read-back verified.
 - `agents/orchestration/rewoo-executor.js`: optional durable run/task transitions, task outcome reconciliation, synthesis evidence writes, and timeout cleanup. Persistence must succeed before the run continues.
 - `agents/planning/proposal-agent.js`: proposal generation without external side effects.
@@ -184,7 +185,7 @@ The current PR branch adds a first proposal-only layer:
 - `agents/core/mcp-coordinator.js`: conservative retry defaults and timeout cleanup.
 - Regression tests for task contracts, routing, policy, and approval behavior.
 
-These modules do not yet constitute a complete durable production runtime. The approval gate still needs a production transactional store and an execution gateway; persistent run/event/evidence tables, provider adapters, end-to-end tests, and deployment verification remain separate work.
+The durable store and run/task ledgers are implemented and applied to the connected `garcar-crf` Supabase project. `agents/orchestration/rewoo-executor.js` writes run/task state and synthesis evidence when durable mode is enabled, and `agents/startup.js` injects that store into ReWOO. This is not a verified production rollout: `RHNS_DURABLE_STORE_ENABLED` remains false by default, no runtime secrets or tenant configuration were changed, and no external write adapter is attached. A complete run and its tasks are not created in one database transaction; each state transition is instead a conditional database update. Provider sandbox tests, a full successful test run, operator-identity integration, and deployment verification remain outstanding.
 
 ## 13. Implementation sequence
 
