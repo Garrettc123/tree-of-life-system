@@ -42,14 +42,27 @@ Set a different port with `PORT`, for example `PORT=8090 bash ops/run_local.sh`.
 
 ## Option B: run the full local Compose stack
 
-Docker is required. Generate the local secrets without printing their values:
+Docker is required. Generate local secrets without printing their values, then validate the Compose configuration without starting containers:
 
 ```bash
-bash ops/init_local_env.sh
-docker compose up --build -d
+bash ops/manage_stack.sh init
+bash ops/manage_stack.sh validate
 ```
 
-The script creates or repairs the two required local secrets in `.env`, restricts the file to owner-only permissions, and does not display the secret values. Do not send or commit `.env`.
+The initialization script creates or repairs the two required local secrets in `.env`, restricts the file to owner-only permissions, and does not display the secret values. Do not send or commit `.env`.
+
+Start the complete local stack only when you are ready. The manager requires you to type an exact confirmation phrase for start, stop, and restart actions:
+
+```bash
+bash ops/manage_stack.sh start
+bash ops/manage_stack.sh status
+bash ops/manage_stack.sh logs control-plane
+bash ops/manage_stack.sh logs orchestrator
+bash ops/verify_local.sh
+REQUIRE_ORCHESTRATOR=1 bash ops/verify_local.sh
+```
+
+These commands operate on your own Docker host; they do not deploy to Render, Railway, or the public internet. Use `bash ops/manage_stack.sh stop` to stop the stack without deleting persisted data, or `bash ops/manage_stack.sh backup` to make timestamped SQLite-verified local backups.
 
 The app is published only at `127.0.0.1:8080`. The orchestrator has no host-published port. SQLite data is persisted in the named volumes `garcar_data` and `garcar_event_data`. Optional Supabase settings may be added to the ignored local `.env` file as `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`; leave them unset to use the local event store.
 
