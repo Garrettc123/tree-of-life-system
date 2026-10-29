@@ -33,6 +33,8 @@ class ReWOOExecutor extends EventEmitter {
 
     this.executions = new Map();
     this.agents = new Map();
+    this.durableStore = config.durableStore || null;
+    this.tenantId = config.tenantId || null;
 
     // Periodically clean up old executions to prevent memory leak
     this.cleanupInterval = setInterval(() => this.cleanupOldExecutions(), 300000); // Every 5 minutes
@@ -97,17 +99,56 @@ class ReWOOExecutor extends EventEmitter {
       stages: {},
       timestamp: new Date().toISOString(),
       status: 'initiated',
+      durableRunStatus: null,
+      durableTaskIds: new Map(),
     };
 
     this.executions.set(executionId, execution);
 
     try {
+      if (this.durableStore) {
+        if (!this.tenantId) throw new Error('Durable RHNS execution requires a tenant ID');
+        await this.durableStore.createRun({
+          id: executionId,
+          tenantId: this.tenantId,
+          runKey: String(context.runKey || executionId),
+          actorId: String(context.actorId || 'rhns-runtime'),
+          executionMode: 'read_only_observation',
+          status: 'created',
+          goal: task,
+          metadata: { source: 'rewoo-executor', version: 1 },
+        });
+        execution.durableRunStatus = 'created';
+        await this._transitionRun(execution, 'planning');
+      }
+
       // STAGE 1: PLANNING
       console.log(`[ReWOOExecutor] Stage 1 - Planning (${executionId})`);
       execution.stages.planning = await this.stagePlanning(task, context, executionId);
       
       if (!execution.stages.planning.success) {
         throw new Error(`Planning failed: ${execution.stages.planning.error}`);
+      }
+
+      if (this.durableStore) {
+        await this._transitionRun(execution, 'executing', {
+          output: { planSteps: execution.stages.planning.stepsCount },
+        });
+        for (const step of execution.stages.planning.plan.steps) {
+          const stepKey = String(step && step.id || '');
+          if (!stepKey) throw new Error('Durable RHNS task requires every plan step to have an id');
+          const taskRow = await this.durableStore.createTask({
+            id: randomUUID(),
+            tenantId: this.tenantId,
+            runId: executionId,
+            taskKey: stepKey,
+            agentId: String(step.agentId || 'unknown-agent'),
+            taskType: String(step.type || 'unknown'),
+            status: 'proposed',
+            input: step,
+          });
+          execution.durableTaskIds.set(stepKey, taskRow.id);
+        }
       }
 
       // STAGE 2: EXECUTION
@@ -120,6 +161,10 @@ class ReWOOExecutor extends EventEmitter {
 
       if (!execution.stages.execution.success) {
         throw new Error(`Execution failed: ${execution.stages.execution.error}`);
+      }
+
+      if (this.durableStore) {
+        await this._transitionRun(execution, 'verifying');
       }
 
       // STAGE 3: SYNTHESIS
@@ -135,6 +180,28 @@ class ReWOOExecutor extends EventEmitter {
         throw new Error(`Synthesis failed: ${execution.stages.synthesis.error || 'no valid synthesis result'}`);
       }
 
+      if (this.durableStore) {
+        const evidenceContent = {
+          runId: executionId,
+          executionMode: 'read_only_observation',
+          task: execution.task,
+          result: execution.stages.synthesis.result,
+          stepCount: execution.stages.execution.stepsExecuted,
+          verifier: 'rewoo-synthesis-stage',
+        };
+        await this.durableStore.appendEvidence({
+          tenantId: this.tenantId,
+          entityType: 'rhns_run',
+          entityId: executionId,
+          evidenceType: 'verified_read_only_run_result',
+          source: 'rhns-rewoo-executor',
+          content: evidenceContent,
+        });
+        await this._transitionRun(execution, 'succeeded', {
+          output: { result: execution.stages.synthesis.result, evidenceType: 'verified_read_only_run_result' },
+        });
+      }
+
       execution.status = 'completed';
       this.emit('execution:completed', execution);
 
@@ -147,6 +214,20 @@ class ReWOOExecutor extends EventEmitter {
     } catch (error) {
       execution.status = 'failed';
       execution.error = error.message;
+      if (this.durableStore && execution.durableRunStatus
+          && !['succeeded', 'rejected', 'failed', 'cancelled', 'unknown_outcome'].includes(execution.durableRunStatus)) {
+        const nextStatus = /timeout/i.test(error.message) && execution.durableRunStatus === 'executing'
+          ? 'unknown_outcome'
+          : 'failed';
+        try {
+          await this._transitionRun(execution, nextStatus, {
+            error: { message: error.message, stage: execution.durableRunStatus },
+          });
+        } catch (persistenceError) {
+          execution.persistenceError = 'Could not persist terminal run status: '
+            + (persistenceError instanceof Error ? persistenceError.message : 'unknown storage error');
+        }
+      }
       this.emit('execution:failed', execution);
 
       console.error(`[ReWOOExecutor] Execution failed (${executionId}):`, error.message);
@@ -157,6 +238,41 @@ class ReWOOExecutor extends EventEmitter {
         stages: execution.stages,
       };
     }
+  }
+
+  async _transitionRun(execution, nextStatus, patch = {}) {
+    const expectedStatus = execution.durableRunStatus;
+    const result = await this.durableStore.transitionRun(
+      execution.id,
+      this.tenantId,
+      expectedStatus,
+      nextStatus,
+      patch,
+    );
+    if (!result) {
+      throw new Error('durable_run_transition_conflict:' + expectedStatus + '->' + nextStatus);
+    }
+    execution.durableRunStatus = nextStatus;
+    return result;
+  }
+
+  async _transitionTask(taskId, expectedStatus, nextStatus, patch = {}) {
+    const result = await this.durableStore.transitionTask(
+      taskId,
+      this.tenantId,
+      expectedStatus,
+      nextStatus,
+      patch,
+    );
+    if (!result) {
+      throw new Error('durable_task_transition_conflict:' + expectedStatus + '->' + nextStatus);
+    }
+    return result;
+  }
+
+  async getDurableRun(executionId) {
+    if (!this.durableStore) throw new Error('Durable RHNS storage is disabled');
+    return this.durableStore.getRun(executionId, this.tenantId);
   }
 
   async stagePlanning(task, context, executionId) {
@@ -170,10 +286,10 @@ class ReWOOExecutor extends EventEmitter {
       }
 
       // Create execution plan WITHOUT making tool calls
-      const plan = await Promise.race([
+      const plan = await this.withTimeout(
         planningAgent.createPlan(task, context),
-        this.timeout(this.config.planningTimeout),
-      ]);
+        this.config.planningTimeout,
+      );
 
       if (!plan || plan.success === false || plan.ok === false
         || (typeof plan.error === 'string' && plan.success !== true && plan.ok !== true)
@@ -218,6 +334,10 @@ class ReWOOExecutor extends EventEmitter {
         if (!agent) {
           const error = `Agent not found for step ${step.id}: ${step.agentId}`;
           console.error(`[ReWOOExecutor] ${error}`);
+          const durableTaskId = execution.durableTaskIds.get(String(step.id));
+          if (this.durableStore && durableTaskId) {
+            await this._transitionTask(durableTaskId, 'proposed', 'failed', { error: { message: error } });
+          }
           outputs.push({
             stepId: step.id,
             error,
@@ -227,11 +347,18 @@ class ReWOOExecutor extends EventEmitter {
           continue;
         }
 
+        let durableTaskStatus = 'proposed';
+        const durableTaskId = execution.durableTaskIds.get(String(step.id));
         try {
-          const output = await Promise.race([
+          if (this.durableStore && durableTaskId) {
+            await this._transitionTask(durableTaskId, 'proposed', 'executing');
+            durableTaskStatus = 'executing';
+          }
+
+          const output = await this.withTimeout(
             agent.executeStep(step, context),
-            this.timeout(this.config.executionTimeout),
-          ]);
+            this.config.executionTimeout,
+          );
 
           if (output === false || (output && typeof output === 'object'
             && (output.success === false || output.ok === false
@@ -240,6 +367,11 @@ class ReWOOExecutor extends EventEmitter {
               ? String(output.error)
               : 'Agent reported an unsuccessful step result';
             throw new Error(detail);
+          }
+
+          if (this.durableStore && durableTaskId) {
+            await this._transitionTask(durableTaskId, 'executing', 'confirmed', { output });
+            durableTaskStatus = 'confirmed';
           }
 
           outputs.push({
@@ -255,6 +387,20 @@ class ReWOOExecutor extends EventEmitter {
           });
         } catch (stepError) {
           console.error(`[ReWOOExecutor] Step ${step.id} failed:`, stepError.message);
+          if (this.durableStore && durableTaskId
+              && ['proposed', 'approved', 'executing'].includes(durableTaskStatus)) {
+            const nextTaskStatus = /timeout/i.test(stepError.message) && durableTaskStatus === 'executing'
+              ? 'unknown_outcome'
+              : 'failed';
+            try {
+              await this._transitionTask(durableTaskId, durableTaskStatus, nextTaskStatus, {
+                error: { message: stepError.message },
+              });
+              durableTaskStatus = nextTaskStatus;
+            } catch (persistenceError) {
+              console.error('[ReWOOExecutor] Could not persist task failure:', persistenceError.message);
+            }
+          }
 
           outputs.push({
             stepId: step.id,
@@ -309,10 +455,10 @@ class ReWOOExecutor extends EventEmitter {
       }
 
       // Synthesize outputs and generate critique
-      const synthesis = await Promise.race([
+      const synthesis = await this.withTimeout(
         reflexionAgent.synthesize(outputs, plan, context),
-        this.timeout(this.config.synthesisTimeout),
-      ]);
+        this.config.synthesisTimeout,
+      );
 
       const result = synthesis && synthesis.result;
       if (!synthesis || typeof synthesis !== 'object' || result === undefined || result === null || result === false
@@ -363,6 +509,18 @@ class ReWOOExecutor extends EventEmitter {
       errors: outputs.filter(o => o.error),
       summary: `${outputs.filter(o => !o.error).length} steps completed, ${outputs.filter(o => o.error).length} failed`,
     };
+  }
+
+  async withTimeout(operation, ms) {
+    let handle;
+    try {
+      const timeout = new Promise((_, reject) => {
+        handle = setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms);
+      });
+      return await Promise.race([Promise.resolve(operation), timeout]);
+    } finally {
+      if (handle) clearTimeout(handle);
+    }
   }
 
   timeout(ms) {
