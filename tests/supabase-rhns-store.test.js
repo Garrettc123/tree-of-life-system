@@ -129,6 +129,52 @@ describe('SupabaseRhnsStore', () => {
     expect(JSON.parse(init.body)[0].tenant_id).toBe(tenantId);
   });
 
+  test('lists and retrieves durable proposals within the requested tenant', async () => {
+    const proposal = {
+      proposalId: 'proposal:development:task-1',
+      taskId: 'task-1',
+      agentId: 'development',
+      taskType: 'create_file',
+      state: 'draft_pending_review',
+      executionMode: 'proposal_only',
+      sideEffectsPerformed: false,
+    };
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response([{
+        proposal_id: proposal.proposalId,
+        proposal_hash: 'a'.repeat(64),
+        proposal,
+        created_at: '2026-01-01T00:00:00.000Z',
+      }]))
+      .mockResolvedValueOnce(response([{
+        proposal_id: proposal.proposalId,
+        proposal_hash: 'a'.repeat(64),
+        proposal,
+        created_at: '2026-01-01T00:00:00.000Z',
+      }]));
+    const store = makeStore(fetchImpl);
+
+    const listed = await store.listProposals(tenantId, { state: 'draft_pending_review', limit: 10, offset: 0 });
+    expect(listed).toHaveLength(1);
+    expect(listed[0].proposalId).toBe(proposal.proposalId);
+    expect(listed[0].durableRecord.proposalHash).toBe('a'.repeat(64));
+    expect(fetchImpl.mock.calls[0][0]).toContain('tenant_id=eq.' + tenantId);
+    expect(fetchImpl.mock.calls[0][0]).toContain('state=eq.draft_pending_review');
+
+    const fetched = await store.getProposal(tenantId, proposal.proposalId);
+    expect(fetched.taskId).toBe('task-1');
+    expect(fetchImpl.mock.calls[1][0]).toContain('proposal_id=eq.proposal%3Adevelopment%3Atask-1');
+  });
+
+  test('rejects invalid durable proposal filters before network calls', async () => {
+    const fetchImpl = jest.fn();
+    const store = makeStore(fetchImpl);
+    await expect(store.listProposals('tenant-not-a-uuid')).rejects.toThrow(/tenantId must be a UUID/);
+    await expect(store.listProposals(tenantId, { limit: 501 })).rejects.toThrow(/limit must be an integer/);
+    await expect(store.listProposals(tenantId, { state: 'executed' })).rejects.toThrow(/Unsupported proposal state/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   test('does not persist event or evidence payloads containing credential-like keys', async () => {
     const fetchImpl = jest.fn();
     const store = makeStore(fetchImpl);
