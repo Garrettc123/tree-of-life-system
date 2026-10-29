@@ -9,6 +9,7 @@ usage() {
 Garcar local stack manager (Docker Compose only)
 
 Usage:
+  bash ops/manage_stack.sh init
   bash ops/manage_stack.sh validate
   bash ops/manage_stack.sh status
   bash ops/manage_stack.sh start
@@ -49,10 +50,14 @@ confirm_action() {
 
 cmd="${1:-}"
 case "$cmd" in
+  init)
+    bash ops/init_local_env.sh
+    ;;
   validate)
     need_compose
     if [[ ! -f .env ]]; then
-      bash ops/init_local_env.sh
+      echo "No local .env file. Run 'bash ops/manage_stack.sh init' first." >&2
+      exit 1
     fi
     docker compose config -q
     echo "PASS: Compose configuration is valid. No containers were started."
