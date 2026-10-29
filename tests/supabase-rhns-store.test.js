@@ -259,6 +259,38 @@ describe('SupabaseRhnsStore', () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({ status: 'unknown_outcome' });
   });
 
+  test('recovers stale runs by calling the atomic tenant-scoped database function', async () => {
+    const staleRunId = '33333333-3333-4333-8333-333333333333';
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response([{
+        id: staleRunId,
+        status: 'executing',
+        updated_at: '2026-01-01T00:00:00.000Z',
+      }]))
+      .mockResolvedValueOnce(response(true));
+    const store = makeStore(fetchImpl);
+    const result = await store.recoverStaleRuns(tenantId, { olderThanMs: 60000, limit: 20 });
+    expect(result).toMatchObject({ scanned: 1, recovered: 1 });
+    expect(result.runs[0]).toMatchObject({ runId: staleRunId, previousStatus: 'executing', recovered: true, status: 'unknown_outcome' });
+    expect(fetchImpl.mock.calls[0][0]).toContain('tenant_id=eq.' + tenantId);
+    expect(fetchImpl.mock.calls[0][0]).toContain('status=in.%28created%2Cplanning%2Cexecuting%2Cverifying%29');
+    expect(fetchImpl.mock.calls[1][0]).toContain('/rest/v1/rpc/rhns_recover_stale_run');
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toMatchObject({
+      p_tenant_id: tenantId,
+      p_run_id: staleRunId,
+      p_expected_status: 'executing',
+      p_next_status: 'unknown_outcome',
+    });
+  });
+
+  test('rejects aggressive stale-run recovery settings before network calls', async () => {
+    const fetchImpl = jest.fn();
+    const store = makeStore(fetchImpl);
+    await expect(store.recoverStaleRuns(tenantId, { olderThanMs: 1000 })).rejects.toThrow(/at least 60000/);
+    await expect(store.recoverStaleRuns(tenantId, { limit: 501 })).rejects.toThrow(/from 1 to 500/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   test('does not persist event or evidence payloads containing credential-like keys', async () => {
     const fetchImpl = jest.fn();
     const store = makeStore(fetchImpl);
