@@ -44,8 +44,11 @@ jobs:
       - name: Install pinned development dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
+      - name: Install MCP runtime dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-mcp.txt
+
       - name: Compile Python sources
-        run: python -m compileall -q app.py ops/backup_db.py
+        run: python -m compileall -q app.py mcp_server.py ops/backup_db.py
 
       - name: Validate local shell scripts
         run: |
@@ -53,7 +56,7 @@ jobs:
             bash -n "$script"
           done
 
-      - name: Run control-plane tests
+      - name: Run control-plane and MCP tests
         run: python -m pytest -q --junitxml=test-results.xml
 
       - name: Validate backup utility CLI
