@@ -12,9 +12,9 @@ describe('proposal-only workforce agents', () => {
     const agents = definitions.map((definition) => new ProposalAgent(definition, mcp));
 
     const assignments = [
-      { agent: 'development', task: { id: 'dev-1', type: 'create_file', title: 'Create a README', params: { repo: 'sample-repo', file: 'README.md' } } },
-      { agent: 'project-management', task: { id: 'pm-1', type: 'create_issues', title: 'Outline project issues', params: { project: 'sample-project' } } },
-      { agent: 'documentation', task: { id: 'doc-1', type: 'enhance_description', title: 'Improve project description', params: { project: 'sample-project' } } },
+      { agent: 'development', task: { id: 'dev-1', agent: 'development', type: 'create_file', title: 'Create a README', params: { repo: 'sample-repo', file: 'README.md' } } },
+      { agent: 'project-management', task: { id: 'pm-1', agent: 'project-management', type: 'create_issues', title: 'Outline project issues', params: { project: 'sample-project' } } },
+      { agent: 'documentation', task: { id: 'doc-1', agent: 'documentation', type: 'enhance_description', title: 'Improve project description', params: { project: 'sample-project' } } },
     ];
 
     for (const assignment of assignments) {
@@ -40,7 +40,7 @@ describe('proposal-only workforce agents', () => {
     new ProposalAgent({ id: 'development' }, mcp);
     const result = await mcp.sendMessage('planning', 'development', {
       type: 'task-assignment',
-      tasks: [{ id: 'bad-1', type: 'deploy_production', title: 'Deploy' }],
+      tasks: [{ id: 'bad-1', agent: 'development', type: 'deploy_production', title: 'Deploy' }],
     });
     expect(result.success).toBe(false);
     expect(result.accepted).toBe(false);
