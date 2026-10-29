@@ -141,7 +141,7 @@ function createSafeRuntimeHandlers({ getStatusSnapshot, now = () => new Date() }
       }
 
       const observations = outputs.map((item) => item.output);
-      if (observations.some((item) => item?.success !== true && item?.action !== 'agent_inventory')) {
+      if (observations.some((item) => item?.success !== true)) {
         return {
           success: false,
           error: 'runtime_observation_unverified',
