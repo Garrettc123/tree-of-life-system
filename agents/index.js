@@ -7,6 +7,7 @@ require('dotenv').config();
 const MCPCoordinator = require('./core/mcp-coordinator');
 const EventBus = require('./core/event-bus');
 const PlanningAgent = require('./planning');
+const ProposalAgent = require('./planning/proposal-agent');
 
 class AgentSystem {
   constructor() {
@@ -15,7 +16,7 @@ class AgentSystem {
       githubOwner: process.env.GITHUB_OWNER || 'Garrettc123',
       linearApiKey: process.env.LINEAR_API_KEY,
       linearTeamId: process.env.LINEAR_TEAM_ID,
-      notionToken: process.env.NOTION_TOKEN,
+      notionToken: process.env.NOTION_TOKEN || process.env.NOTION_API_KEY,
       mode: process.env.AGENT_MODE || 'development',
       autoExecute: process.env.AGENT_AUTO_EXECUTE === 'true'
     };
@@ -51,12 +52,33 @@ class AgentSystem {
     this.agents.set('planning', planningAgent);
     console.log('✅ Planning Agent ready\n');
 
-    // TODO: Initialize other agents
-    // const devAgent = new DevelopmentAgent(...);
-    // const pmAgent = new ProjectManagementAgent(...);
-    // const docAgent = new DocumentationAgent(...);
+    // These handlers intentionally prepare proposals only. They do not write
+    // files, create issues, change descriptions, send messages, or deploy.
+    const proposalAgents = [
+      {
+        id: 'development',
+        name: 'Development Proposal Agent',
+        capabilities: ['file-change-proposal', 'cicd-proposal'],
+      },
+      {
+        id: 'project-management',
+        name: 'Project Management Proposal Agent',
+        capabilities: ['issue-outline-proposal'],
+      },
+      {
+        id: 'documentation',
+        name: 'Documentation Proposal Agent',
+        capabilities: ['documentation-draft-proposal'],
+      },
+    ];
 
-    console.log('✨ Agent system initialized\n');
+    for (const definition of proposalAgents) {
+      const agent = new ProposalAgent(definition, this.mcp);
+      this.agents.set(definition.id, agent);
+      console.log(`✅ ${definition.name} ready (proposal-only; approval required)`);
+    }
+
+    console.log('✨ Agent system initialized with one planner and three proposal-only agents.\n');
   }
 
   async start() {
