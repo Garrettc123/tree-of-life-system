@@ -247,3 +247,27 @@ def test_failed_event_write_releases_the_signed_request_replay_claim(tmp_path, m
     assert response.status_code == 500
     assert module.event_log.claim_dispatch_request(body_hash) is True
     module.event_log.release_dispatch_request(body_hash)
+
+
+
+def test_shared_atlas_signer_returns_hmac_for_the_exact_serialized_body():
+    from dispatch_signing import sign_json_payload
+
+    payload = {
+        "event_type": "stripe.payment_intent_succeeded",
+        "trace_id": "trace-123",
+        "payload": {"label": "café"},
+    }
+    secret = "strong-dispatch-secret-for-test-123456"
+    body, signature = sign_json_payload(payload, secret)
+
+    assert json.loads(body.decode("utf-8")) == payload
+    expected = "sha256=" + hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    assert signature == expected
+
+
+def test_shared_atlas_signer_rejects_weak_secret():
+    from dispatch_signing import sign_json_payload
+
+    with pytest.raises(ValueError, match="at least 32 bytes"):
+        sign_json_payload({"event_type": "rhns.brief"}, "short-secret")
