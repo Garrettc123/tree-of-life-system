@@ -18,7 +18,7 @@ function assertSafePayload(value, path = 'payload') {
   }
   if (!value || typeof value !== 'object') return;
   for (const [key, item] of Object.entries(value)) {
-    if (/(secret|password|authorization|api[_-]?key|(^|[_-])token($|[_-])|private[_-]?key|credential|cookie|session[_-]?id|signing[_-]?key)/i.test(key)) {
+    if (/(secret|password|authorization|api[_-]?key|token|private[_-]?key|credential|cookie|session[_-]?id|signing[_-]?key)/i.test(key)) {
       throw new Error('Sensitive field is not permitted in durable RHNS payload: ' + path + '.' + key);
     }
     assertSafePayload(item, path + '.' + key);
@@ -43,6 +43,8 @@ function mapApproval(row) {
 }
 
 class SupabaseRhnsStore {
+  #serviceRoleKey;
+
   constructor({ url, serviceRoleKey, fetchImpl = global.fetch } = {}) {
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
       throw new TypeError('Supabase URL is required');
@@ -55,7 +57,7 @@ class SupabaseRhnsStore {
     }
     const parsed = new URL(url);
     this.url = parsed.origin;
-    this.serviceRoleKey = serviceRoleKey;
+    this.#serviceRoleKey = serviceRoleKey;
     this.fetchImpl = fetchImpl;
   }
 
@@ -63,8 +65,8 @@ class SupabaseRhnsStore {
     const endpoint = new URL(path, this.url + '/rest/v1/');
     for (const [key, value] of Object.entries(query)) endpoint.searchParams.set(key, String(value));
     const headers = {
-      apikey: this.serviceRoleKey,
-      Authorization: 'Bearer ' + this.serviceRoleKey,
+      apikey: this.#serviceRoleKey,
+      Authorization: 'Bearer ' + this.#serviceRoleKey,
       Accept: 'application/json',
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
