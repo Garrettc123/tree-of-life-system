@@ -228,3 +228,79 @@ def test_audit_append_refuses_to_extend_a_corrupted_earlier_record(tmp_path, mon
 
     with pytest.raises(RuntimeError, match="Audit chain fails verification"):
         app_module.audit("operator", "must_not_append", {})
+
+
+
+def test_legacy_audit_schema_migrates_atomically_and_verifies(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    with app_module.connect_db() as db:
+        db.execute(
+            """CREATE TABLE audit_events (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                detail_json TEXT NOT NULL
+            )"""
+        )
+        db.execute(
+            "INSERT INTO audit_events (id, created_at, actor, event_type, detail_json) VALUES (?, ?, ?, ?, ?)",
+            ("legacy-1", "2026-01-01T00:00:00+00:00", "operator", "legacy_event", "{}"),
+        )
+
+    app_module.init_db()
+    with app_module.connect_db() as db:
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(audit_events)").fetchall()}
+        row = db.execute("SELECT previous_hash, event_hash FROM audit_events WHERE id = ?", ("legacy-1",)).fetchone()
+    assert {"previous_hash", "event_hash"} <= columns
+    assert row["previous_hash"] == "0" * 64
+    assert row["event_hash"]
+    assert app_module.verify_audit_chain()["valid"] is True
+
+
+def test_plan_state_rolls_back_when_its_audit_append_fails(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        app_module,
+        "append_audit",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("synthetic audit failure")),
+    )
+    client = TestClient(app_module.app, raise_server_exceptions=False)
+    response = client.post(
+        "/api/work/plan",
+        json={"action": "deploy_production", "parameters": {"environment": "production"}},
+        headers={"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"},
+    )
+    assert response.status_code == 500
+    with app_module.connect_db() as db:
+        count = db.execute("SELECT COUNT(*) AS n FROM work_plans").fetchone()["n"]
+    assert count == 0
+
+
+def test_approval_state_rolls_back_when_its_audit_append_fails(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    headers = {"X-Operator-Token": "ci-test-token-that-is-at-least-32-chars"}
+    planned = client.post(
+        "/api/work/plan",
+        json={"action": "deploy_production", "parameters": {}},
+        headers=headers,
+    )
+    assert planned.status_code == 200
+    plan_id = planned.json()["plan_id"]
+
+    monkeypatch.setattr(
+        app_module,
+        "append_audit",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("synthetic audit failure")),
+    )
+    client = TestClient(app_module.app, raise_server_exceptions=False)
+    response = client.post(
+        f"/api/work/{plan_id}/approve",
+        json={"confirmation": f"APPROVE {plan_id}"},
+        headers=headers,
+    )
+    assert response.status_code == 500
+    with app_module.connect_db() as db:
+        row = db.execute("SELECT status, approved_at FROM work_plans WHERE id = ?", (plan_id,)).fetchone()
+    assert row["status"] == "approval_required"
+    assert row["approved_at"] is None
