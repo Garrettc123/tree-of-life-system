@@ -182,7 +182,7 @@ GitHub Actions is configured to run both test suites and build local images. A w
 - It does not execute arbitrary shell commands, deploy code, charge cards, send customer email, or mutate cloud infrastructure through the control-plane API.
 - Approval is an audit record only; mutation execution is deliberately disabled.
 - Supabase fallback data is local and is not automatically replayed to Supabase.
-- The local SQLite audit hash chain is tamper-evident against simple record edits, but is not a substitute for signed external log storage, secure backups, or protection against an attacker who can rewrite the database and recompute the chain.
+- The local SQLite audit hash chain is tamper-evident against simple record edits, but is not a substitute for signed external log storage, secure backups, or protection against an attacker who can rewrite the database and recompute the chain. When an older v0.1 database is first upgraded, the migration adds hashes to existing records; this creates an integrity baseline at migration time, but does not prove those earlier records were never altered.
 - A local app is only reachable from the same machine. Continuous public access requires a lawful machine or host that remains online.
 - No paid deployment, billing change, production secret, or external side effect is performed by these files.
 
