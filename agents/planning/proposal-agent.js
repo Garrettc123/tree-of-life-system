@@ -169,6 +169,11 @@ class ProposalAgent {
     };
   }
 
+  async listDurableProposals(options = {}) {
+    if (!this.proposalStore) return this.listProposals();
+    return this.proposalStore.listProposals(this.tenantId, options);
+  }
+
   listProposals() {
     return Array.from(this.proposals.values()).map((proposal) => ({ ...proposal }));
   }
