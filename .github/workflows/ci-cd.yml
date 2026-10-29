@@ -78,7 +78,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run lint
-      - run: node --check agents/core/supabase-rhns-store.js && node --check agents/planning/proposal-agent.js && node --check agents/index.js
+      - run: node --check agents/core/supabase-rhns-store.js && node --check agents/planning/proposal-agent.js && node --check agents/index.js && node --check agents/startup.js && node --check agents/orchestration/rewoo-executor.js
 
   build:
     name: Build Docker Image
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '20'
-      - run: npm audit --production 2>/dev/null || echo "No package.json or no vulnerabilities"
+      - run: npm audit --omit=dev --audit-level=high
 
   deploy-production:
     name: Deploy to Production
