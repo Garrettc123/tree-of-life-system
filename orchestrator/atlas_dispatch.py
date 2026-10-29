@@ -2,7 +2,8 @@
 # Deploy on Railway alongside garcar-dispatch.
 # pip install fastapi uvicorn supabase httpx python-dotenv pydantic
 
-import asyncio, os, httpx
+import asyncio, hashlib, hmac, json, logging, os, httpx
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from typing import List
 from fastapi import FastAPI, HTTPException, Security, Depends
@@ -11,12 +12,14 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 app = FastAPI(title="ATLAS Dispatch Engine", version="1.0.0")
+log = logging.getLogger("atlas_dispatch")
 security = HTTPBearer()
 
 sb: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
 ATLAS_API_KEY = os.environ["ATLAS_API_KEY"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "garcar-alerts")
-DISPATCH_URL = os.environ.get("DISPATCH_URL", "")
+DISPATCH_URL = os.environ.get("DISPATCH_URL", "").rstrip("/")
+DISPATCH_SECRET = os.environ.get("DISPATCH_SECRET", "")
 
 def verify(creds: HTTPAuthorizationCredentials = Security(security)):
     if creds.credentials != ATLAS_API_KEY:
@@ -34,17 +37,47 @@ class DispatchReq(BaseModel):
 async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, results: dict) -> None:
     if not DISPATCH_URL:
         return
+    if len(DISPATCH_SECRET.encode("utf-8")) < 32:
+        log.warning("atlas_dispatch_forward_disabled reason=missing_or_weak_signing_secret")
+        return
+
     try:
-        async with httpx.AsyncClient(timeout=5.0) as c:
-            await c.post(f"{DISPATCH_URL}/dispatch", json={
-                "event_type": f"{source}.{event_type}".replace(".", "_"),
-                "source_system": "atlas-dispatch",
-                "trace_id": f"atlas_{webhook_event_id[:12]}",
-                "payload": {"webhook_event_id": webhook_event_id, "source": source,
-                            "event_type": event_type, "results": results},
-            })
-    except Exception:
-        pass
+        target = urlsplit(DISPATCH_URL)
+        is_loopback = target.hostname in {"localhost", "127.0.0.1", "::1"}
+        if target.scheme != "https" and not (target.scheme == "http" and is_loopback):
+            log.warning("atlas_dispatch_forward_disabled reason=insecure_dispatch_url")
+            return
+        if not target.hostname or target.username or target.password or target.query or target.fragment:
+            log.warning("atlas_dispatch_forward_disabled reason=invalid_dispatch_url")
+            return
+
+        event = {
+            "event_type": f"{source}.{event_type}".replace(".", "_"),
+            "source_system": "atlas-dispatch",
+            "trace_id": f"atlas_{webhook_event_id[:12]}",
+            "payload": {
+                "webhook_event_id": webhook_event_id,
+                "source": source,
+                "event_type": event_type,
+                "results": results,
+            },
+        }
+        body = json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        signature = "sha256=" + hmac.new(
+            DISPATCH_SECRET.encode("utf-8"), body, hashlib.sha256
+        ).hexdigest()
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{DISPATCH_URL}/dispatch",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Dispatch-Sig": signature,
+                },
+            )
+            response.raise_for_status()
+    except Exception as exc:
+        log.warning("atlas_dispatch_forward_failed error_type=%s", type(exc).__name__)
 
 # ── Task Handlers ────────────────────────────────────────────
 async def handle_accrual_tax(wid: str, payload: dict) -> dict:
