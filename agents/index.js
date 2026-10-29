@@ -31,17 +31,21 @@ class AgentSystem {
     console.log('│  🤖 Tree of Life Autonomous Agent System  │');
     console.log('└────────────────────────────────────────────────┘\n');
 
-    // Validate configuration
+    // Missing integration credentials should degrade planning, not terminate
+    // the whole workforce or prevent proposal-only agents from registering.
+    this.configWarnings = [];
     if (!this.config.githubToken) {
-      console.error('❌ GITHUB_TOKEN not configured');
-      console.log('\nPlease set up your environment variables:');
-      console.log('1. Copy .env.example to .env');
-      console.log('2. Add your API keys');
-      console.log('3. Run the system again\n');
-      process.exit(1);
+      const warning = 'GITHUB_TOKEN is not configured; repository analysis will remain unavailable.';
+      this.configWarnings.push(warning);
+      console.warn(`⚠️ ${warning}`);
+    }
+    if (!this.config.linearApiKey || !this.config.linearTeamId) {
+      const warning = 'Linear integration is not fully configured; Linear analysis will be marked incomplete.';
+      this.configWarnings.push(warning);
+      console.warn(`⚠️ ${warning}`);
     }
 
-    console.log('✅ Configuration loaded');
+    console.log('✅ Configuration loaded with ${this.configWarnings.length} warning(s)');
     console.log(`   Mode: ${this.config.mode}`);
     console.log(`   Owner: ${this.config.githubOwner}\n`);
 
