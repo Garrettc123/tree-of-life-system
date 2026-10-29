@@ -52,7 +52,7 @@ async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, re
             return
 
         event = {
-            "event_type": f"{source}.{event_type}".replace(".", "_"),
+            "event_type": f"{source}.{event_type.replace('.', '_')}",
             "source_system": "atlas-dispatch",
             "trace_id": f"atlas_{webhook_event_id[:12]}",
             "payload": {
