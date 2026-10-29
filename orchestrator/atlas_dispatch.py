@@ -2,7 +2,7 @@
 # Deploy on Railway alongside garcar-dispatch.
 # pip install -r requirements-atlas.txt
 
-import asyncio, hashlib, hmac, json, logging, os, httpx
+import asyncio, logging, os, httpx
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from typing import List
@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from supabase import create_client, Client
+from dispatch_signing import sign_json_payload
 
 app = FastAPI(title="ATLAS Dispatch Engine", version="1.0.0")
 log = logging.getLogger("atlas_dispatch")
@@ -80,10 +81,7 @@ async def _emit_dispatch(source: str, event_type: str, webhook_event_id: str, re
                 "results": results,
             },
         }
-        body = json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        signature = "sha256=" + hmac.new(
-            DISPATCH_SECRET.encode("utf-8"), body, hashlib.sha256
-        ).hexdigest()
+        body, signature = sign_json_payload(event, DISPATCH_SECRET)
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(
                 f"{DISPATCH_URL}/dispatch",
