@@ -15,6 +15,22 @@ function get(url) {
   });
 }
 
+function getRaw(host, port, requestPath) {
+  return new Promise((resolve, reject) => {
+    const request = http.request({ host, port, path: requestPath, method: 'GET' }, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => resolve({
+        statusCode: response.statusCode,
+        body: JSON.parse(body),
+      }));
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 describe('agent runtime health endpoints', () => {
   let snapshot;
   let server;
@@ -68,5 +84,12 @@ describe('agent runtime health endpoints', () => {
     expect(result.statusCode).toBe(200);
     expect(result.body.agents.operational).toBe(0);
     expect(result.body.status).toBe('degraded');
+  });
+
+  test('malformed request targets return 400 rather than crashing the runtime', async () => {
+    const address = server.address();
+    const result = await getRaw('127.0.0.1', address.port, '//[');
+    expect(result.statusCode).toBe(400);
+    expect(result.body.error).toBe('invalid_request_target');
   });
 });
