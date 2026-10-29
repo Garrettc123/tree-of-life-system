@@ -80,7 +80,7 @@ class GapAnalyzer {
           }
 
           // Check for missing CI/CD
-          const hasGithubActions = contents.some(file => file.name === '.github');
+          const hasGithubActions = Array.isArray(contents) && contents.some(file => file.name === '.github');
           if (!hasGithubActions && !repo.archived) {
             repoGaps.push({
               type: 'missing_cicd',
