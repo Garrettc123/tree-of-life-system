@@ -26,6 +26,7 @@ const ReWOOExecutor = require('./orchestration/rewoo-executor');
 const RuntimeAgent = require('./runtime-agent');
 const { createSafeRuntimeHandlers } = require('./core/safe-runtime-handlers');
 const SupabaseRhnsStore = require('./core/supabase-rhns-store');
+const ApprovalGate = require('./core/approval-gate');
 
 class StartupSequence extends EventEmitter {
   constructor() {
@@ -37,6 +38,7 @@ class StartupSequence extends EventEmitter {
     this.handles = {};
     this.healthServer = null;
     this.durableStore = null;
+    this.approvalGate = null;
     this.tenantId = process.env.RHNS_TENANT_ID || null;
   }
 
@@ -81,6 +83,8 @@ class StartupSequence extends EventEmitter {
         list: registered,
       },
       execution_mode: operational > 0 ? 'configured_handlers' : 'safe_scaffold_no_handlers',
+      durable_storage: this.durableStore ? 'configured' : 'disabled',
+      approval_gate: this.approvalGate ? 'configured_not_bound_to_write_adapter' : 'disabled',
     };
   }
 
@@ -121,13 +125,14 @@ class StartupSequence extends EventEmitter {
       serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     });
     const storage = await this.durableStore.healthCheck();
+    this.approvalGate = new ApprovalGate({ store: this.durableStore });
     await this.durableStore.appendEvent({
       type: 'rhns.runtime.storage.initialized',
       source: 'tree-of-life-agent-runtime',
       severity: 'info',
       data: { storage: storage.storage, tables: storage.tables },
     }, this.tenantId);
-    this.log('STORAGE', 'Durable RHNS storage verified and startup audit event recorded', 'success');
+    this.log('STORAGE', 'Durable RHNS storage verified and startup audit event recorded; exact-action gate initialized (no write adapter attached)', 'success');
     return { enabled: true, mode: storage.storage, tables: storage.tables };
   }
 
