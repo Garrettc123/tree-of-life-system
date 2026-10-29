@@ -111,9 +111,22 @@ async def dispatch(
 ):
     if not DISPATCH_SECRET:
         raise HTTPException(503, "Dispatch signature validation is not configured")
-    body = await request.body()
-    if len(body) > MAX_EVENT_BYTES:
-        raise HTTPException(413, "event payload exceeds the 1 MB limit")
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_EVENT_BYTES:
+                raise HTTPException(413, "event payload exceeds the 1 MB limit")
+        except ValueError:
+            raise HTTPException(400, "invalid content-length")
+
+    chunks = []
+    total_bytes = 0
+    async for chunk in request.stream():
+        total_bytes += len(chunk)
+        if total_bytes > MAX_EVENT_BYTES:
+            raise HTTPException(413, "event payload exceeds the 1 MB limit")
+        chunks.append(chunk)
+    body = b"".join(chunks)
     if not _verify_sig(body, x_dispatch_sig):
         raise HTTPException(403, "invalid signature")
 
@@ -127,11 +140,21 @@ async def dispatch(
     event_type = event.get("event_type")
     if not isinstance(event_type, str) or not event_type.strip():
         raise HTTPException(400, "missing or invalid event_type")
-    if len(event_type) > 150:
-        raise HTTPException(400, "event_type is too long")
+    event_type = event_type.strip()
+    if len(event_type) > 150 or any(ord(char) < 32 for char in event_type):
+        raise HTTPException(400, "event_type is invalid or too long")
+    event["event_type"] = event_type
 
-    if "trace_id" not in event:
+    source_system = event.get("source_system")
+    if source_system is not None:
+        if not isinstance(source_system, str) or len(source_system) > 100 or any(ord(char) < 32 for char in source_system):
+            raise HTTPException(400, "source_system is invalid or too long")
+
+    trace_id = event.get("trace_id")
+    if trace_id is None:
         event["trace_id"] = f"trc_{uuid.uuid4().hex[:12]}"
+    elif not isinstance(trace_id, str) or not trace_id.strip() or len(trace_id) > 200 or any(ord(char) < 32 for char in trace_id):
+        raise HTTPException(400, "trace_id is invalid or too long")
 
     # Persist a redacted copy; dispatch the original event to the internal handler.
     event_id = await event_log.write(_redact_for_storage(event))
