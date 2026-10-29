@@ -1,23 +1,26 @@
-# Garcar Native Control Plane
+# Garcar Native Control Plane and Local Event Orchestrator
 
 Version: `0.2.0`
 
-A local-first, self-hosted control-plane foundation for Garcar Enterprise. It is intended to reduce reliance on hosted app platforms, but it is not itself an always-on hosting provider.
+A local-first, self-hosted foundation intended to reduce reliance on blocked hosted app platforms. The Docker Compose setup contains two services: a protected control-plane API with a browser console, and a private event orchestrator. It is not itself an always-on public hosting provider.
 
 ## Current capabilities
 
-- Public `GET /health` liveness endpoint.
+- Control-plane browser console served from the same origin at `/console`.
+- Public liveness endpoints at `/health`; these do not claim database or integration readiness.
 - Protected operator endpoints using `GARCAR_OPERATOR_TOKEN` and `X-Operator-Token`.
-- Same-origin browser console at `/console`.
-- Read-only health and service-inventory operations.
-- Persistent work plans in SQLite with explicit approval-recording for plans outside the read-only allowlist.
+- Read-only local health and service inventory operations. When Compose is used, the control plane checks the orchestrator's known-local `/health` endpoint. Web, worker, and scheduler statuses remain unverified.
+- Persistent work plans in SQLite with an explicit approval-recording endpoint for actions outside the read-only allowlist.
 - Fail-closed execution: even an approved mutating plan **cannot** execute in this version.
-- Secret-like parameter values are redacted before plan persistence and audit logging.
-- SQLite audit entries include a SHA-256 hash chain, with `GET /api/audit/verify` to detect unexpected edits to the stored chain.
-- Local backup utility with SQLite `integrity_check`.
-- Local-only Docker Compose mapping and non-root container user.
+- Values under common secret-like parameter keys are redacted before plan persistence and audit logging. Do not submit credentials or private customer data in parameters.
+- Control-plane SQLite audit entries include a SHA-256 hash chain, with `GET /api/audit/verify` to detect unexpected edits to the stored chain.
+- The event orchestrator requires an HMAC signature on `POST /dispatch`; if `DISPATCH_SECRET` is unset, the endpoint returns HTTP 503 rather than accepting requests.
+- `GET /events` requires operator authentication.
+- Event payloads are redacted for common secret-like keys before persistence. If Supabase is unset or temporarily fails, events fall back to local SQLite; local event data lives in its own Docker volume.
+- Local backup utilities for both SQLite databases, including SQLite integrity checks.
+- Docker containers run as non-root users. Only the control-plane port is published, bound to `127.0.0.1`; the orchestrator is private to the Compose network.
 
-## Run locally (Python 3.12+)
+## Option A: run the control plane by itself (Python 3.12+)
 
 From this directory, run:
 
@@ -25,77 +28,116 @@ From this directory, run:
 bash ops/run_local.sh
 ```
 
-On first run, the script creates a Python virtual environment and a local `.env` file with a random operator token. The script binds the server to `127.0.0.1`, not a public network interface.
+The script creates a Python virtual environment and a local `.env` file with random operator and dispatch secrets when needed. It runs only the control-plane API, bound to `127.0.0.1`.
 
-Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console). The token is not printed or saved by the browser console. To retrieve the token locally for pasting into the console, use:
+Open [http://127.0.0.1:8080/console](http://127.0.0.1:8080/console). To retrieve the operator token locally for pasting into the console, use:
 
 ```bash
 grep '^GARCAR_OPERATOR_TOKEN=' .env
 ```
 
-Keep `.env` private. It is excluded from Git. Never put the token in source code, a public issue, chat, or a screenshot.
+Keep `.env` private. It is excluded from Git. Never put tokens in source code, public issues, chat, or screenshots.
 
-Set a different port by setting `PORT` before running the script, for example `PORT=8090 bash ops/run_local.sh`.
+Set a different port with `PORT`, for example `PORT=8090 bash ops/run_local.sh`.
 
-## Run with Docker Compose
+## Option B: run the full local Compose stack
 
-Docker must be installed locally. If you do not already have a local `.env`, generate one:
+Docker is required. Generate both local secrets without sending them anywhere:
 
 ```bash
-python3 -c 'import secrets; print("GARCAR_OPERATOR_TOKEN=" + secrets.token_urlsafe(48))' > .env
-chmod 600 .env
+python3 - <<'PY'
+import secrets
+print("GARCAR_OPERATOR_TOKEN=" + secrets.token_urlsafe(48))
+print("DISPATCH_SECRET=" + secrets.token_urlsafe(48))
+PY
 ```
 
-Then run:
+Copy those two lines into a local `.env` file in this directory, then restrict permissions:
 
 ```bash
+chmod 600 .env
 docker compose up --build -d
 ```
 
-The app is published only on `127.0.0.1:8080`. SQLite data is persisted in the named `garcar_data` volume. Set `HOST_PORT` in `.env` if you need a different local port. Check status with:
+The app is published only at `127.0.0.1:8080`. The orchestrator has no host-published port. SQLite data is persisted in the named volumes `garcar_data` and `garcar_event_data`. Optional Supabase settings may be added to the ignored local `.env` file as `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`; leave them unset to use the local event store.
+
+Check local service status:
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 control-plane
+docker compose logs --tail=100 control-plane orchestrator
 ```
 
-Stop the local container with `docker compose down`. Do not use `docker compose down -v` unless you explicitly want to delete the named database volume.
+Stop without deleting persisted data:
 
-## API reference
+```bash
+docker compose down
+```
+
+Do **not** use `docker compose down -v` unless you intend to delete both database volumes.
+
+## Control-plane API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Public process liveness only |
-| GET | `/api/status` | Protected process/database status and local record counts |
-| GET | `/api/services` | Protected service-name inventory; external state is unverified |
-| POST | `/api/work/plan` | Store a work plan and redact secret-like parameter keys |
-| GET | `/api/work/{plan_id}` | Read the stored plan and approval state |
-| POST | `/api/work/{plan_id}/approve` | Record explicit approval with exact `APPROVE {plan_id}` confirmation; does not enable execution |
+| GET | `/console` | Browser console |
+| GET | `/api/status` | Protected process/database status |
+| GET | `/api/services` | Protected inventory; probes only the configured local orchestrator health endpoint |
+| POST | `/api/work/plan` | Store a plan and redact common secret-keyed parameters |
+| GET | `/api/work/{plan_id}` | Read a stored plan and approval state |
+| POST | `/api/work/{plan_id}/approve` | Record approval with exact `APPROVE {plan_id}` confirmation; does not enable execution |
 | POST | `/api/work/execute` | Execute only `health_check` or `list_services` |
-| GET | `/api/audit` | Read recent audit entries and hash links |
-| GET | `/api/audit/verify` | Verify the local hash chain |
+| GET | `/api/audit` | Read recent audit records |
+| GET | `/api/audit/verify` | Check the local audit hash chain |
 
-All protected endpoints require the `X-Operator-Token` header. Keep the API on localhost until proper remote authentication, TLS, network restrictions, recovery, and operational monitoring are designed and tested.
+All control-plane protected endpoints require `X-Operator-Token`.
+
+## Orchestrator API (private network)
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Public liveness inside the private Compose network |
+| GET | `/events` | Read event history; requires `X-Operator-Token` |
+| POST | `/dispatch` | Accept a JSON object only when `X-Dispatch-Sig` matches the HMAC-SHA256 of the exact request bytes |
+
+The dispatch signature format is `sha256=<hex-digest>`. The signing secret must stay in local configuration and be shared only with an authorized event sender. Requests over 1 MB are rejected. CORS has no allowed origins by default.
+
+The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete.
 
 ## Backup and verification
 
-For a local Python run, create a backup:
+For a local Python control-plane run:
 
 ```bash
 python ops/backup_db.py
 ```
 
-The utility uses SQLite's online backup mechanism, writes the backup with restrictive local file permissions where supported, and runs `PRAGMA integrity_check`. This checks the database file's structural integrity; it does **not** prove the history was never changed. While the local server is running, verify the audit chain via the console or:
+For the event store:
 
 ```bash
-curl -H "X-Operator-Token: YOUR_LOCAL_TOKEN" http://127.0.0.1:8080/api/audit/verify
+cd ../orchestrator
+python backup_db.py
 ```
 
-Replace the example token locally; do not commit it. Keep backups outside the Git repository and test restoration before relying on them.
+Both utilities use SQLite's online backup mechanism and run `PRAGMA integrity_check`. This validates SQLite file structure, not business-event correctness or the audit hash chain.
 
-For the Docker named volume, make a backup using the container's database path and copy the resulting file out of the container; do not assume the host-side Python backup command can see the named volume directly.
+For a Docker Compose run, create both backups inside their respective containers and copy them out before relying on them:
+
+```bash
+mkdir -p backups
+chmod 700 backups
+docker compose exec -T control-plane python ops/backup_db.py --output /app/backups/garcar-control-plane-manual.sqlite3
+docker cp "$(docker compose ps -q control-plane):/app/backups/garcar-control-plane-manual.sqlite3" backups/
+docker compose exec -T orchestrator python backup_db.py --output /app/backups/garcar-events-manual.sqlite3
+docker cp "$(docker compose ps -q orchestrator):/app/backups/garcar-events-manual.sqlite3" backups/
+```
+
+To verify the control-plane audit chain, use the console or make a local request to `/api/audit/verify` with the operator token. Keep backups outside Git and test restoration before relying on them.
 
 ## Tests
+
+Control plane:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -103,23 +145,31 @@ python -m compileall -q app.py ops/backup_db.py
 python -m pytest -q
 ```
 
-GitHub Actions runs these checks for pull requests that change this directory or its workflow. Test evidence must come from the workflow result; a workflow declaration alone is not evidence that tests passed.
+Orchestrator (from `../orchestrator`):
+
+```bash
+python -m pip install -r requirements.txt
+python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py
+python -m pytest -q test_main.py
+```
+
+GitHub Actions is configured to run both test suites and build local images. A workflow file alone is not test evidence; use the actual check result.
 
 ## Explicit limitations
 
-- This branch does not replace or repair existing Render, Railway, or Vercel services.
-- It does not automatically deploy, start, or restart the existing Garcar web, worker, or scheduler.
-- Service names in the inventory are not live uptime evidence.
-- It does not execute arbitrary shell commands, run jobs, send email, contact payment processors, charge cards, or mutate cloud infrastructure.
+- This branch does not repair existing Render, Railway, or Vercel deployments.
+- It does not automatically start, restart, or verify the existing web, worker, or scheduler services.
+- It does not execute arbitrary shell commands, deploy code, charge cards, send customer email, or mutate cloud infrastructure through the control-plane API.
 - Approval is an audit record only; mutation execution is deliberately disabled.
-- The SQLite hash chain is tamper-evident against simple record edits but is not a substitute for signed external log storage, secure backups, or protection against an attacker who can rewrite the database and recompute the chain.
-- A local app is reachable only from the same machine. Public, continuous access requires a lawful machine or host that remains online.
+- Supabase fallback data is local and is not automatically replayed to Supabase.
+- The local SQLite audit hash chain is tamper-evident against simple record edits, but is not a substitute for signed external log storage, secure backups, or protection against an attacker who can rewrite the database and recompute the chain.
+- A local app is only reachable from the same machine. Continuous public access requires a lawful machine or host that remains online.
 - No paid deployment, billing change, production secret, or external side effect is performed by these files.
 
 ## Next engineering stages
 
-1. Pass tests and review the resulting check run.
-2. Add verified adapters for specific local services, each with timeouts, allowlisted operations, dry-run behavior, and auditable results.
-3. Add a supervised process manager with rollback and restart limits.
-4. Add backup/restore drills and externally anchored audit evidence.
-5. Evaluate a free, lawful runtime only after the local system is tested.
+1. Get the new CI suites passing and inspect their logs.
+2. Add verified service adapters one at a time, each with timeouts, allowlisted operations, dry-run behavior, and auditable results.
+3. Add a supervised process manager with restart limits and rollback.
+4. Add a tested local-to-Supabase reconciliation process with idempotency before enabling auto-sync.
+5. Test database restore and audit recovery using non-production data.
