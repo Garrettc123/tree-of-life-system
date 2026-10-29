@@ -6,7 +6,12 @@ function makeStore() {
     records,
     async create(record) { records.set(record.id, { ...record }); },
     async get(id) { const record = records.get(id); return record ? { ...record } : null; },
-    async update(id, record) { if (!records.has(id)) throw new Error('not found'); records.set(id, { ...record }); },
+    async compareAndSet(id, expectedState, record) {
+      const current = records.get(id);
+      if (!current || current.state !== expectedState) return false;
+      records.set(id, { ...record });
+      return true;
+    },
     async consumeIfMatches(id, actionHash, consumedAt) {
       const record = records.get(id);
       if (!record || record.state !== 'approved' || record.actionHash !== actionHash) return false;
