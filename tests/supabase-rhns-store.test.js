@@ -95,7 +95,7 @@ describe('SupabaseRhnsStore', () => {
     expect(url).toContain('expires_at_ms=gt.200');
     expect(JSON.parse(init.body).state).toBe('approved');
     expect(init.headers.Prefer).toBe('return=representation');
-    expect(await store.compareAndSet(approvalId, 'approved', { state: 'consumed' })).toBe(false);
+    expect(await store.compareAndSet(approvalId, 'approved', { tenantId, state: 'consumed' })).toBe(false);
   });
 
   test('consumes only once through a conditional state-and-expiry update', async () => {
