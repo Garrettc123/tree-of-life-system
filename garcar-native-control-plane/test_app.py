@@ -243,19 +243,32 @@ def test_legacy_audit_schema_migrates_atomically_and_verifies(tmp_path, monkeypa
                 detail_json TEXT NOT NULL
             )"""
         )
-        db.execute(
+        db.executemany(
             "INSERT INTO audit_events (id, created_at, actor, event_type, detail_json) VALUES (?, ?, ?, ?, ?)",
-            ("legacy-1", "2026-01-01T00:00:00+00:00", "operator", "legacy_event", "{}"),
+            [
+                ("legacy-1", "2026-01-01T00:00:00+00:00", "operator", "legacy_event", "{}"),
+                ("legacy-2", "2026-01-02T00:00:00+00:00", "operator", "legacy_event_2", '{"label":"existing"}'),
+            ],
         )
 
     app_module.init_db()
     with app_module.connect_db() as db:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(audit_events)").fetchall()}
-        row = db.execute("SELECT previous_hash, event_hash FROM audit_events WHERE id = ?", ("legacy-1",)).fetchone()
+        rows = db.execute("SELECT id, previous_hash, event_hash FROM audit_events ORDER BY rowid").fetchall()
     assert {"previous_hash", "event_hash"} <= columns
-    assert row["previous_hash"] == "0" * 64
-    assert row["event_hash"]
+    assert len(rows) == 2
+    assert rows[0]["id"] == "legacy-1"
+    assert rows[0]["previous_hash"] == "0" * 64
+    assert rows[0]["event_hash"]
+    assert rows[1]["id"] == "legacy-2"
+    assert rows[1]["previous_hash"] == rows[0]["event_hash"]
+    assert rows[1]["event_hash"]
     assert app_module.verify_audit_chain()["valid"] is True
+
+    app_module.audit("operator", "post_migration_event", {"migration": "checked"})
+    verified = app_module.verify_audit_chain()
+    assert verified["valid"] is True
+    assert verified["events_checked"] == 3
 
 
 def test_plan_state_rolls_back_when_its_audit_append_fails(tmp_path, monkeypatch):
