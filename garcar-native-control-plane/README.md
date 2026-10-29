@@ -61,6 +61,18 @@ bash ops/run_termux_stack.sh stop
 
 Stop also requires an exact confirmation phrase. The stack saves logs and local databases under the repository's ignored runtime/data/backups directories. If Android kills the processes, run the start command again. A Termux wake lock may reduce sleep-related interruptions but is not a guarantee of continuous operation. Do not expose the API to the internet or forward these ports publicly.
 
+### Optional: temporary, email-gated remote preview
+
+Keep the regular stack loopback-only unless remote access is needed. To create a temporary protected preview, `cloudflared` must already be installed and support the `--allowed-mail` option. First confirm that the local stack is healthy, then run:
+
+```bash
+GARCAR_TUNNEL_ALLOWED_MAIL=you@example.com bash ops/run_termux_stack.sh tunnel
+```
+
+Replace the example with an email address you control. The command refuses to start without a single specific email address, verifies both local APIs, displays a public-exposure warning, and requires you to type an exact confirmation phrase. Cloudflare then requires an email one-time PIN before visitors can reach the console; the Garcar operator token is still separately required for protected API actions. The tunnel runs in the foreground; keep Termux open and press `Ctrl+C` to end it. Its `trycloudflare.com` URL is temporary and changes on restart.
+
+This is **for temporary testing, not production hosting**. Cloudflare states that Quick Tunnels have no uptime guarantee and are limited to 200 in-flight requests; the URL stops working when the tunnel process stops. See the [official Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Do not remove the email gate, share the operator token, or commit `.env`.
+
 ## Option A: run the control plane by itself (Python 3.12+)
 
 From this directory, run:
