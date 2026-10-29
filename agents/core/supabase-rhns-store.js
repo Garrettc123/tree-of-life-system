@@ -208,6 +208,50 @@ class SupabaseRhnsStore {
     return rows[0];
   }
 
+  async settleOpenTasks(runId, tenantId, reason, { unknownOutcome = false } = {}) {
+    requireUuid(runId, 'run id');
+    requireUuid(tenantId, 'task tenantId');
+    const completedAt = new Date().toISOString();
+    const pendingResult = await this._request('rhns_tasks', {
+      method: 'PATCH',
+      query: {
+        run_id: 'eq.' + runId,
+        tenant_id: 'eq.' + tenantId,
+        status: 'in.(proposed,approved)',
+        select: 'id',
+      },
+      prefer: 'return=representation',
+      body: {
+        status: 'cancelled',
+        completed_at: completedAt,
+        updated_at: completedAt,
+        error: { message: String(reason || 'run_terminated'), disposition: 'run_terminated_before_execution' },
+      },
+    });
+    const executingStatus = unknownOutcome ? 'unknown_outcome' : 'failed';
+    const executingResult = await this._request('rhns_tasks', {
+      method: 'PATCH',
+      query: {
+        run_id: 'eq.' + runId,
+        tenant_id: 'eq.' + tenantId,
+        status: 'eq.executing',
+        select: 'id',
+      },
+      prefer: 'return=representation',
+      body: {
+        status: executingStatus,
+        completed_at: completedAt,
+        updated_at: completedAt,
+        error: { message: String(reason || 'run_terminated'), disposition: unknownOutcome ? 'outcome_ambiguous' : 'run_failed' },
+      },
+    });
+    return {
+      cancelled: Array.isArray(pendingResult) ? pendingResult.length : 0,
+      failedOrUnknown: Array.isArray(executingResult) ? executingResult.length : 0,
+      executingStatus,
+    };
+  }
+
   async transitionTask(id, tenantId, expectedStatus, nextStatus, patch = {}) {
     requireUuid(id, 'task record id');
     requireUuid(tenantId, 'task tenantId');
