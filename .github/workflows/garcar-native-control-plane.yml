@@ -129,7 +129,6 @@ jobs:
 
       - name: Verify both services, database, and audit chain
         env:
-          REQUIRE_ORCHESTRATOR: "1"
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
@@ -138,7 +137,6 @@ jobs:
             sleep 2
           done
           curl --fail --silent http://127.0.0.1:8080/health
-          bash ops/verify_local.sh
           REQUIRE_ORCHESTRATOR=1 bash ops/verify_local.sh
 
       - name: Show container status on failure
