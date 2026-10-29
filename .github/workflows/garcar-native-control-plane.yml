@@ -128,7 +128,6 @@ jobs:
         run: docker compose up --build -d
 
       - name: Verify both services, database, and audit chain
-        env:
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
