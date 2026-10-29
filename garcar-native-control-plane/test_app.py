@@ -139,3 +139,31 @@ def test_status_reports_database_and_local_mode(tmp_path, monkeypatch):
     assert response.json()["database"] == "available"
     assert response.json()["mode"] == "local_self_hosted"
     assert response.json()["external_services_verified"] is False
+
+
+
+def test_audit_hash_chain_verifies(tmp_path, monkeypatch):
+    client, _ = build_client(tmp_path, monkeypatch)
+    headers = {"X-Operator-Token": "ci-test-token"}
+    assert client.get("/api/status", headers=headers).status_code == 200
+    response = client.get("/api/audit/verify", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["valid"] is True
+    assert response.json()["events_checked"] >= 2
+
+
+def test_audit_hash_chain_detects_record_tampering(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    headers = {"X-Operator-Token": "ci-test-token"}
+    assert client.get("/api/status", headers=headers).status_code == 200
+
+    with app_module.connect_db() as db:
+        db.execute(
+            "UPDATE audit_events SET detail_json = ? WHERE rowid = (SELECT MIN(rowid) FROM audit_events)",
+            ('{"tampered":true}',),
+        )
+
+    response = client.get("/api/audit/verify", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["valid"] is False
+    assert response.json()["failed_event_id"]
