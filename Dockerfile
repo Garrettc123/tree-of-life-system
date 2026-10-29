@@ -32,7 +32,7 @@ RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD-SHELL curl -fsS "http://127.0.0.1:${PORT:-3000}/health" || exit 1
+  CMD curl -fsS "http://127.0.0.1:${PORT:-3000}/health" || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
