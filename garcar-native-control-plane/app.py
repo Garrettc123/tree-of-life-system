@@ -175,12 +175,18 @@ def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
     created_at = utc_now()
     detail_json = json.dumps(redact_sensitive(detail), sort_keys=True, separators=(",", ":"))
     with connect_db() as db:
-        # Serialize read-hash-insert so concurrent requests cannot fork the local chain.
+        # Serialize verification and append so concurrent requests cannot fork the local chain.
         db.execute("BEGIN IMMEDIATE")
-        latest = db.execute("SELECT event_hash FROM audit_events ORDER BY rowid DESC LIMIT 1").fetchone()
-        if latest and not latest["event_hash"]:
-            raise RuntimeError("Audit chain head has no hash; refusing to append.")
-        previous_hash = latest["event_hash"] if latest else "0" * 64
+        previous_hash = "0" * 64
+        rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+        for row in rows:
+            expected_hash = event_digest(
+                row["id"], row["created_at"], row["actor"], row["event_type"],
+                row["detail_json"], previous_hash,
+            )
+            if row["previous_hash"] != previous_hash or row["event_hash"] != expected_hash:
+                raise RuntimeError("Audit chain fails verification; refusing to append.")
+            previous_hash = expected_hash
         digest = event_digest(event_id, created_at, actor, event_type, detail_json, previous_hash)
         db.execute(
             """INSERT INTO audit_events
