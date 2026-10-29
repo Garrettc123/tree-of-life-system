@@ -8,10 +8,16 @@ services:
     environment:
       GARCAR_OPERATOR_TOKEN: ${GARCAR_OPERATOR_TOKEN:?Set GARCAR_OPERATOR_TOKEN in the local .env file}
       GARCAR_DB_PATH: /data/garcar-control-plane.sqlite3
+      GARCAR_ORCHESTRATOR_HEALTH_URL: http://orchestrator:8001/health
     ports:
       - "127.0.0.1:${HOST_PORT:-8080}:8080"
     volumes:
       - garcar_data:/data
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - garcar_local
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
       interval: 30s
@@ -19,5 +25,36 @@ services:
       retries: 3
       start_period: 10s
 
+  orchestrator:
+    build:
+      context: ../orchestrator
+      dockerfile: Dockerfile
+    image: garcar-orchestrator:local
+    restart: unless-stopped
+    environment:
+      PORT: "8001"
+      DISPATCH_SECRET: ${DISPATCH_SECRET:?Set DISPATCH_SECRET in the local .env file}
+      GARCAR_OPERATOR_TOKEN: ${GARCAR_OPERATOR_TOKEN:?Set GARCAR_OPERATOR_TOKEN in the local .env file}
+      GARCAR_EVENT_DB_PATH: /data/garcar-events.sqlite3
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
+      DISPATCH_ALLOWED_ORIGINS: ${DISPATCH_ALLOWED_ORIGINS:-}
+    expose:
+      - "8001"
+    volumes:
+      - garcar_event_data:/data
+    networks:
+      - garcar_local
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  garcar_local:
+
 volumes:
   garcar_data:
+  garcar_event_data:
