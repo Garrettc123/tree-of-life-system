@@ -37,10 +37,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: garcar-native-control-plane/requirements.txt
+          cache-dependency-path: garcar-native-control-plane/requirements-dev.txt
 
-      - name: Install pinned dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Install pinned development dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
       - name: Compile Python sources
         run: python -m compileall -q app.py ops/backup_db.py
