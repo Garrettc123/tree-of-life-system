@@ -24,6 +24,7 @@ const KafkaCoordinator = require('./event-bus/kafka-coordinator');
 const gRPCGateway = require('./grpc-gateway');
 const ReWOOExecutor = require('./orchestration/rewoo-executor');
 const RuntimeAgent = require('./runtime-agent');
+const { createSafeRuntimeHandlers } = require('./core/safe-runtime-handlers');
 
 class StartupSequence extends EventEmitter {
   constructor() {
@@ -207,10 +208,14 @@ class StartupSequence extends EventEmitter {
   async phase4_registerAgents(grpcGateway, rewooExecutor) {
     this.log('PHASE 4', 'Starting: Register agents', 'info');
 
+    const handlers = createSafeRuntimeHandlers({
+      getStatusSnapshot: () => this.getStatusSnapshot(),
+    });
+
     const specs = [
-      { id: 'planning-agent', role: 'planner', type: 'Planning' },
-      { id: 'execution-agent', role: 'executor', type: 'Execution' },
-      { id: 'reflexion-agent', role: 'critic', type: 'Reflexion' },
+      { id: 'planning-agent', role: 'planner', type: 'Planning', planHandler: handlers.planHandler },
+      { id: 'execution-agent', role: 'executor', type: 'Execution', stepHandler: handlers.stepHandler },
+      { id: 'reflexion-agent', role: 'critic', type: 'Reflexion', synthesisHandler: handlers.synthesisHandler },
     ];
 
     const agents = specs.map((spec) => new RuntimeAgent(spec));
