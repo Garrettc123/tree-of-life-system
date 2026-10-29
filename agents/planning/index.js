@@ -6,6 +6,7 @@
 const GapAnalyzer = require('./gap-analyzer');
 const TaskGenerator = require('./task-generator');
 const EventBus = require('../core/event-bus');
+const { validateTask } = require('../core/contracts');
 
 class PlanningAgent {
   constructor(config, mcpCoordinator, eventBus) {
@@ -59,9 +60,12 @@ class PlanningAgent {
         this.config.linearTeamId
       );
 
-      this.eventBus.publish('planning:analysis-complete', { 
+      const analysisStatus = this.gapAnalyzer.getStatus();
+
+      this.eventBus.publish('planning:analysis-complete', {
         gapCount: gaps.length,
-        gaps 
+        coverage: analysisStatus,
+        gaps,
       }, 'planning');
 
       // Step 2: Generate tasks from gaps
@@ -73,17 +77,44 @@ class PlanningAgent {
         tasks
       }, 'planning');
 
-      // Step 3: Distribute tasks to agents
+      // Step 3: Distribute tasks to registered agents.
       this.state = 'coordinating';
-      await this._distributeTasks(tasks);
+      const distribution = await this._distributeTasks(tasks);
+      const blocked = distribution.filter((item) => item.status !== 'assigned');
+      const tasksAssigned = distribution
+        .filter((item) => item.status === 'assigned')
+        .reduce((count, item) => count + item.taskIds.length, 0);
+
+      if (blocked.length > 0) {
+        const errorMessage = `${blocked.length} task group(s) could not be assigned to a registered agent`;
+        this.state = 'error';
+        this.eventBus.publish('agent:error', {
+          agent: 'planning',
+          error: errorMessage,
+          blockedAssignments: blocked,
+        }, 'planning');
+        return {
+          success: false,
+          error: errorMessage,
+          gapsFound: gaps.length,
+          tasksGenerated: tasks.length,
+          tasksAssigned,
+          distribution,
+        };
+      }
 
       console.log('[PlanningAgent] Execution cycle complete');
       this.state = 'idle';
 
       return {
         success: true,
+        complete: !analysisStatus.partial,
+        partial: analysisStatus.partial,
+        analysisStatus,
         gapsFound: gaps.length,
-        tasksGenerated: tasks.length
+        tasksGenerated: tasks.length,
+        tasksAssigned,
+        distribution,
       };
 
     } catch (error) {
@@ -97,7 +128,12 @@ class PlanningAgent {
 
       return {
         success: false,
-        error: error.message
+        complete: false,
+        partial: true,
+        error: error.message,
+        analysisStatus: typeof this.gapAnalyzer.getStatus === 'function'
+          ? this.gapAnalyzer.getStatus()
+          : undefined,
       };
     }
   }
@@ -138,34 +174,112 @@ class PlanningAgent {
    * Distribute tasks to appropriate agents
    */
   async _distributeTasks(tasks) {
-    const agentTasks = {
-      development: [],
-      'project-management': [],
-      documentation: []
-    };
+    const grouped = new Map();
+    const outcomes = [];
+    const registered = new Set(
+      typeof this.mcp.getAgentStatus === 'function'
+        ? this.mcp.getAgentStatus().filter((agent) => agent.status === 'active').map((agent) => agent.id)
+        : [],
+    );
 
-    // Group tasks by agent
     for (const task of tasks) {
-      if (agentTasks[task.agent]) {
-        agentTasks[task.agent].push(task);
+      const validation = validateTask(task);
+      if (!validation.valid) {
+        outcomes.push({
+          agent: task && task.agent ? task.agent : null,
+          status: 'blocked',
+          taskIds: task && task.id ? [task.id] : [],
+          reason: 'task_contract_invalid',
+          detail: validation.error,
+        });
+        continue;
       }
+      if (!task || typeof task.agent !== 'string' || !task.agent.trim()) {
+        outcomes.push({
+          agent: null,
+          status: 'blocked',
+          taskIds: task && task.id ? [task.id] : [],
+          reason: 'task_missing_target_agent',
+        });
+        continue;
+      }
+
+      if (!grouped.has(task.agent)) grouped.set(task.agent, []);
+      grouped.get(task.agent).push(task);
     }
 
-    // Send tasks to each agent
-    for (const [agent, tasks] of Object.entries(agentTasks)) {
-      if (tasks.length === 0) continue;
+    for (const [agent, agentTasks] of grouped.entries()) {
+      const taskIds = agentTasks.map((task) => task.id).filter(Boolean);
+
+      if (agent === 'planning') {
+        outcomes.push({
+          agent,
+          status: 'blocked',
+          taskIds,
+          reason: 'planning_agent_has_no_self-execution_adapter',
+        });
+        continue;
+      }
+
+      if (!registered.has(agent)) {
+        outcomes.push({
+          agent,
+          status: 'blocked',
+          taskIds,
+          reason: 'target_agent_not_registered',
+        });
+        console.warn(`[PlanningAgent] Cannot assign ${agentTasks.length} task(s): agent is not registered`);
+        continue;
+      }
 
       try {
-        await this.mcp.sendMessage('planning', agent, {
+        const response = await this.mcp.sendMessage('planning', agent, {
           type: 'task-assignment',
-          tasks
+          tasks: agentTasks,
         });
-        
-        console.log(`[PlanningAgent] Assigned ${tasks.length} tasks to ${agent}`);
+
+        if (response && (response.success === false || response.accepted === false)) {
+          outcomes.push({
+            agent,
+            status: 'failed',
+            taskIds,
+            reason: response.error || 'Target agent rejected the assignment',
+            response,
+          });
+          console.warn(`[PlanningAgent] ${agent} rejected ${agentTasks.length} task(s)`);
+          continue;
+        }
+
+        outcomes.push({
+          agent,
+          status: 'assigned',
+          taskIds,
+          proposalIds: Array.isArray(response && response.proposals)
+            ? response.proposals.map((proposal) => proposal.proposalId)
+            : [],
+          response,
+        });
+        this.eventBus.publish('agent:assignment-accepted', {
+          agent,
+          taskIds,
+          proposalIds: Array.isArray(response && response.proposals)
+            ? response.proposals.map((proposal) => proposal.proposalId)
+            : [],
+          completionState: 'proposal_pending_review',
+        }, 'planning');
+        console.log(`[PlanningAgent] Assigned ${agentTasks.length} task(s) to ${agent}`);
       } catch (error) {
+        outcomes.push({
+          agent,
+          status: 'failed',
+          taskIds,
+          reason: error instanceof Error ? error.message : 'Unknown assignment failure',
+        });
         console.error(`[PlanningAgent] Failed to assign tasks to ${agent}:`, error);
       }
     }
+
+    return outcomes;
   }
 
   /**

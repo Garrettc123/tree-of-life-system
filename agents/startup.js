@@ -16,6 +16,7 @@
 
 const path = require('path');
 const EventEmitter = require('events');
+const { createHealthServer } = require('./health-server');
 
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
@@ -23,6 +24,9 @@ const KafkaCoordinator = require('./event-bus/kafka-coordinator');
 const gRPCGateway = require('./grpc-gateway');
 const ReWOOExecutor = require('./orchestration/rewoo-executor');
 const RuntimeAgent = require('./runtime-agent');
+const { createSafeRuntimeHandlers } = require('./core/safe-runtime-handlers');
+const SupabaseRhnsStore = require('./core/supabase-rhns-store');
+const ApprovalGate = require('./core/approval-gate');
 
 class StartupSequence extends EventEmitter {
   constructor() {
@@ -32,6 +36,10 @@ class StartupSequence extends EventEmitter {
     this.startTime = Date.now();
     this.results = {};
     this.handles = {};
+    this.healthServer = null;
+    this.durableStore = null;
+    this.approvalGate = null;
+    this.tenantId = process.env.RHNS_TENANT_ID || null;
   }
 
   log(phase, message, type = 'info') {
@@ -48,6 +56,112 @@ class StartupSequence extends EventEmitter {
     this.emit('log', { phase, message, type, timestamp });
   }
 
+  getStatusSnapshot() {
+    const registered = this.results.phase4?.agents || [];
+    const operational = registered.filter((agent) => agent.status === 'active').length;
+    const kafkaPhase = this.results.phase2;
+    const kafkaStatus = !kafkaPhase
+      ? 'starting'
+      : kafkaPhase.success
+        ? 'connected'
+        : kafkaPhase.skipped
+          ? 'optional_unavailable'
+          : 'failed';
+
+    return {
+      service: 'tree-of-life-agent-runtime',
+      status: this.status,
+      startup_completed: ['ready', 'degraded'].includes(this.status),
+      uptime_seconds: Math.floor((Date.now() - this.startTime) / 1000),
+      grpc: { status: this.results.phase3?.success ? 'listening' : 'starting', ...(this.results.phase3 || {}) },
+      dependencies: {
+        kafka: { status: kafkaStatus, required: process.env.KAFKA_REQUIRED === 'true' },
+      },
+      agents: {
+        registered: registered.length,
+        operational,
+        list: registered,
+      },
+      execution_mode: operational > 0 ? 'configured_handlers' : 'safe_scaffold_no_handlers',
+      durable_storage: this.durableStore ? 'configured' : 'disabled',
+      stale_run_recovery: process.env.RHNS_RECOVER_STALE_RUNS === 'true' ? 'enabled' : 'disabled',
+      approval_gate: this.approvalGate ? 'configured_not_bound_to_write_adapter' : 'disabled',
+    };
+  }
+
+  async startHealthServer() {
+    const rawPort = process.env.PORT || process.env.HEALTH_PORT || '3000';
+    const port = Number.parseInt(rawPort, 10);
+    const host = process.env.HEALTH_HOST || '0.0.0.0';
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      throw new Error('PORT/HEALTH_PORT must be an integer from 0 to 65535');
+    }
+
+    this.healthServer = createHealthServer(() => this.getStatusSnapshot());
+    await new Promise((resolve, reject) => {
+      const onError = (error) => reject(error);
+      this.healthServer.once('error', onError);
+      this.healthServer.listen(port, host, () => {
+        this.healthServer.removeListener('error', onError);
+        const address = this.healthServer.address();
+        this.log('HEALTH', `HTTP health server listening on ${host}:${address && address.port}`, 'success');
+        resolve();
+      });
+    });
+  }
+
+  async initializeDurableStore() {
+    if (process.env.RHNS_DURABLE_STORE_ENABLED !== 'true') {
+      return { enabled: false, mode: 'disabled' };
+    }
+
+    const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RHNS_TENANT_ID']
+      .filter((name) => !process.env[name]);
+    if (missing.length) {
+      throw new Error('RHNS durable storage is enabled but required server environment is missing: ' + missing.join(', '));
+    }
+
+    this.durableStore = new SupabaseRhnsStore({
+      url: process.env.SUPABASE_URL,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
+    const storage = await this.durableStore.healthCheck();
+    this.approvalGate = new ApprovalGate({ store: this.durableStore });
+    let staleRecovery = null;
+    if (process.env.RHNS_RECOVER_STALE_RUNS === 'true') {
+      const rawAge = Number.parseInt(process.env.RHNS_STALE_RUN_AGE_MS || '600000', 10);
+      const olderThanMs = Number.isInteger(rawAge) ? rawAge : 600000;
+      staleRecovery = await this.durableStore.recoverStaleRuns(this.tenantId, { olderThanMs, limit: 100 });
+    }
+    await this.durableStore.appendEvent({
+      type: 'rhns.runtime.storage.initialized',
+      source: 'tree-of-life-agent-runtime',
+      severity: 'info',
+      data: {
+        storage: storage.storage,
+        tables: storage.tables,
+        staleRecovery: staleRecovery
+          ? { scanned: staleRecovery.scanned, recovered: staleRecovery.recovered }
+          : { enabled: false },
+      },
+    }, this.tenantId);
+    this.log('STORAGE', 'Durable RHNS storage verified and startup audit event recorded; exact-action gate initialized (no write adapter attached)', 'success');
+    if (staleRecovery) {
+      this.log('RECOVERY', 'Scanned ' + staleRecovery.scanned + ' stale runs; recovered ' + staleRecovery.recovered, 'info');
+    }
+    return { enabled: true, mode: storage.storage, tables: storage.tables, staleRecovery };
+  }
+
+  async persistRuntimeEvent(type, data = {}, severity = 'info') {
+    if (!this.durableStore) return null;
+    return this.durableStore.appendEvent({
+      type,
+      source: 'tree-of-life-agent-runtime',
+      severity,
+      data,
+    }, this.tenantId);
+  }
+
   async phase1_loadEnvironment() {
     this.log('PHASE 1', 'Starting: Load environment & configuration', 'info');
 
@@ -59,7 +173,7 @@ class StartupSequence extends EventEmitter {
         requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000', 10),
       },
       grpc: {
-        host: process.env.GRPC_HOST || '0.0.0.0',
+        host: process.env.GRPC_HOST || '127.0.0.1',
         port: parseInt(process.env.GRPC_PORT || '50051', 10),
         maxReceiveMessageLength: parseInt(process.env.GRPC_MAX_RECEIVE_MESSAGE_LENGTH || '4194304', 10),
         maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304', 10),
@@ -154,10 +268,14 @@ class StartupSequence extends EventEmitter {
   async phase4_registerAgents(grpcGateway, rewooExecutor) {
     this.log('PHASE 4', 'Starting: Register agents', 'info');
 
+    const handlers = createSafeRuntimeHandlers({
+      getStatusSnapshot: () => this.getStatusSnapshot(),
+    });
+
     const specs = [
-      { id: 'planning-agent', role: 'planner', type: 'Planning' },
-      { id: 'execution-agent', role: 'executor', type: 'Execution' },
-      { id: 'reflexion-agent', role: 'critic', type: 'Reflexion' },
+      { id: 'planning-agent', role: 'planner', type: 'Planning', planHandler: handlers.planHandler },
+      { id: 'execution-agent', role: 'executor', type: 'Execution', stepHandler: handlers.stepHandler },
+      { id: 'reflexion-agent', role: 'critic', type: 'Reflexion', synthesisHandler: handlers.synthesisHandler },
     ];
 
     const agents = specs.map((spec) => new RuntimeAgent(spec));
@@ -171,11 +289,12 @@ class StartupSequence extends EventEmitter {
     this.results.phase4 = {
       success: true,
       agentsRegistered: agents.length,
-      agents: agents.map((a) => ({ id: a.id, type: a.type })),
+      agents: agents.map((a) => ({ id: a.id, type: a.type, status: a.getStatus() })),
       duration: Date.now() - this.startTime,
     };
 
-    this.log('PHASE 4', `✅ ${agents.length} agents registered`, 'success');
+    const operational = agents.filter((agent) => agent.getStatus() === 'active').length;
+    this.log('PHASE 4', `Registered ${agents.length} agents; ${operational} have task handlers configured`, operational === agents.length ? 'success' : 'warn');
     return agents;
   }
 
@@ -204,26 +323,65 @@ class StartupSequence extends EventEmitter {
     const phaseStartTime = Date.now();
 
     const config = await this.phase1_loadEnvironment();
+    const durableStorage = await this.initializeDurableStore();
+    await this.persistRuntimeEvent('rhns.runtime.phase.completed', {
+      phase: 'environment',
+      success: true,
+      durableStorage: durableStorage.mode,
+    });
+    await this.startHealthServer();
     const kafkaCoordinator = await this.phase2_connectKafka(config);
+    await this.persistRuntimeEvent('rhns.runtime.phase.completed', {
+      phase: 'kafka',
+      success: Boolean(this.results.phase2 && this.results.phase2.success),
+      required: config.kafkaRequired,
+    }, this.results.phase2 && this.results.phase2.success ? 'info' : 'warning');
     const grpcGateway = await this.phase3_initializeGRPC(config);
-    const rewooExecutor = new ReWOOExecutor(config.rewoo);
+    await this.persistRuntimeEvent('rhns.runtime.phase.completed', {
+      phase: 'grpc',
+      success: Boolean(this.results.phase3 && this.results.phase3.success),
+    });
+    const rewooExecutor = new ReWOOExecutor({
+      ...config.rewoo,
+      durableStore: this.durableStore,
+      tenantId: this.tenantId,
+    });
     await this.phase4_registerAgents(grpcGateway, rewooExecutor);
+    await this.persistRuntimeEvent('rhns.runtime.agents.registered', {
+      count: (this.results.phase4 && this.results.phase4.agents || []).length,
+      ids: (this.results.phase4 && this.results.phase4.agents || []).map((agent) => agent.id),
+    });
     await this.phase5_startReWOO(rewooExecutor);
+    await this.persistRuntimeEvent('rhns.runtime.phase.completed', {
+      phase: 'rewoo',
+      success: Boolean(this.results.phase5 && this.results.phase5.success),
+      registeredAgents: this.results.phase5 && this.results.phase5.registeredAgents || 0,
+    });
 
     const totalDuration = Date.now() - phaseStartTime;
-    this.status = 'ready';
+    const registered = this.results.phase4?.agents || [];
+    const operational = registered.filter((agent) => agent.status === 'active').length;
+    this.status = registered.length > 0 && operational === registered.length ? 'ready' : 'degraded';
     this.handles = { config, kafkaCoordinator, grpcGateway, rewooExecutor };
+    await this.persistRuntimeEvent('rhns.runtime.startup.completed', {
+      status: this.status,
+      registeredAgents: registered.length,
+      operationalAgents: operational,
+      executionMode: operational > 0 ? 'configured_handlers' : 'safe_scaffold_no_handlers',
+    }, this.status === 'ready' ? 'info' : 'warning');
 
     console.log('\nSTARTUP COMPLETE');
     console.log(`duration_ms=${totalDuration}`);
     console.log(`grpc=${config.grpc.host}:${config.grpc.port}`);
     console.log(`kafka=${this.results.phase2.success ? 'up' : 'skipped'}`);
     console.log('agents=planning-agent,execution-agent,reflexion-agent');
+    console.log(`execution_readiness=${this.status}; configured_agents=${operational}/${registered.length}`);
     console.log('keep_alive=true (SIGINT/SIGTERM to stop)');
     console.log('\n');
 
     this.emit('startup:complete', {
       duration: totalDuration,
+      status: this.status,
       results: this.results,
     });
 
@@ -243,6 +401,10 @@ class StartupSequence extends EventEmitter {
     }
     if (this.handles.grpcGateway) {
       await this.handles.grpcGateway.shutdown();
+    }
+    if (this.healthServer && this.healthServer.listening) {
+      await new Promise((resolve) => this.healthServer.close(resolve));
+      this.healthServer = null;
     }
   }
 }
@@ -264,6 +426,7 @@ if (require.main === module) {
       process.on('SIGTERM', stop);
     })
     .catch((error) => {
+      startup.status = 'failed';
       console.error('Fatal startup error:', error);
       process.exit(1);
     });
