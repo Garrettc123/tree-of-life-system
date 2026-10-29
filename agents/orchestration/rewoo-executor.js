@@ -305,12 +305,14 @@ class ReWOOExecutor extends EventEmitter {
         this.timeout(this.config.synthesisTimeout),
       ]);
 
-      if (!synthesis || synthesis.success === false || synthesis.ok === false
-        || (synthesis.result && typeof synthesis.result === 'object'
-          && (synthesis.result.success === false || synthesis.result.ok === false))) {
+      const result = synthesis && synthesis.result;
+      if (!synthesis || typeof synthesis !== 'object' || result === undefined || result === null || result === false
+        || synthesis.success === false || synthesis.ok === false
+        || (result && typeof result === 'object'
+          && (result.success === false || result.ok === false))) {
         throw new Error(synthesis && synthesis.error
           ? String(synthesis.error)
-          : 'Reflexion agent returned an unsuccessful synthesis result');
+          : 'Reflexion agent returned a missing or unsuccessful synthesis result');
       }
 
       const duration = Date.now() - startTime;
