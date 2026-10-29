@@ -161,6 +161,57 @@ class SupabaseRhnsStore {
     return Array.isArray(rows) && rows.length === 1;
   }
 
+  async listProposals(tenantId, { state = 'draft_pending_review', limit = 100, offset = 0 } = {}) {
+    requireUuid(tenantId, 'proposal tenantId');
+    const allowedStates = new Set(['draft_pending_review', 'approved', 'rejected', 'cancelled']);
+    if (!allowedStates.has(state)) throw new TypeError('Unsupported proposal state');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new TypeError('Proposal limit must be an integer from 1 to 500');
+    if (!Number.isInteger(offset) || offset < 0) throw new TypeError('Proposal offset must be a non-negative integer');
+    const rows = await this._request('rhns_proposals', {
+      query: {
+        tenant_id: 'eq.' + tenantId,
+        state: 'eq.' + state,
+        select: 'proposal_id,proposal_hash,proposal,created_at',
+        order: 'created_at.desc,proposal_id.asc',
+        limit,
+        offset,
+      },
+    });
+    return Array.isArray(rows) ? rows.map((row) => ({
+      ...row.proposal,
+      durableRecord: {
+        tenantId,
+        proposalId: row.proposal_id,
+        proposalHash: row.proposal_hash,
+        createdAt: row.created_at,
+      },
+    })) : [];
+  }
+
+  async getProposal(tenantId, proposalId) {
+    requireUuid(tenantId, 'proposal tenantId');
+    if (typeof proposalId !== 'string' || !proposalId.trim()) throw new TypeError('proposalId is required');
+    const rows = await this._request('rhns_proposals', {
+      query: {
+        tenant_id: 'eq.' + tenantId,
+        proposal_id: 'eq.' + proposalId,
+        select: 'proposal_id,proposal_hash,proposal,created_at',
+        limit: '1',
+      },
+    });
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const row = rows[0];
+    return {
+      ...row.proposal,
+      durableRecord: {
+        tenantId,
+        proposalId: row.proposal_id,
+        proposalHash: row.proposal_hash,
+        createdAt: row.created_at,
+      },
+    };
+  }
+
   async recordProposals(proposals, tenantId) {
     requireUuid(tenantId, 'proposal tenantId');
     if (!Array.isArray(proposals) || proposals.length === 0) {
