@@ -70,11 +70,11 @@ class RuntimeAgent extends EventEmitter {
     } else if (this.role === 'planner' && this.handlers.plan) {
       result = await this.handlers.plan(payload ?? task, task.context || {});
     } else if (this.role === 'executor' && this.handlers.step) {
-      const step = task.step || {
-        id: task.taskId,
-        type: task.taskType || 'execute',
-        input: payload,
-      };
+      const suppliedStep = task.step
+        || (payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null);
+      const step = suppliedStep
+        ? { id: task.taskId, type: task.taskType || 'execute', ...suppliedStep }
+        : { id: task.taskId, type: task.taskType || 'execute', input: payload };
       result = await this.handlers.step(step, task.context || {});
     } else if (this.role === 'critic' && this.handlers.synthesis) {
       const request = payload && typeof payload === 'object' ? payload : {};
