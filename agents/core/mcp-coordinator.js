@@ -4,7 +4,7 @@
  */
 
 const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 class MCPCoordinator extends EventEmitter {
   constructor(config = {}) {
@@ -57,8 +57,8 @@ class MCPCoordinator extends EventEmitter {
    * Send a message from one agent to another
    */
   async sendMessage(fromAgentId, toAgentId, message, context = {}) {
-    const sessionId = uuidv4();
-    const messageId = uuidv4();
+    const sessionId = randomUUID();
+    const messageId = randomUUID();
 
     const envelope = {
       id: messageId,
