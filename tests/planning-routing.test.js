@@ -10,6 +10,7 @@ function sampleGaps() {
     { type: 'missing_cicd', severity: 'high', repo: 'sample-repo', description: 'No workflow files', action: 'create_github_actions' },
     { type: 'empty_project', severity: 'medium', project: 'Sample project', description: 'No project issues', action: 'generate_project_issues' },
     { type: 'incomplete_description', severity: 'low', project: 'Sample project', description: 'Description too short', action: 'enhance_project_description' },
+    { type: 'integration_sync', severity: 'medium', description: 'Integration state needs reconciliation', action: 'sync_integration' },
   ];
 }
 
@@ -35,22 +36,25 @@ describe('planning-to-proposal agent routing', () => {
     const development = new ProposalAgent({ id: 'development' }, mcp);
     const projectManagement = new ProposalAgent({ id: 'project-management' }, mcp);
     const documentation = new ProposalAgent({ id: 'documentation' }, mcp);
+    const integration = new ProposalAgent({ id: 'integration' }, mcp);
 
     const result = await planner.execute();
     expect(result.success).toBe(true);
     expect(result.complete).toBe(false);
     expect(result.partial).toBe(true);
-    expect(result.gapsFound).toBe(5);
-    expect(result.tasksGenerated).toBe(5);
-    expect(result.tasksAssigned).toBe(5);
+    expect(result.gapsFound).toBe(6);
+    expect(result.tasksGenerated).toBe(6);
+    expect(result.tasksAssigned).toBe(6);
     expect(result.distribution.every((item) => item.status === 'assigned')).toBe(true);
     expect(development.listProposals()).toHaveLength(3);
     expect(projectManagement.listProposals()).toHaveLength(1);
     expect(documentation.listProposals()).toHaveLength(1);
+    expect(integration.listProposals()).toHaveLength(1);
     expect([
       ...development.listProposals(),
       ...projectManagement.listProposals(),
       ...documentation.listProposals(),
+      ...integration.listProposals(),
     ].every((proposal) => proposal.sideEffectsPerformed === false && proposal.requiresHumanApproval)).toBe(true);
   });
 
