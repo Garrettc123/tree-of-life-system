@@ -87,6 +87,17 @@ describe('ReWOO execution status is evidence-based', () => {
     expect(result.error).toMatch(/Synthesis failed/);
   });
 
+  test('rejects synthesis that returns no result payload', async () => {
+    const executor = track({
+      stepHandler: async () => ({ success: true, value: 'real-result' }),
+      synthesisHandler: async () => ({ critiques: [] }),
+    });
+    const result = await executor.execute('empty synthesis task');
+    expect(result.success).toBe(false);
+    expect(result.stages.synthesis.success).toBe(false);
+    expect(result.error).toMatch(/Synthesis failed/);
+  });
+
   test('treats explicit unsuccessful step results as failures', async () => {
     const executor = track({
       stepHandler: async () => ({ ok: false, error: 'policy denied' }),
