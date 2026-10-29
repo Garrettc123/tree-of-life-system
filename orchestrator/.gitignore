@@ -1,0 +1,10 @@
+data/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.env
+.env.*
