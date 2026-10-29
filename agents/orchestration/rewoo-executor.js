@@ -175,6 +175,10 @@ class ReWOOExecutor extends EventEmitter {
         this.timeout(this.config.planningTimeout),
       ]);
 
+      if (!plan || plan.success === false || plan.ok === false || !Array.isArray(plan.steps)) {
+        throw new Error(plan && plan.error ? String(plan.error) : 'Planning agent returned an invalid or unsuccessful plan');
+      }
+
       const duration = Date.now() - startTime;
 
       this.emit('stage:planning:completed', {
@@ -300,6 +304,14 @@ class ReWOOExecutor extends EventEmitter {
         reflexionAgent.synthesize(outputs, plan, context),
         this.timeout(this.config.synthesisTimeout),
       ]);
+
+      if (!synthesis || synthesis.success === false || synthesis.ok === false
+        || (synthesis.result && typeof synthesis.result === 'object'
+          && (synthesis.result.success === false || synthesis.result.ok === false))) {
+        throw new Error(synthesis && synthesis.error
+          ? String(synthesis.error)
+          : 'Reflexion agent returned an unsuccessful synthesis result');
+      }
 
       const duration = Date.now() - startTime;
 
