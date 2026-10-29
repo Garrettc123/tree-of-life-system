@@ -29,6 +29,8 @@ Usage:
   bash ops/run_termux_stack.sh status
   bash ops/run_termux_stack.sh logs [control-plane|orchestrator]
   bash ops/run_termux_stack.sh backup
+  bash ops/run_termux_stack.sh mcp-install
+  bash ops/run_termux_stack.sh mcp-run
   bash ops/run_termux_stack.sh tunnel
   bash ops/run_termux_stack.sh stop
 
@@ -356,6 +358,11 @@ case "$cmd" in
     }
     "$CONTROL_VENV/bin/python" -m pytest -q "$CONTROL_DIR/test_app.py"
     (cd "$ORCH_DIR" && "$ORCH_VENV/bin/python" -m pytest -q test_main.py)
+    if [[ -x "$CONTROL_DIR/.mcp-venv/bin/python" ]]; then
+      "$CONTROL_DIR/.mcp-venv/bin/python" -m pytest -q "$CONTROL_DIR/test_mcp_server.py"
+    else
+      echo "MCP tests skipped: install optional MCP environment with 'bash ops/run_termux_stack.sh mcp-install'."
+    fi
     ;;
   start)
     need_python
@@ -418,6 +425,12 @@ case "$cmd" in
     GARCAR_DB_PATH="$CONTROL_DB" "$CONTROL_VENV/bin/python" "$CONTROL_DIR/ops/backup_db.py" --output "$CONTROL_DIR/backups/garcar-control-plane-$stamp.sqlite3"
     GARCAR_EVENT_DB_PATH="$ORCH_DB" "$ORCH_VENV/bin/python" "$ORCH_DIR/backup_db.py" --output "$CONTROL_DIR/backups/garcar-events-$stamp.sqlite3"
     chmod 600 "$CONTROL_DIR/backups/garcar-control-plane-$stamp.sqlite3" "$CONTROL_DIR/backups/garcar-events-$stamp.sqlite3"
+    ;;
+  mcp-install)
+    bash "$CONTROL_DIR/ops/install_mcp.sh"
+    ;;
+  mcp-run)
+    exec bash "$CONTROL_DIR/ops/run_mcp_local.sh"
     ;;
   tunnel)
     run_public_tunnel
