@@ -73,4 +73,17 @@ describe('RuntimeAgent execution safety', () => {
     expect(agent.tasksProcessed).toBe(0);
     expect(events).toHaveLength(0);
   });
+
+  test('an error-only result is not treated as successful task completion', async () => {
+    const agent = new RuntimeAgent({
+      id: 'execution-agent',
+      role: 'executor',
+      taskHandler: async () => ({ error: 'downstream unavailable' }),
+    });
+    const events = [];
+    agent.on('event', (event) => events.push(event));
+    await expect(agent.handleTask({ taskId: 'error-only-1' })).rejects.toThrow('downstream unavailable');
+    expect(agent.tasksProcessed).toBe(0);
+    expect(events).toHaveLength(0);
+  });
 });
