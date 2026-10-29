@@ -15,7 +15,25 @@ app = FastAPI(title="ATLAS Dispatch Engine", version="1.0.0")
 log = logging.getLogger("atlas_dispatch")
 security = HTTPBearer()
 
-sb: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+try:
+    _supabase_url = urlsplit(SUPABASE_URL)
+    _is_loopback_supabase = _supabase_url.hostname in {"localhost", "127.0.0.1", "::1"}
+except ValueError:
+    _is_loopback_supabase = False
+    _supabase_url = None
+if (
+    _supabase_url is None
+    or not _supabase_url.hostname
+    or _supabase_url.username
+    or _supabase_url.password
+    or _supabase_url.query
+    or _supabase_url.fragment
+    or not (_supabase_url.scheme == "https" or (_supabase_url.scheme == "http" and _is_loopback_supabase))
+):
+    raise ValueError("SUPABASE_URL must use HTTPS except for an explicit loopback development URL")
+sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 ATLAS_API_KEY = os.environ["ATLAS_API_KEY"]
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "garcar-alerts")
 DISPATCH_URL = os.environ.get("DISPATCH_URL", "").rstrip("/")
