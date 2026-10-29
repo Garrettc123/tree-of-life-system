@@ -202,6 +202,7 @@ describe('ReWOO execution status is evidence-based', () => {
       transitionRun: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
       createTask: jest.fn(async (task) => ({ id: task.id, status: task.status })),
       transitionTask: jest.fn(async (id, _tenant, _expected, next) => ({ id, status: next })),
+      settleOpenTasks: jest.fn().mockResolvedValue({ cancelled: 0, failedOrUnknown: 0 }),
       appendEvidence: jest.fn(),
     };
     const executor = track({
