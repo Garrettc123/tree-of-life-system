@@ -114,6 +114,20 @@ python backup_db.py
 
 Both utilities use SQLite's online backup mechanism and run `PRAGMA integrity_check`. This validates SQLite file structure, not business-event correctness or the audit hash chain.
 
+After starting a local instance, run the operator verification script from this directory:
+
+```bash
+bash ops/verify_local.sh
+```
+
+It checks control-plane liveness, authenticated database status, the local audit chain, and prints the orchestrator probe status. For a Compose stack, require the orchestrator probe to pass:
+
+```bash
+REQUIRE_ORCHESTRATOR=1 bash ops/verify_local.sh
+```
+
+A successful local check does not prove public availability or third-party integration status.
+
 For a Docker Compose run, create both backups inside their respective containers and copy them out before relying on them:
 
 ```bash
