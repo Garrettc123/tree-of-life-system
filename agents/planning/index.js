@@ -6,6 +6,7 @@
 const GapAnalyzer = require('./gap-analyzer');
 const TaskGenerator = require('./task-generator');
 const EventBus = require('../core/event-bus');
+const { validateTask } = require('../core/contracts');
 
 class PlanningAgent {
   constructor(config, mcpCoordinator, eventBus) {
@@ -182,6 +183,17 @@ class PlanningAgent {
     );
 
     for (const task of tasks) {
+      const validation = validateTask(task);
+      if (!validation.valid) {
+        outcomes.push({
+          agent: task && task.agent ? task.agent : null,
+          status: 'blocked',
+          taskIds: task && task.id ? [task.id] : [],
+          reason: 'task_contract_invalid',
+          detail: validation.error,
+        });
+        continue;
+      }
       if (!task || typeof task.agent !== 'string' || !task.agent.trim()) {
         outcomes.push({
           agent: null,
@@ -209,7 +221,7 @@ class PlanningAgent {
         continue;
       }
 
-      if (registered.size > 0 && !registered.has(agent)) {
+      if (!registered.has(agent)) {
         outcomes.push({
           agent,
           status: 'blocked',
@@ -242,8 +254,19 @@ class PlanningAgent {
           agent,
           status: 'assigned',
           taskIds,
+          proposalIds: Array.isArray(response && response.proposals)
+            ? response.proposals.map((proposal) => proposal.proposalId)
+            : [],
           response,
         });
+        this.eventBus.publish('agent:assignment-accepted', {
+          agent,
+          taskIds,
+          proposalIds: Array.isArray(response && response.proposals)
+            ? response.proposals.map((proposal) => proposal.proposalId)
+            : [],
+          completionState: 'proposal_pending_review',
+        }, 'planning');
         console.log(`[PlanningAgent] Assigned ${agentTasks.length} task(s) to ${agent}`);
       } catch (error) {
         outcomes.push({
