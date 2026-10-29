@@ -102,11 +102,12 @@ describe('SupabaseRhnsStore', () => {
   test('consumes only once through a conditional state-and-expiry update', async () => {
     const fetchImpl = jest.fn().mockResolvedValueOnce(response([{ id: approvalId }])).mockResolvedValueOnce(response([]));
     const store = makeStore(fetchImpl);
-    expect(await store.consumeIfMatches(approvalId, 'b'.repeat(64), 300)).toBe(true);
-    expect(await store.consumeIfMatches(approvalId, 'b'.repeat(64), 301)).toBe(false);
+    expect(await store.consumeIfMatches(approvalId, 'b'.repeat(64), 300, tenantId)).toBe(true);
+    expect(await store.consumeIfMatches(approvalId, 'b'.repeat(64), 301, tenantId)).toBe(false);
     const [url, init] = fetchImpl.mock.calls[0];
     expect(init.method).toBe('PATCH');
     expect(url).toContain('state=eq.approved');
+    expect(url).toContain('tenant_id=eq.' + tenantId);
     expect(url).toContain('expires_at_ms=gt.300');
     expect(JSON.parse(init.body)).toEqual({ state: 'consumed', consumed_at_ms: 300 });
   });
