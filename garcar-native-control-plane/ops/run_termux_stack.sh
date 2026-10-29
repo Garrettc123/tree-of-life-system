@@ -162,8 +162,10 @@ health_ok() {
 import json
 import sys
 import urllib.request
+# Health probes must go directly to loopback, not a user-configured HTTP proxy.
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 try:
-    with urllib.request.urlopen(sys.argv[1], timeout=2) as response:
+    with opener.open(sys.argv[1], timeout=2) as response:
         data = json.loads(response.read().decode("utf-8"))
     raise SystemExit(0 if data.get("status") == "ok" and data.get("service") == sys.argv[2] else 1)
 except Exception:
