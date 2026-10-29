@@ -56,9 +56,11 @@ def test_invalid_dispatch_signature_is_rejected(tmp_path, monkeypatch):
 def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_path, monkeypatch):
     client, module = load_app(tmp_path, monkeypatch)
     captured = {}
+    writes = []
 
     async def fake_write(event):
         captured.update(event)
+        writes.append(event)
         return "local-test-event-id"
 
     async def fake_route_event(event, event_id, event_log):
@@ -88,6 +90,17 @@ def test_valid_signed_event_is_queued_and_secrets_are_redacted_for_storage(tmp_p
     assert captured["api_key"] == "[REDACTED]"
     assert captured["payload"]["client_secret"] == "[REDACTED]"
     assert captured["payload"]["label"] == "safe"
+
+    replay = client.post(
+        "/dispatch",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Dispatch-Sig": sign(body, "test-dispatch-secret"),
+        },
+    )
+    assert replay.status_code == 409
+    assert len(writes) == 1
 
 
 def test_signed_json_array_is_rejected_as_not_an_event_object(tmp_path, monkeypatch):
