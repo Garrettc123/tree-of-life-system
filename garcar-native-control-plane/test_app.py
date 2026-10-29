@@ -180,3 +180,19 @@ def test_service_inventory_does_not_probe_unapproved_external_url(tmp_path, monk
     assert response.status_code == 200
     services = {item["name"]: item for item in response.json()["services"]}
     assert services["orchestrator"]["status"] == "invalid_health_url_config"
+
+
+
+def test_audit_verifier_does_not_repair_a_deleted_hash(tmp_path, monkeypatch):
+    client, app_module = build_client(tmp_path, monkeypatch)
+    headers = {"X-Operator-Token": "ci-test-token"}
+    assert client.get("/api/status", headers=headers).status_code == 200
+
+    with app_module.connect_db() as db:
+        db.execute(
+            "UPDATE audit_events SET event_hash = NULL WHERE rowid = (SELECT MAX(rowid) FROM audit_events)"
+        )
+
+    response = client.get("/api/audit/verify", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["valid"] is False
