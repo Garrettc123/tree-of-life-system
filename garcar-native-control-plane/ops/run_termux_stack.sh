@@ -15,6 +15,8 @@ CONTROL_DB="$CONTROL_DIR/data/garcar-control-plane.sqlite3"
 ORCH_DB="$ORCH_DIR/data/garcar-events.sqlite3"
 ENV_FILE="$CONTROL_DIR/.env"
 
+cd "$CONTROL_DIR"
+
 usage() {
   cat <<'EOF'
 Garcar local stack for Termux/Linux (no Docker required)
@@ -104,9 +106,7 @@ install_runtime() {
     python3 -m venv "$ORCH_VENV"
   fi
 
-  local is_termux="false"
   if [[ -n "${TERMUX_VERSION:-}" || -d /data/data/com.termux ]]; then
-    is_termux="true"
     local py_minor
     py_minor="$("$CONTROL_VENV/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
     if [[ "$py_minor" != "3.14" ]]; then
