@@ -9,7 +9,7 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const RuntimeAgent = require('./runtime-agent');
 
 class gRPCGateway extends EventEmitter {
@@ -153,7 +153,7 @@ class gRPCGateway extends EventEmitter {
 
   async executeTask(call, callback) {
     const startTime = Date.now();
-    const requestId = uuidv4();
+    const requestId = randomUUID();
 
     try {
       const { agentId, taskId, taskType, payload } = call.request;
