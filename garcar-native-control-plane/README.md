@@ -134,6 +134,38 @@ docker compose down
 
 Do **not** use `docker compose down -v` unless you intend to delete both database volumes.
 
+## Optional MCP server for AI hosts
+
+The local MCP adapter exposes the existing control-plane API to an MCP-compatible host using the official Python SDK v2.3.0. It runs over **stdio**, not a public HTTP MCP endpoint, and sends API requests to the URL in `GARCAR_CONTROL_PLANE_URL` (default `http://127.0.0.1:8080`). The operator token is read from the ignored local `.env` file by the launcher; it is not written into the host configuration.
+
+Install its dependencies in a separate virtual environment:
+
+```bash
+bash ops/install_mcp.sh
+```
+
+With the local control plane running, generate the MCP host configuration entry:
+
+```bash
+bash ops/run_mcp_local.sh --print-config
+```
+
+Copy the JSON entry into your MCP host's configuration and restart that host. The generated command points at the exact absolute path of this repository's `ops/run_mcp_local.sh`; it contains no secret values. The launcher reads only the expected local environment keys and starts `mcp_server.py` with stdio.
+
+Available tools are `get_control_plane_health`, `get_control_plane_status`, `list_services`, `get_recent_audit_events`, `verify_audit_chain`, `create_work_plan`, and `get_work_plan`. The plan tool records a proposal but does not execute it. **The MCP server does not expose approval or execution tools.** Mutating operations remain blocked through the MCP surface; use the local console for deliberate human approval records.
+
+The MCP URL policy allows HTTP only for loopback addresses; a remote control-plane URL must use HTTPS. Requests disable environment proxy settings, reject redirects, require the strong operator token, and avoid forwarding raw upstream error details into the model context.
+
+Test the MCP adapter with the separate MCP environment:
+
+```bash
+. .mcp-venv/bin/activate
+python -m pytest -q test_mcp_server.py
+deactivate
+```
+
+For Termux, use `bash ops/run_termux_stack.sh mcp-install`, then `bash ops/run_mcp_local.sh --print-config`. The MCP process still needs a compatible MCP host on the same machine or a trusted host configured to use an HTTPS control-plane endpoint.
+
 ## Control-plane API
 
 | Method | Path | Purpose |
