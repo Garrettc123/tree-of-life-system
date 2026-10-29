@@ -3,9 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install root runtime dependencies and the nested planning-agent dependencies.
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+COPY agents/package.json ./agents/package.json
+RUN npm ci --omit=dev \
+    && npm install --prefix ./agents --omit=dev --no-package-lock \
+    && npm cache clean --force
 
 # Production stage
 FROM node:20-alpine
@@ -24,6 +27,7 @@ COPY --from=builder /app/package*.json ./
 
 # Copy application code
 COPY agents ./agents
+COPY --from=builder /app/agents/node_modules ./agents/node_modules
 COPY proto ./proto
 COPY .env.template ./.env.template
 
