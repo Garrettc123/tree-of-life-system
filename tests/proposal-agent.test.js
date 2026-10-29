@@ -53,7 +53,7 @@ describe('proposal-only workforce agents', () => {
     const result = await mcp.sendMessage('planning', 'documentation', {
       type: 'task-assignment',
       tasks: [
-        { id: 'valid-1', type: 'create_file', title: 'Draft a README' },
+        { id: 'valid-1', agent: 'documentation', type: 'create_file', title: 'Draft a README' },
         { type: 'create_issues', title: 'Missing task id' },
       ],
     });
