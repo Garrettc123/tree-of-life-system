@@ -180,6 +180,7 @@ describe('SupabaseRhnsStore', () => {
     const fetchImpl = jest.fn()
       .mockResolvedValueOnce(response([{ id: runId, status: 'created' }], 201))
       .mockResolvedValueOnce(response([{ id: runId, status: 'planning' }]))
+      .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([{ id: runId, tenant_id: tenantId, status: 'planning', goal: { action: 'agent_inventory' } }]));
     const store = makeStore(fetchImpl);
     await expect(store.createRun({
@@ -194,7 +195,7 @@ describe('SupabaseRhnsStore', () => {
     })).resolves.toMatchObject({ id: runId, status: 'created' });
 
     await expect(store.transitionRun(runId, tenantId, 'created', 'planning')).resolves.toMatchObject({ id: runId, status: 'planning' });
-    expect(await store.transitionRun(runId, tenantId, 'created', 'executing')).toBe(false);
+    expect(await store.transitionRun(runId, tenantId, 'planning', 'executing')).toBe(false);
     await expect(store.getRun(runId, tenantId)).resolves.toMatchObject({ id: runId, tenant_id: tenantId });
     expect(fetchImpl.mock.calls[1][0]).toContain('status=eq.created');
     expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
@@ -237,7 +238,7 @@ describe('SupabaseRhnsStore', () => {
     })).resolves.toMatchObject({ id: taskId, status: 'proposed' });
 
     await expect(store.transitionTask(taskId, tenantId, 'proposed', 'executing')).resolves.toMatchObject({ id: taskId, status: 'executing' });
-    expect(await store.transitionTask(taskId, tenantId, 'proposed', 'confirmed')).toBe(false);
+    expect(await store.transitionTask(taskId, tenantId, 'executing', 'confirmed')).toBe(false);
     expect(fetchImpl.mock.calls[1][0]).toContain('status=eq.proposed');
     expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
   });
