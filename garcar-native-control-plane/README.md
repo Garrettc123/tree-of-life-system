@@ -160,7 +160,7 @@ To verify the control-plane audit chain, use the console or make a local request
 Control plane:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 python -m compileall -q app.py ops/backup_db.py
 python -m pytest -q
 ```
