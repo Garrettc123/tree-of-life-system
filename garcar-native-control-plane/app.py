@@ -97,7 +97,7 @@ def init_db() -> None:
         # Migrate the legacy v0.1 schema only when hash columns are first introduced.
         # Never silently rebuild a missing hash on a newer schema: verification must flag it.
         columns = {row["name"] for row in db.execute("PRAGMA table_info(audit_events)").fetchall()}
-        legacy_hash_schema = "previous_hash" not in columns or "event_hash" not in columns
+        legacy_hash_schema = "previous_hash" not in columns and "event_hash" not in columns
         if "previous_hash" not in columns:
             db.execute("ALTER TABLE audit_events ADD COLUMN previous_hash TEXT")
         if "event_hash" not in columns:
