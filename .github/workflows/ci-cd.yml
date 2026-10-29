@@ -52,10 +52,10 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci 2>/dev/null || echo "No package-lock.json, skipping"
+        run: npm ci
 
       - name: Run Tests
-        run: npm test -- --coverage 2>/dev/null || npm test 2>/dev/null || echo "No tests found"
+        run: npm test -- --coverage --runInBand
         env:
           MONGODB_URI: mongodb://localhost:27017/test_db
           DATABASE_URL: postgresql://test_user:testpass123@localhost:5432/test_db
@@ -76,9 +76,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci 2>/dev/null || true
-      - run: npm run lint 2>/dev/null || echo "No lint script"
-      - run: npm run type-check 2>/dev/null || echo "No type-check script"
+      - run: npm ci
+      - run: npm run lint
+      - run: for file in agents/core/supabase-rhns-store.js agents/core/approval-gate.js agents/core/contracts.js agents/core/mcp-coordinator.js agents/planning/proposal-agent.js agents/planning/index.js agents/index.js agents/startup.js agents/orchestration/rewoo-executor.js tests/supabase-rhns-store.test.js tests/startup-durable-storage.test.js tests/proposal-agent.test.js tests/rewoo-executor.test.js; do node --check "$file" || exit 1; done
 
   build:
     name: Build Docker Image
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '20'
-      - run: npm audit --production 2>/dev/null || echo "No package.json or no vulnerabilities"
+      - run: npm audit --omit=dev --audit-level=high
 
   deploy-production:
     name: Deploy to Production

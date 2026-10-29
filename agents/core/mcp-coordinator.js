@@ -4,7 +4,7 @@
  */
 
 const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 class MCPCoordinator extends EventEmitter {
   constructor(config = {}) {
@@ -13,7 +13,9 @@ class MCPCoordinator extends EventEmitter {
     this.sessions = new Map();
     this.messageQueue = [];
     this.config = {
-      maxRetries: 3,
+      // Retry is opt-in per message because a timeout does not prove that a
+      // recipient did not process the request.
+      maxRetries: 0,
       timeout: 30000, // 30 seconds
       ...config
     };
@@ -57,8 +59,8 @@ class MCPCoordinator extends EventEmitter {
    * Send a message from one agent to another
    */
   async sendMessage(fromAgentId, toAgentId, message, context = {}) {
-    const sessionId = uuidv4();
-    const messageId = uuidv4();
+    const sessionId = randomUUID();
+    const messageId = randomUUID();
 
     const envelope = {
       id: messageId,
@@ -157,23 +159,34 @@ class MCPCoordinator extends EventEmitter {
       throw new Error(`Target agent is not active: ${envelope.to}`);
     }
 
+    let timeoutHandle;
     try {
-      // Call the agent's message handler
+      // Clear the timer after the handler settles so completed messages do not
+      // leave stray timers keeping the process alive.
+      const timeout = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error(`Message delivery timeout after ${this.config.timeout}ms`)),
+          this.config.timeout,
+        );
+      });
       const response = await Promise.race([
-        targetAgent.instance.handleMessage(envelope),
-        this._timeout(this.config.timeout)
+        Promise.resolve().then(() => targetAgent.instance.handleMessage(envelope)),
+        timeout,
       ]);
-
       return response;
     } catch (error) {
-      // Retry logic
-      if (envelope.retries < this.config.maxRetries) {
+      // Retrying an unknown outcome can duplicate side effects. Retries are
+      // therefore permitted only for messages explicitly declared retry-safe.
+      if (envelope.context && envelope.context.retrySafe === true
+          && envelope.retries < this.config.maxRetries) {
         envelope.retries++;
-        console.log(`[MCP] Retrying message ${envelope.id} (attempt ${envelope.retries})`);
-        await this._delay(1000 * envelope.retries); // Exponential backoff
+        console.log(`[MCP] Retrying retry-safe message ${envelope.id} (attempt ${envelope.retries})`);
+        await this._delay(1000 * (2 ** (envelope.retries - 1)));
         return await this._deliverMessage(envelope);
       }
       throw error;
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
 
