@@ -26,9 +26,10 @@ function decodePayload(payload) {
 }
 
 function hasExplicitFailure(result) {
-  return result === false
-    || (result && typeof result === 'object'
-      && (result.success === false || result.ok === false));
+  if (result === false) return true;
+  if (!result || typeof result !== 'object') return false;
+  if (result.success === false || result.ok === false) return true;
+  return typeof result.error === 'string' && result.success !== true && result.ok !== true;
 }
 
 class RuntimeAgent extends EventEmitter {
