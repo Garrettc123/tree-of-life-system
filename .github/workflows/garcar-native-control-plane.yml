@@ -45,6 +45,9 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q app.py ops/backup_db.py
 
+      - name: Validate local shell scripts
+        run: bash -n ops/*.sh
+
       - name: Run control-plane tests
         run: python -m pytest -q --junitxml=test-results.xml
 
