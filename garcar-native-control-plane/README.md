@@ -42,22 +42,14 @@ Set a different port with `PORT`, for example `PORT=8090 bash ops/run_local.sh`.
 
 ## Option B: run the full local Compose stack
 
-Docker is required. Generate both local secrets without sending them anywhere:
+Docker is required. Generate the local secrets without printing their values:
 
 ```bash
-python3 - <<'PY'
-import secrets
-print("GARCAR_OPERATOR_TOKEN=" + secrets.token_urlsafe(48))
-print("DISPATCH_SECRET=" + secrets.token_urlsafe(48))
-PY
-```
-
-Copy those two lines into a local `.env` file in this directory, then restrict permissions:
-
-```bash
-chmod 600 .env
+bash ops/init_local_env.sh
 docker compose up --build -d
 ```
+
+The script creates or repairs the two required local secrets in `.env`, restricts the file to owner-only permissions, and does not display the secret values. Do not send or commit `.env`.
 
 The app is published only at `127.0.0.1:8080`. The orchestrator has no host-published port. SQLite data is persisted in the named volumes `garcar_data` and `garcar_event_data`. Optional Supabase settings may be added to the ignored local `.env` file as `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`; leave them unset to use the local event store.
 
@@ -103,7 +95,7 @@ All control-plane protected endpoints require `X-Operator-Token`.
 
 The dispatch signature format is `sha256=<hex-digest>`. The signing secret must stay in local configuration and be shared only with an authorized event sender. Requests over 1 MB are rejected. CORS has no allowed origins by default.
 
-The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete.
+The orchestrator stores events in local SQLite when Supabase is not configured or a remote write fails. Local fallback records remain visible alongside remote results, but are **not** automatically reconciled to Supabase; inspect and reconcile those records before treating the remote store as complete. The current Compose file deliberately does not pass GitHub, Linear, or Notion API keys into the orchestrator. Do not add them until explicit per-action approval gates are implemented, because existing event handlers can create external issue/comment records when those credentials are present.
 
 ## Backup and verification
 
@@ -127,10 +119,11 @@ For a Docker Compose run, create both backups inside their respective containers
 ```bash
 mkdir -p backups
 chmod 700 backups
-docker compose exec -T control-plane python ops/backup_db.py --output /app/backups/garcar-control-plane-manual.sqlite3
-docker cp "$(docker compose ps -q control-plane):/app/backups/garcar-control-plane-manual.sqlite3" backups/
-docker compose exec -T orchestrator python backup_db.py --output /app/backups/garcar-events-manual.sqlite3
-docker cp "$(docker compose ps -q orchestrator):/app/backups/garcar-events-manual.sqlite3" backups/
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+docker compose exec -T control-plane python ops/backup_db.py --output "/app/backups/garcar-control-plane-$STAMP.sqlite3"
+docker cp "$(docker compose ps -q control-plane):/app/backups/garcar-control-plane-$STAMP.sqlite3" backups/
+docker compose exec -T orchestrator python backup_db.py --output "/app/backups/garcar-events-$STAMP.sqlite3"
+docker cp "$(docker compose ps -q orchestrator):/app/backups/garcar-events-$STAMP.sqlite3" backups/
 ```
 
 To verify the control-plane audit chain, use the console or make a local request to `/api/audit/verify` with the operator token. Keep backups outside Git and test restoration before relying on them.
