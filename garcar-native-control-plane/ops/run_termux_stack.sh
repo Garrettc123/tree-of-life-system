@@ -39,10 +39,6 @@ need_python() {
     echo "Python 3 is required. In Termux, run: pkg install python git" >&2
     exit 1
   }
-  command -v nohup >/dev/null 2>&1 || {
-    echo "nohup is required for background runtime. In Termux, run: pkg install coreutils" >&2
-    exit 1
-  }
   python3 - <<'PY'
 import sys
 if sys.version_info < (3, 11):
@@ -88,8 +84,16 @@ ensure_runtime_dirs() {
   chmod 700 "$RUNTIME_DIR" "$LOG_DIR" "$PID_DIR" "$CONTROL_DIR/data" "$ORCH_DIR/data" "$CONTROL_DIR/backups" "$ORCH_DIR/backups"
 }
 
+need_nohup() {
+  command -v nohup >/dev/null 2>&1 || {
+    echo "nohup is required for background runtime. In Termux, run: pkg install coreutils" >&2
+    exit 1
+  }
+}
+
 install_runtime() {
   need_python
+  need_nohup
   load_local_env
   ensure_runtime_dirs
 
@@ -292,8 +296,17 @@ case "$cmd" in
     ;;
   start)
     need_python
+    need_nohup
     validate_port GARCAR_CONTROL_PORT "$CONTROL_PORT"
     validate_port GARCAR_ORCHESTRATOR_PORT "$ORCH_PORT"
+    if [[ "$ORCH_PORT" != "8001" && "$ORCH_PORT" != "8080" ]]; then
+      echo "GARCAR_ORCHESTRATOR_PORT must be 8001 or 8080 so the control plane can safely verify it." >&2
+      exit 2
+    fi
+    if [[ "$CONTROL_PORT" == "$ORCH_PORT" ]]; then
+      echo "Control-plane and orchestrator ports must differ." >&2
+      exit 2
+    fi
     load_local_env
     ensure_runtime_dirs
     [[ -x "$CONTROL_VENV/bin/uvicorn" && -x "$ORCH_VENV/bin/uvicorn" ]] || {
@@ -306,7 +319,10 @@ case "$cmd" in
       stop_one orchestrator || true
       exit 1
     fi
-    start_service control-plane
+    if ! start_service control-plane; then
+      stop_one orchestrator || true
+      exit 1
+    fi
     if ! wait_for_health control-plane "http://127.0.0.1:$CONTROL_PORT/health" "garcar-native-control-plane"; then
       stop_one control-plane || true
       stop_one orchestrator || true
