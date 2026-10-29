@@ -112,7 +112,7 @@ class StartupSequence extends EventEmitter {
         requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000', 10),
       },
       grpc: {
-        host: process.env.GRPC_HOST || '0.0.0.0',
+        host: process.env.GRPC_HOST || '127.0.0.1',
         port: parseInt(process.env.GRPC_PORT || '50051', 10),
         maxReceiveMessageLength: parseInt(process.env.GRPC_MAX_RECEIVE_MESSAGE_LENGTH || '4194304', 10),
         maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304', 10),
