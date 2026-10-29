@@ -60,7 +60,7 @@ Do not mark a run successful solely because a tool call returned HTTP 2xx. Verif
 
 ### Task lifecycle
 
-`draft_pending_review -> approved -> executing -> confirmed`
+`proposed -> approved -> executing -> confirmed` (the persisted proposal record separately uses `draft_pending_review`).
 
 Alternative states: `rejected`, `failed`, `unknown_outcome`, `cancelled`.
 
@@ -175,8 +175,10 @@ The current PR branch adds a first proposal-only layer:
 - `agents/core/contracts.js`: task validation and canonical hashing.
 - `agents/core/policy-engine.js`: proposal-only defaults and depth/task/tool-call budget checks.
 - `agents/core/approval-gate.js`: exact-action approval contract requiring an atomic store adapter.
-- `agents/core/supabase-rhns-store.js`: server-only Supabase REST adapter for durable approvals, idempotent proposal persistence, and the existing CRF event/evidence ledger. Approval transitions use a single conditional database update to avoid read-then-write races.
-- `migrations/007_rhns_durable_store.sql`: additive tenant-scoped approval/proposal tables with RLS enabled and privileges restricted to `service_role`; applied to the connected `garcar-crf` project on 2026-10-29 and read-back verified.
+- `agents/core/supabase-rhns-store.js`: server-only Supabase REST adapter for durable approvals, idempotent proposal persistence, run/task lifecycle records, and the existing CRF event/evidence ledger. Approval and lifecycle transitions use single conditional database updates.
+- `migrations/007_rhns_durable_store.sql`: tenant-scoped exact-action approval and proposal tables with RLS enabled and privileges restricted to `service_role`; applied to `garcar-crf` on 2026-10-29 and read-back verified.
+- `migrations/008_rhns_run_task_ledger.sql`: tenant-scoped run/task lifecycle tables with constrained states and row-level access restricted to `service_role`; applied to `garcar-crf` on 2026-10-29 and read-back verified.
+- `agents/orchestration/rewoo-executor.js`: optional durable run/task transitions, task outcome reconciliation, synthesis evidence writes, and timeout cleanup. Persistence must succeed before the run continues.
 - `agents/planning/proposal-agent.js`: proposal generation without external side effects.
 - `agents/planning/index.js`: planner routing and rejection of unregistered recipients.
 - `agents/core/mcp-coordinator.js`: conservative retry defaults and timeout cleanup.
