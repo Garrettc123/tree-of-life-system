@@ -8,7 +8,7 @@ import os
 import re
 import sqlite3
 import uuid
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -30,10 +30,17 @@ SENSITIVE_KEY_PARTS = (
     "authorization", "private_key", "access_key", "client_secret",
 )
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="Garcar Native Control Plane",
     version="0.2.0",
     description="Local-first control API with protected operations, persistent plans, and an audit ledger.",
+    lifespan=lifespan,
 )
 
 # These are inventory labels, not evidence that external systems are online.
@@ -185,9 +192,9 @@ def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
 
 def require_operator(x_operator_token: str | None = Header(default=None)) -> str:
     expected = os.getenv("GARCAR_OPERATOR_TOKEN", "")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Operator authentication is not configured")
-    if not x_operator_token or not hmac.compare_digest(x_operator_token, expected):
+    if len(expected.encode("utf-8")) < 32:
+        raise HTTPException(status_code=503, detail="Operator authentication requires a token of at least 32 bytes")
+    if not x_operator_token or not hmac.compare_digest(x_operator_token.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Operator authentication required")
     return "operator"
 
@@ -199,11 +206,6 @@ class WorkPlan(BaseModel):
 
 class PlanApproval(BaseModel):
     confirmation: str = Field(min_length=1, max_length=180)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    init_db()
 
 
 @app.get("/health")
