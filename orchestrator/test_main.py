@@ -157,3 +157,52 @@ def test_event_history_rejects_weak_configured_operator_token(tmp_path, monkeypa
     client, _ = load_app(tmp_path, monkeypatch, operator_token="short-token")
     response = client.get("/events", headers={"X-Operator-Token": "short-token"})
     assert response.status_code == 503
+
+
+def test_external_handlers_remain_disabled_with_credentials_present_by_default(tmp_path, monkeypatch):
+    import asyncio
+
+    monkeypatch.delenv("GARCAR_ENABLE_EXTERNAL_HANDLERS", raising=False)
+    for key, value in {
+        "LINEAR_API_KEY": "test-linear-key",
+        "LINEAR_REVENUE_ISSUE_ID": "test-linear-issue",
+        "NOTION_API_KEY": "test-notion-key",
+        "NOTION_REVENUE_DB_ID": "test-notion-database",
+        "GITHUB_PAT": "test-github-token",
+        "LINEAR_TEAM_ID": "test-linear-team",
+    }.items():
+        monkeypatch.setenv(key, value)
+
+    import handlers.stripe_payment as stripe_module
+    import handlers.github_ci as github_module
+    import handlers.rhns_alert as alert_module
+
+    importlib.reload(stripe_module)
+    importlib.reload(github_module)
+    importlib.reload(alert_module)
+
+    calls = []
+
+    async def record_call(name, *args, **kwargs):
+        calls.append(name)
+
+    monkeypatch.setattr(stripe_module, "_comment_linear", lambda *args, **kwargs: record_call("linear"))
+    monkeypatch.setattr(stripe_module, "_log_notion", lambda *args, **kwargs: record_call("notion"))
+    monkeypatch.setattr(github_module, "_open_issue", lambda *args, **kwargs: record_call("github_issue"))
+    monkeypatch.setattr(github_module, "_create_linear_incident", lambda *args, **kwargs: record_call("linear_incident"))
+    monkeypatch.setattr(alert_module, "_open_issue", lambda *args, **kwargs: record_call("alert_issue"))
+    monkeypatch.setattr(alert_module, "_create_p0", lambda *args, **kwargs: record_call("alert_linear"))
+
+    asyncio.run(stripe_module.handle({
+        "event_type": "stripe.payment_intent_succeeded",
+        "payload": {"amount_total": 500, "currency": "usd", "customer_email": "private@example.com"},
+        "trace_id": "trace-stripe",
+    }, "event-stripe"))
+    asyncio.run(github_module.handle({
+        "status": "failure", "repo": "demo/repo", "branch": "main", "trace_id": "trace-ci"
+    }, "event-ci"))
+    asyncio.run(alert_module.handle({
+        "service": "demo", "error": "synthetic", "severity": "critical", "trace_id": "trace-alert"
+    }, "event-alert"))
+
+    assert calls == []
