@@ -229,22 +229,34 @@ def status(actor: str = Depends(require_operator)) -> dict[str, Any]:
         "mode": "local_self_hosted",
         "database": "available",
         "spending_authorized": False,
-        "external_services_verified": False,
+        "external_services_checked_by_this_endpoint": False,
         "service_count": len(SERVICE_INVENTORY),
         "stored_plan_count": plan_count,
         "audit_event_count": audit_count,
+        "note": "Use /api/services for the configured orchestrator health probe.",
     }
 
 
 def _validated_orchestrator_health_url() -> str:
-    """Only probe an operator-configured, known-local orchestrator endpoint."""
+    """Only probe an operator-configured, known-local orchestrator health endpoint."""
     if not ORCHESTRATOR_HEALTH_URL:
         return ""
-    parsed = urlsplit(ORCHESTRATOR_HEALTH_URL)
-    allowed_hosts = {"orchestrator", "localhost", "127.0.0.1", "::1"}
-    if parsed.scheme != "http" or parsed.hostname not in allowed_hosts or parsed.port not in {None, 8001, 8080}:
+    try:
+        parsed = urlsplit(ORCHESTRATOR_HEALTH_URL)
+        port = parsed.port
+    except ValueError:
         return ""
-    if parsed.username or parsed.password:
+    allowed_hosts = {"orchestrator", "localhost", "127.0.0.1", "::1"}
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in allowed_hosts
+        or port not in {None, 8001, 8080}
+        or parsed.path != "/health"
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
         return ""
     return ORCHESTRATOR_HEALTH_URL
 
@@ -268,7 +280,9 @@ async def collect_service_status() -> list[dict[str, Any]]:
                 payload = response.json()
                 service["status"] = (
                     "healthy"
-                    if payload.get("status") == "ok" and payload.get("service") == "garcar-dispatch"
+                    if isinstance(payload, dict)
+                    and payload.get("status") == "ok"
+                    and payload.get("service") == "garcar-dispatch"
                     else "unexpected_health_response"
                 )
             else:
