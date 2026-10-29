@@ -18,7 +18,7 @@ function assertSafePayload(value, path = 'payload') {
   }
   if (!value || typeof value !== 'object') return;
   for (const [key, item] of Object.entries(value)) {
-    if (/(secret|password|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|credential)/i.test(key)) {
+    if (/(secret|password|authorization|api[_-]?key|(^|[_-])token($|[_-])|private[_-]?key|credential|cookie|session[_-]?id|signing[_-]?key)/i.test(key)) {
       throw new Error('Sensitive field is not permitted in durable RHNS payload: ' + path + '.' + key);
     }
     assertSafePayload(item, path + '.' + key);
