@@ -1,6 +1,6 @@
 # GARCAR ENTERPRISE — ATLAS Dispatch Service
 # Deploy on Railway alongside garcar-dispatch.
-# pip install fastapi uvicorn supabase httpx python-dotenv pydantic
+# pip install -r requirements-atlas.txt
 
 import asyncio, hashlib, hmac, json, logging, os, httpx
 from urllib.parse import urlsplit
