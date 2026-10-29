@@ -59,9 +59,12 @@ class PlanningAgent {
         this.config.linearTeamId
       );
 
-      this.eventBus.publish('planning:analysis-complete', { 
+      const analysisStatus = this.gapAnalyzer.getStatus();
+
+      this.eventBus.publish('planning:analysis-complete', {
         gapCount: gaps.length,
-        gaps 
+        coverage: analysisStatus,
+        gaps,
       }, 'planning');
 
       // Step 2: Generate tasks from gaps
@@ -104,6 +107,9 @@ class PlanningAgent {
 
       return {
         success: true,
+        complete: !analysisStatus.partial,
+        partial: analysisStatus.partial,
+        analysisStatus,
         gapsFound: gaps.length,
         tasksGenerated: tasks.length,
         tasksAssigned,
@@ -121,7 +127,12 @@ class PlanningAgent {
 
       return {
         success: false,
-        error: error.message
+        complete: false,
+        partial: true,
+        error: error.message,
+        analysisStatus: typeof this.gapAnalyzer.getStatus === 'function'
+          ? this.gapAnalyzer.getStatus()
+          : undefined,
       };
     }
   }
