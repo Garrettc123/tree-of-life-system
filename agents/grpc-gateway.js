@@ -12,6 +12,21 @@ const EventEmitter = require('events');
 const { randomUUID } = require('crypto');
 const RuntimeAgent = require('./runtime-agent');
 
+function assertSafeBinding(host, allowInsecureRemote = false) {
+  const normalized = String(host || '').toLowerCase();
+  const loopback = normalized === 'localhost'
+    || normalized === '127.0.0.1'
+    || normalized === '::1'
+    || normalized === '[::1]';
+
+  if (!loopback && !allowInsecureRemote) {
+    throw new Error(
+      `Refusing to bind unauthenticated gRPC to non-loopback host "${host}". `
+      + 'Use a loopback host or explicitly set GRPC_ALLOW_INSECURE_REMOTE=true only on a trusted private network.',
+    );
+  }
+}
+
 class gRPCGateway extends EventEmitter {
   constructor(config = {}) {
     super();
@@ -24,6 +39,7 @@ class gRPCGateway extends EventEmitter {
       maxSendMessageLength: config.maxSendMessageLength || 4 * 1024 * 1024,
       keepaliveTime: config.keepaliveTime || 30000,
       keepaliveTimeout: config.keepaliveTimeout || 10000,
+      allowInsecureRemote: process.env.GRPC_ALLOW_INSECURE_REMOTE === 'true',
       ...config,
     };
 
@@ -76,6 +92,7 @@ class gRPCGateway extends EventEmitter {
 
   async startServer() {
     try {
+      assertSafeBinding(this.config.host, this.config.allowInsecureRemote === true);
       await this.loadProto();
 
       this.server = new grpc.Server({
@@ -322,5 +339,7 @@ class gRPCGateway extends EventEmitter {
     };
   }
 }
+
+gRPCGateway.assertSafeBinding = assertSafeBinding;
 
 module.exports = gRPCGateway;
