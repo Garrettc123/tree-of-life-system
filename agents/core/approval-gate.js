@@ -9,9 +9,9 @@ class ApprovalGate {
   constructor({ store, clock = () => Date.now(), ttlMs = 15 * 60 * 1000 } = {}) {
     if (!store || typeof store.create !== 'function'
       || typeof store.get !== 'function'
-      || typeof store.update !== 'function'
+      || typeof store.compareAndSet !== 'function'
       || typeof store.consumeIfMatches !== 'function') {
-      throw new TypeError('ApprovalGate requires a store with create/get/consumeIfMatches methods');
+      throw new TypeError('ApprovalGate requires a store with create/get/compareAndSet/consumeIfMatches methods');
     }
     this.store = store;
     this.clock = clock;
@@ -59,7 +59,8 @@ class ApprovalGate {
     if (record.tenantId !== approver.tenantId) throw new Error('Cross-tenant approval denied');
     if (record.expiresAt <= this.clock()) throw new Error('Approval expired');
     const updated = { ...record, state: 'approved', approvedBy: approver.id, approvedAt: this.clock() };
-    await this.store.update(approvalId, updated);
+    const changed = await this.store.compareAndSet(approvalId, 'pending', updated);
+    if (!changed) throw new Error('Approval could not be approved; it may have changed concurrently');
     return { approvalId, state: 'approved', actionHash: record.actionHash };
   }
 
