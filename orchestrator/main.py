@@ -55,7 +55,7 @@ event_log = EventLog(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 def _verify_sig(body: bytes, sig: Optional[str]) -> bool:
     """Verify the exact request bytes; an unset secret must never allow a request."""
-    if not DISPATCH_SECRET or not sig:
+    if len(DISPATCH_SECRET.encode("utf-8")) < 32 or not sig:
         return False
     expected = "sha256=" + hmac.new(
         DISPATCH_SECRET.encode("utf-8"), body, hashlib.sha256
@@ -80,9 +80,9 @@ def _redact_for_storage(value):
 
 
 def require_operator(x_operator_token: Optional[str] = Header(default=None, alias="X-Operator-Token")) -> str:
-    if not OPERATOR_TOKEN:
-        raise HTTPException(503, "Operator authentication is not configured")
-    if not x_operator_token or not hmac.compare_digest(x_operator_token, OPERATOR_TOKEN):
+    if len(OPERATOR_TOKEN.encode("utf-8")) < 32:
+        raise HTTPException(503, "Operator authentication requires a token of at least 32 bytes")
+    if not x_operator_token or not hmac.compare_digest(x_operator_token.encode("utf-8"), OPERATOR_TOKEN.encode("utf-8")):
         raise HTTPException(401, "Operator authentication required")
     return "operator"
 
@@ -109,8 +109,8 @@ async def dispatch(
     background: BackgroundTasks,
     x_dispatch_sig: Optional[str] = Header(default=None, alias="X-Dispatch-Sig"),
 ):
-    if not DISPATCH_SECRET:
-        raise HTTPException(503, "Dispatch signature validation is not configured")
+    if len(DISPATCH_SECRET.encode("utf-8")) < 32:
+        raise HTTPException(503, "Dispatch signature validation requires a secret of at least 32 bytes")
     content_length = request.headers.get("content-length")
     if content_length:
         try:
