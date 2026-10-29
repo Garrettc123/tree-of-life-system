@@ -352,12 +352,14 @@ class SupabaseRhnsStore {
     return Array.isArray(rows) && rows.length === 1;
   }
 
-  async consumeIfMatches(id, actionHash, consumedAt) {
+  async consumeIfMatches(id, actionHash, consumedAt, tenantId) {
     requireUuid(id, 'approval id');
+    requireUuid(tenantId, 'approval tenantId');
     const rows = await this._request('rhns_action_approvals', {
       method: 'PATCH',
       query: {
         id: 'eq.' + id,
+        tenant_id: 'eq.' + tenantId,
         action_hash: 'eq.' + actionHash,
         state: 'eq.approved',
         expires_at_ms: 'gt.' + consumedAt,
