@@ -175,6 +175,8 @@ The current PR branch adds a first proposal-only layer:
 - `agents/core/contracts.js`: task validation and canonical hashing.
 - `agents/core/policy-engine.js`: proposal-only defaults and depth/task/tool-call budget checks.
 - `agents/core/approval-gate.js`: exact-action approval contract requiring an atomic store adapter.
+- `agents/core/supabase-rhns-store.js`: server-only Supabase REST adapter for durable approvals, idempotent proposal persistence, and the existing CRF event/evidence ledger. Approval transitions use a single conditional database update to avoid read-then-write races.
+- `migrations/007_rhns_durable_store.sql`: additive tenant-scoped approval/proposal tables with RLS enabled and privileges restricted to `service_role`; applied to the connected `garcar-crf` project on 2026-10-29 and read-back verified.
 - `agents/planning/proposal-agent.js`: proposal generation without external side effects.
 - `agents/planning/index.js`: planner routing and rejection of unregistered recipients.
 - `agents/core/mcp-coordinator.js`: conservative retry defaults and timeout cleanup.
