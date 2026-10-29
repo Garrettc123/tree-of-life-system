@@ -252,7 +252,7 @@ def _validated_orchestrator_health_url() -> str:
     if (
         parsed.scheme != "http"
         or parsed.hostname not in allowed_hosts
-        or port not in {None, 8001, 8080}
+        or port not in {8001, 8080}
         or parsed.path != "/health"
         or parsed.query
         or parsed.fragment
