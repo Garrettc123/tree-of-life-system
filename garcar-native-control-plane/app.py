@@ -1,28 +1,38 @@
-"""Minimal self-hosted Garcar control plane; safe-by-default reference implementation."""
+"""Local-first Garcar control plane with fail-closed execution policy."""
 from __future__ import annotations
 
 import hmac
 import json
 import os
+import re
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 APP_NAME = "garcar-native-control-plane"
-DB_PATH = os.getenv("GARCAR_DB_PATH", str(Path(__file__).with_name("garcar-control-plane.sqlite3")))
+APP_DIR = Path(__file__).resolve().parent
+CONSOLE_PATH = APP_DIR / "console" / "index.html"
+DB_PATH = os.getenv("GARCAR_DB_PATH", str(APP_DIR / "data" / "garcar-control-plane.sqlite3"))
+READ_ONLY_ACTIONS = {"health_check", "list_services"}
+SENSITIVE_KEY_PARTS = (
+    "token", "secret", "password", "credential", "api_key", "apikey",
+    "authorization", "private_key", "access_key", "client_secret",
+)
 
 app = FastAPI(
     title="Garcar Native Control Plane",
-    version="0.1.0",
-    description="Self-hosted control API with local audit records and fail-closed execution policy.",
+    version="0.2.0",
+    description="Local-first control API with protected operations, persistent plans, and an audit ledger.",
 )
 
-# This is an inventory of known service names, not a claim that those services are running.
+# These are inventory labels, not evidence that external systems are online.
 SERVICE_INVENTORY = [
     {"name": "native-control-plane", "kind": "api", "status": "current_process"},
     {"name": "web", "kind": "application", "status": "external_status_unverified"},
@@ -30,32 +40,68 @@ SERVICE_INVENTORY = [
     {"name": "scheduler", "kind": "scheduler", "status": "external_status_unverified"},
 ]
 
-READ_ONLY_ACTIONS = {"health_check", "list_services"}
-
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def connect_db() -> sqlite3.Connection:
+@contextmanager
+def connect_db() -> Iterator[sqlite3.Connection]:
+    """Open, commit/rollback, and always close one SQLite connection."""
     path = Path(DB_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(path), timeout=5)
     connection.row_factory = sqlite3.Row
-    return connection
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def init_db() -> None:
     with connect_db() as db:
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS audit_events (
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS audit_events (
                 id TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
                 actor TEXT NOT NULL,
                 event_type TEXT NOT NULL,
                 detail_json TEXT NOT NULL
-            )
-        """)
+            )"""
+        )
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS work_plans (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                action TEXT NOT NULL,
+                parameters_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                requires_approval INTEGER NOT NULL,
+                approved_at TEXT,
+                approved_by TEXT
+            )"""
+        )
+
+
+def redact_sensitive(value: Any) -> Any:
+    """Redact values under secret-like keys before they reach disk or responses."""
+    if isinstance(value, dict):
+        cleaned: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized = re.sub(r"[^a-z0-9_]", "", str(key).lower())
+            if any(part in normalized for part in SENSITIVE_KEY_PARTS):
+                cleaned[str(key)] = "[REDACTED]"
+            else:
+                cleaned[str(key)] = redact_sensitive(item)
+        return cleaned
+    if isinstance(value, list):
+        return [redact_sensitive(item) for item in value]
+    return value
 
 
 def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
@@ -63,13 +109,12 @@ def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
     with connect_db() as db:
         db.execute(
             "INSERT INTO audit_events (id, created_at, actor, event_type, detail_json) VALUES (?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), utc_now(), actor, event_type, json.dumps(detail, sort_keys=True)),
+            (str(uuid.uuid4()), utc_now(), actor, event_type, json.dumps(redact_sensitive(detail), sort_keys=True)),
         )
 
 
 def require_operator(x_operator_token: str | None = Header(default=None)) -> str:
     expected = os.getenv("GARCAR_OPERATOR_TOKEN", "")
-    # Protected operations fail closed when no token has been configured.
     if not expected:
         raise HTTPException(status_code=503, detail="Operator authentication is not configured")
     if not x_operator_token or not hmac.compare_digest(x_operator_token, expected):
@@ -82,6 +127,10 @@ class WorkPlan(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class PlanApproval(BaseModel):
+    confirmation: str = Field(min_length=1, max_length=180)
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -89,66 +138,148 @@ def startup() -> None:
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Liveness only: does not claim database or integration readiness."""
     return {"status": "ok", "service": APP_NAME, "version": app.version}
+
+
+@app.get("/console", include_in_schema=False)
+def console() -> FileResponse:
+    if not CONSOLE_PATH.is_file():
+        raise HTTPException(status_code=404, detail="Console assets are not installed")
+    return FileResponse(CONSOLE_PATH, media_type="text/html")
 
 
 @app.get("/api/status")
 def status(actor: str = Depends(require_operator)) -> dict[str, Any]:
     audit(actor, "status_read", {})
+    with connect_db() as db:
+        db.execute("SELECT 1").fetchone()
+        plan_count = db.execute("SELECT COUNT(*) AS n FROM work_plans").fetchone()["n"]
+        audit_count = db.execute("SELECT COUNT(*) AS n FROM audit_events").fetchone()["n"]
     return {
         "control_plane": "available",
         "mode": "local_self_hosted",
+        "database": "available",
         "spending_authorized": False,
-        "live_external_services_verified": False,
+        "external_services_verified": False,
         "service_count": len(SERVICE_INVENTORY),
+        "stored_plan_count": plan_count,
+        "audit_event_count": audit_count,
     }
 
 
 @app.get("/api/services")
 def list_services(actor: str = Depends(require_operator)) -> dict[str, Any]:
     audit(actor, "service_inventory_read", {"count": len(SERVICE_INVENTORY)})
-    return {"services": SERVICE_INVENTORY, "note": "Inventory only; external runtime states have not been checked."}
+    return {
+        "services": SERVICE_INVENTORY,
+        "note": "Inventory only; external runtime states have not been checked.",
+    }
 
 
 @app.post("/api/work/plan")
 def plan_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
-    safe = work.action in READ_ONLY_ACTIONS
+    action = work.action.strip()
+    if not action:
+        raise HTTPException(status_code=422, detail="Action cannot be blank")
+    parameters = redact_sensitive(work.parameters)
+    read_only = action in READ_ONLY_ACTIONS
+    plan_id = str(uuid.uuid4())
+    state = "ready_read_only" if read_only else "approval_required"
+    created_at = utc_now()
+    with connect_db() as db:
+        db.execute(
+            """INSERT INTO work_plans
+               (id, created_at, actor, action, parameters_json, status, requires_approval)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (plan_id, created_at, actor, action, json.dumps(parameters, sort_keys=True), state, int(not read_only)),
+        )
     result = {
-        "plan_id": str(uuid.uuid4()),
-        "action": work.action,
-        "parameters": work.parameters,
-        "mode": "read_only" if safe else "approval_required",
-        "requires_approval": not safe,
-        "executable_now": safe,
+        "plan_id": plan_id,
+        "created_at": created_at,
+        "action": action,
+        "parameters": parameters,
+        "status": state,
+        "mode": "read_only" if read_only else "approval_required",
+        "requires_approval": not read_only,
+        "executable_now": read_only,
         "external_side_effects": False,
     }
     audit(actor, "work_plan_created", result)
     return result
 
 
+@app.get("/api/work/{plan_id}")
+def get_plan(plan_id: str, actor: str = Depends(require_operator)) -> dict[str, Any]:
+    with connect_db() as db:
+        row = db.execute("SELECT * FROM work_plans WHERE id = ?", (plan_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return {
+        "plan_id": row["id"],
+        "created_at": row["created_at"],
+        "action": row["action"],
+        "parameters": json.loads(row["parameters_json"]),
+        "status": row["status"],
+        "requires_approval": bool(row["requires_approval"]),
+        "approved_at": row["approved_at"],
+        "approved_by": row["approved_by"],
+        "execution_enabled": row["action"] in READ_ONLY_ACTIONS,
+    }
+
+
+@app.post("/api/work/{plan_id}/approve")
+def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(require_operator)) -> dict[str, Any]:
+    """Record deliberate operator approval; approval does not enable mutation execution."""
+    expected_confirmation = f"APPROVE {plan_id}"
+    if not hmac.compare_digest(approval.confirmation, expected_confirmation):
+        raise HTTPException(status_code=400, detail=f"Confirmation must exactly equal: {expected_confirmation}")
+    with connect_db() as db:
+        row = db.execute("SELECT * FROM work_plans WHERE id = ?", (plan_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        if row["action"] in READ_ONLY_ACTIONS:
+            raise HTTPException(status_code=409, detail="Read-only plans do not require approval")
+        if row["status"] != "approval_required":
+            raise HTTPException(status_code=409, detail="Plan is not awaiting approval")
+        approved_at = utc_now()
+        db.execute(
+            "UPDATE work_plans SET status = ?, approved_at = ?, approved_by = ? WHERE id = ?",
+            ("approved_not_executable", approved_at, actor, plan_id),
+        )
+    audit(actor, "work_plan_approval_recorded", {"plan_id": plan_id, "action": row["action"]})
+    return {
+        "plan_id": plan_id,
+        "status": "approved_not_executable",
+        "approval_recorded": True,
+        "execution_enabled": False,
+        "note": "Approval evidence was recorded. This version still blocks all mutating action execution.",
+    }
+
+
 @app.post("/api/work/execute")
 def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
-    # Deliberately no arbitrary shell, deployment, payment, or integration execution.
-    if work.action not in READ_ONLY_ACTIONS:
-        audit(actor, "work_execution_blocked", {"action": work.action, "reason": "not_in_read_only_allowlist"})
+    action = work.action.strip()
+    if action not in READ_ONLY_ACTIONS:
+        audit(actor, "work_execution_blocked", {"action": action, "reason": "not_in_read_only_allowlist"})
         raise HTTPException(
             status_code=403,
             detail="Action is not in the read-only allowlist; no action was executed.",
         )
-
-    if work.action == "health_check":
+    if action == "health_check":
         result: dict[str, Any] = health()
     else:
-        result = {"services": SERVICE_INVENTORY, "note": "Inventory only; external runtime states have not been checked."}
-
-    audit(actor, "read_only_work_executed", {"action": work.action})
-    return {"executed": True, "action": work.action, "result": result}
+        result = {
+            "services": SERVICE_INVENTORY,
+            "note": "Inventory only; external runtime states have not been checked.",
+        }
+    audit(actor, "read_only_work_executed", {"action": action})
+    return {"executed": True, "action": action, "result": result}
 
 
 @app.get("/api/audit")
 def get_audit(limit: int = 50, actor: str = Depends(require_operator)) -> dict[str, Any]:
     safe_limit = max(1, min(limit, 200))
-    init_db()
     with connect_db() as db:
         rows = db.execute(
             "SELECT id, created_at, actor, event_type, detail_json FROM audit_events ORDER BY created_at DESC LIMIT ?",
