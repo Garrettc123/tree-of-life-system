@@ -175,6 +175,7 @@ class EventLog:
                     "payload": row["payload"],
                     "status": row["status"],
                     "error_detail": row["error_detail"],
+                    "local_fallback": True,
                 }
                 for row in rows
             ]
@@ -198,7 +199,19 @@ class EventLog:
                 response.raise_for_status()
                 result = response.json()
                 if isinstance(result, list):
-                    return result
+                    # Keep local fallback records visible after the remote store recovers.
+                    local_events = self._fetch_local(safe_limit, source)
+                    combined = result + local_events
+                    combined.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+                    seen: set[str] = set()
+                    unique = []
+                    for item in combined:
+                        event_id = str(item.get("id", ""))
+                        if event_id in seen:
+                            continue
+                        seen.add(event_id)
+                        unique.append(item)
+                    return unique[:safe_limit]
                 log.warning("Supabase fetch returned an unexpected shape; using local events")
                 return self._fetch_local(safe_limit, source)
         except Exception as exc:
