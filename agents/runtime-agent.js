@@ -4,7 +4,7 @@
  */
 
 const EventEmitter = require('events');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 class RuntimeAgent extends EventEmitter {
   constructor(spec = {}) {
@@ -45,7 +45,7 @@ class RuntimeAgent extends EventEmitter {
     this.tasksProcessed += 1;
     this.lastHeartbeat = new Date().toISOString();
     this.emit('event', {
-      id: uuidv4(),
+      id: randomUUID(),
       type: 'task.completed',
       timestamp: this.lastHeartbeat,
       payload: Buffer.from(JSON.stringify({ taskId: task.taskId, taskType: task.taskType })),
