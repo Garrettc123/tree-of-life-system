@@ -71,7 +71,7 @@ GARCAR_TUNNEL_ALLOWED_MAIL=you@example.com bash ops/run_termux_stack.sh tunnel
 
 Replace the example with an email address you control. The command refuses to start without a single specific email address, verifies both local APIs, displays a public-exposure warning, and requires you to type an exact confirmation phrase. Cloudflare then requires an email one-time PIN before visitors can reach the console; the Garcar operator token is still separately required for protected API actions. The tunnel runs in the foreground; keep Termux open and press `Ctrl+C` to end it. Its `trycloudflare.com` URL is temporary and changes on restart.
 
-This is **for temporary testing, not production hosting**. Cloudflare states that Quick Tunnels have no uptime guarantee and are limited to 200 in-flight requests; the URL stops working when the tunnel process stops. See the [official Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Do not remove the email gate, share the operator token, or commit `.env`.
+This is **for temporary testing, not production hosting**. Cloudflare states that Quick Tunnels have no uptime guarantee and are limited to 200 in-flight requests; the URL stops working when the tunnel process stops. See the [official Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Cloudflare's issue tracker also has a report of very short email-auth sessions in some `--allowed-mail` builds; test the currently installed version before relying on access ([issue #1752](https://github.com/cloudflare/cloudflared/issues/1752)). Do not remove the email gate, share the operator token, or commit `.env`.
 
 ## Option A: run the control plane by itself (Python 3.12+)
 
