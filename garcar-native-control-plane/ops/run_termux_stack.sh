@@ -68,11 +68,12 @@ load_local_env() {
     esac
   done < "$ENV_FILE"
 
-  if [[ ${#GARCAR_OPERATOR_TOKEN:-0} -lt 32 ]]; then
+  local operator_token="${GARCAR_OPERATOR_TOKEN:-}" dispatch_secret="${DISPATCH_SECRET:-}"
+  if (( ${#operator_token} < 32 )); then
     echo "GARCAR_OPERATOR_TOKEN is missing or shorter than 32 characters." >&2
     exit 1
   fi
-  if [[ ${#DISPATCH_SECRET:-0} -lt 32 ]]; then
+  if (( ${#dispatch_secret} < 32 )); then
     echo "DISPATCH_SECRET is missing or shorter than 32 characters." >&2
     exit 1
   fi
@@ -116,7 +117,8 @@ pid_is_expected() {
 }
 
 service_pid() {
-  local service="$1" pidfile="$PID_DIR/$service.pid" pattern
+  local service="$1" pidfile pattern pid
+  pidfile="$PID_DIR/$service.pid"
   [[ -f "$pidfile" ]] || return 1
   read -r pid < "$pidfile" || return 1
   case "$service" in
@@ -155,11 +157,29 @@ wait_for_health() {
 }
 
 start_service() {
-  local service="$1" pidfile="$PID_DIR/$service.pid"
-  shift
+  local service="$1" pidfile url expected
+  pidfile="$PID_DIR/$service.pid"
   if service_pid "$service" >/dev/null 2>&1; then
     echo "$service already appears to be running."
     return 0
+  fi
+  case "$service" in
+    control-plane)
+      url="http://127.0.0.1:$CONTROL_PORT/health"
+      expected="garcar-native-control-plane"
+      ;;
+    orchestrator)
+      url="http://127.0.0.1:$ORCH_PORT/health"
+      expected="garcar-dispatch"
+      ;;
+    *)
+      echo "Unknown service: $service" >&2
+      return 2
+      ;;
+  esac
+  if health_ok "$url" "$expected"; then
+    echo "$service already answers on its configured port but is not managed by this script; refusing to start a duplicate." >&2
+    return 2
   fi
   rm -f "$pidfile"
 
@@ -187,7 +207,8 @@ start_service() {
 }
 
 stop_one() {
-  local service="$1" pidfile="$PID_DIR/$service.pid" pid i pattern
+  local service="$1" pidfile pid i pattern
+  pidfile="$PID_DIR/$service.pid"
   [[ -f "$pidfile" ]] || return 0
   read -r pid < "$pidfile" || { rm -f "$pidfile"; return 0; }
   case "$service" in
@@ -306,6 +327,10 @@ case "$cmd" in
   backup)
     load_local_env
     ensure_runtime_dirs
+    [[ -x "$CONTROL_VENV/bin/python" && -x "$ORCH_VENV/bin/python" ]] || {
+      echo "Install environments first: bash ops/run_termux_stack.sh install" >&2
+      exit 1
+    }
     stamp="$(date -u +%Y%m%dT%H%M%SZ)"
     GARCAR_DB_PATH="$CONTROL_DB" "$CONTROL_VENV/bin/python" "$CONTROL_DIR/ops/backup_db.py" --output "$CONTROL_DIR/backups/garcar-control-plane-$stamp.sqlite3"
     GARCAR_EVENT_DB_PATH="$ORCH_DB" "$ORCH_VENV/bin/python" "$ORCH_DIR/backup_db.py" --output "$CONTROL_DIR/backups/garcar-events-$stamp.sqlite3"
