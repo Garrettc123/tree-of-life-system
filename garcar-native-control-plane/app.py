@@ -12,15 +12,18 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
+import httpx
 from pydantic import BaseModel, Field
 
 APP_NAME = "garcar-native-control-plane"
 APP_DIR = Path(__file__).resolve().parent
 CONSOLE_PATH = APP_DIR / "console" / "index.html"
 DB_PATH = os.getenv("GARCAR_DB_PATH", str(APP_DIR / "data" / "garcar-control-plane.sqlite3"))
+ORCHESTRATOR_HEALTH_URL = os.getenv("GARCAR_ORCHESTRATOR_HEALTH_URL", "").strip()
 READ_ONLY_ACTIONS = {"health_check", "list_services"}
 SENSITIVE_KEY_PARTS = (
     "token", "secret", "password", "credential", "api_key", "apikey",
@@ -36,6 +39,7 @@ app = FastAPI(
 # These are inventory labels, not evidence that external systems are online.
 SERVICE_INVENTORY = [
     {"name": "native-control-plane", "kind": "api", "status": "current_process"},
+    {"name": "orchestrator", "kind": "event-api", "status": "external_status_unverified"},
     {"name": "web", "kind": "application", "status": "external_status_unverified"},
     {"name": "worker", "kind": "worker", "status": "external_status_unverified"},
     {"name": "scheduler", "kind": "scheduler", "status": "external_status_unverified"},
@@ -232,12 +236,61 @@ def status(actor: str = Depends(require_operator)) -> dict[str, Any]:
     }
 
 
+def _validated_orchestrator_health_url() -> str:
+    """Only probe an operator-configured, known-local orchestrator endpoint."""
+    if not ORCHESTRATOR_HEALTH_URL:
+        return ""
+    parsed = urlsplit(ORCHESTRATOR_HEALTH_URL)
+    allowed_hosts = {"orchestrator", "localhost", "127.0.0.1", "::1"}
+    if parsed.scheme != "http" or parsed.hostname not in allowed_hosts or parsed.port not in {None, 8001, 8080}:
+        return ""
+    if parsed.username or parsed.password:
+        return ""
+    return ORCHESTRATOR_HEALTH_URL
+
+
+async def collect_service_status() -> list[dict[str, Any]]:
+    services = [dict(service) for service in SERVICE_INVENTORY]
+    for service in services:
+        if service["name"] != "orchestrator":
+            continue
+        if not ORCHESTRATOR_HEALTH_URL:
+            continue
+        url = _validated_orchestrator_health_url()
+        service["checked_at"] = utc_now()
+        if not url:
+            service["status"] = "invalid_health_url_config"
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=2.0, follow_redirects=False) as client:
+                response = await client.get(url)
+            if response.status_code == 200:
+                payload = response.json()
+                service["status"] = (
+                    "healthy"
+                    if payload.get("status") == "ok" and payload.get("service") == "garcar-dispatch"
+                    else "unexpected_health_response"
+                )
+            else:
+                service["status"] = "unhealthy"
+                service["http_status"] = response.status_code
+        except Exception as exc:
+            service["status"] = "unreachable"
+            service["check_error"] = type(exc).__name__
+    return services
+
+
 @app.get("/api/services")
-def list_services(actor: str = Depends(require_operator)) -> dict[str, Any]:
-    audit(actor, "service_inventory_read", {"count": len(SERVICE_INVENTORY)})
+async def list_services(actor: str = Depends(require_operator)) -> dict[str, Any]:
+    services = await collect_service_status()
+    audit(
+        actor,
+        "service_inventory_read",
+        {"count": len(services), "statuses": {item["name"]: item["status"] for item in services}},
+    )
     return {
-        "services": SERVICE_INVENTORY,
-        "note": "Inventory only; external runtime states have not been checked.",
+        "services": services,
+        "note": "Only the orchestrator is actively checked when a known-local health URL is configured; other external runtime states remain unverified.",
     }
 
 
@@ -325,7 +378,7 @@ def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(requ
 
 
 @app.post("/api/work/execute")
-def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
+async def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
     action = work.action.strip()
     if action not in READ_ONLY_ACTIONS:
         audit(actor, "work_execution_blocked", {"action": action, "reason": "not_in_read_only_allowlist"})
@@ -336,9 +389,10 @@ def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict
     if action == "health_check":
         result: dict[str, Any] = health()
     else:
+        services = await collect_service_status()
         result = {
-            "services": SERVICE_INVENTORY,
-            "note": "Inventory only; external runtime states have not been checked.",
+            "services": services,
+            "note": "Only the orchestrator is actively checked when a known-local health URL is configured; other external runtime states remain unverified.",
         }
     audit(actor, "read_only_work_executed", {"action": action})
     return {"executed": True, "action": action, "result": result}
