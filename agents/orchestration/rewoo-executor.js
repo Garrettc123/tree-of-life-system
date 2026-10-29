@@ -15,7 +15,7 @@
  */
 
 const EventEmitter = require('events');
-const uuid = require('uuid');
+const { randomUUID } = require('crypto');
 
 class ReWOOExecutor extends EventEmitter {
   constructor(config = {}) {
@@ -89,7 +89,7 @@ class ReWOOExecutor extends EventEmitter {
   }
 
   async execute(task, context = {}) {
-    const executionId = uuid.v4();
+    const executionId = randomUUID();
     const execution = {
       id: executionId,
       task,
