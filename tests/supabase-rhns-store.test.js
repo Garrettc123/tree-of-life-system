@@ -30,6 +30,7 @@ describe('SupabaseRhnsStore', () => {
   test('stores approval requests using tenant-scoped durable rows', async () => {
     const fetchImpl = jest.fn().mockResolvedValue(response(null, 201));
     const store = makeStore(fetchImpl);
+    expect(JSON.stringify(store)).not.toContain('server-only-test-key');
     await store.create({
       id: approvalId,
       tenantId,
