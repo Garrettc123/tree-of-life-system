@@ -168,8 +168,8 @@ python -m pytest -q
 Orchestrator (from `../orchestrator`):
 
 ```bash
-python -m pip install -r requirements.txt
-python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py
+python -m pip install -r requirements.txt pytest==8.3.5
+python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py handlers/stripe_payment.py handlers/github_ci.py handlers/rhns_alert.py handlers/generic.py
 python -m pytest -q test_main.py
 ```
 
