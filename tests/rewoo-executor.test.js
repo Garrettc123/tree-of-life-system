@@ -107,4 +107,25 @@ describe('ReWOO execution status is evidence-based', () => {
     expect(result.success).toBe(false);
     expect(result.stages.execution.outputs[0].error).toMatch(/policy denied/);
   });
+
+  test('treats error-only execution output as failure', async () => {
+    const executor = track({
+      stepHandler: async () => ({ error: 'connector unavailable' }),
+      synthesisHandler: async () => ({ result: { success: true }, critiques: [] }),
+    });
+    const result = await executor.execute('connector error task');
+    expect(result.success).toBe(false);
+    expect(result.stages.execution.outputs[0].error).toMatch(/connector unavailable/);
+  });
+
+  test('treats a plan with an unqualified error as unsuccessful', async () => {
+    const executor = track({
+      plan: { steps: [], error: 'planning dependency unavailable' },
+      stepHandler: async () => ({ success: true }),
+      synthesisHandler: async () => ({ result: { success: true }, critiques: [] }),
+    });
+    const result = await executor.execute('planning error task');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/planning dependency unavailable/);
+  });
 });
