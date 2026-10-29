@@ -81,7 +81,7 @@ class ApprovalGate {
       artifactHash: action.artifactHash || null,
     });
     if (actionHash !== record.actionHash) throw new Error('Action does not match approved target and arguments');
-    const consumed = await this.store.consumeIfMatches(approvalId, record.actionHash, this.clock());
+    const consumed = await this.store.consumeIfMatches(approvalId, record.actionHash, this.clock(), record.tenantId);
     if (!consumed) throw new Error('Approval could not be consumed; it may have been used concurrently');
     return { approvalId, state: 'consumed', actionHash };
   }
