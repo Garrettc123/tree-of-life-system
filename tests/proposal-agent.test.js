@@ -38,20 +38,21 @@ describe('proposal-only workforce agents', () => {
 
   test('persists proposals before acknowledging durable acceptance', async () => {
     const mcp = new MCPCoordinator({ maxRetries: 0, timeout: 100 });
-    const store = {
-      recordProposals: jest.fn().mockResolvedValue({ recorded: 1, alreadyPresent: 0 }),
-    };
     const tenantId = '11111111-1111-4111-8111-111111111111';
-    const agent = new ProposalAgent({ id: 'development' }, mcp, { store, tenantId });
+    let agent;
+    const store = {
+      recordProposals: jest.fn(async () => {
+        expect(agent.listProposals()).toHaveLength(0);
+        return { recorded: 1, alreadyPresent: 0 };
+      }),
+    };
+    agent = new ProposalAgent({ id: 'development' }, mcp, { store, tenantId });
     const result = await mcp.sendMessage('planning', 'development', {
       type: 'task-assignment',
       tasks: [{ id: 'durable-1', agent: 'development', type: 'create_file', title: 'Draft README' }],
     });
 
     expect(store.recordProposals).toHaveBeenCalledTimes(1);
-    expect(store.recordProposals.mock.invocationCallOrder[0]).toBeLessThan(
-      store.recordProposals.mock.invocationCallOrder[0] + 1,
-    );
     expect(store.recordProposals).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ proposalId: 'proposal:development:durable-1' })]),
       tenantId,
