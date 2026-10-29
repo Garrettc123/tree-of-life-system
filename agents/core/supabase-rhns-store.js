@@ -46,8 +46,17 @@ class SupabaseRhnsStore {
   #serviceRoleKey;
 
   constructor({ url, serviceRoleKey, fetchImpl = global.fetch } = {}) {
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+    if (typeof url !== 'string') {
       throw new TypeError('Supabase URL is required');
+    }
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new TypeError('Supabase URL must be an absolute HTTPS URL');
+    }
+    if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password) {
+      throw new TypeError('Supabase URL must be HTTPS and must not contain embedded credentials');
     }
     if (typeof serviceRoleKey !== 'string' || !serviceRoleKey.trim()) {
       throw new TypeError('Supabase service-role key is required');
@@ -55,7 +64,6 @@ class SupabaseRhnsStore {
     if (typeof fetchImpl !== 'function') {
       throw new TypeError('A fetch implementation is required');
     }
-    const parsed = new URL(url);
     this.url = parsed.origin;
     this.#serviceRoleKey = serviceRoleKey;
     this.fetchImpl = fetchImpl;
@@ -76,6 +84,7 @@ class SupabaseRhnsStore {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      redirect: 'error',
     });
     const text = await response.text();
     let data = null;
