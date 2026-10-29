@@ -3,6 +3,7 @@ import hmac
 import importlib
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -213,3 +214,36 @@ def test_external_handlers_remain_disabled_with_credentials_present_by_default(t
     }, "event-alert"))
 
     assert calls == []
+
+
+
+def test_http_supabase_url_is_rejected_when_service_key_is_configured(tmp_path, monkeypatch):
+    from supabase_log import EventLog
+
+    monkeypatch.setenv("GARCAR_EVENT_DB_PATH", str(tmp_path / "https-url-test.sqlite3"))
+    with pytest.raises(ValueError, match="must be a valid HTTPS base URL"):
+        EventLog("http://supabase.example", "x" * 48)
+
+
+def test_failed_event_write_releases_the_signed_request_replay_claim(tmp_path, monkeypatch):
+    client, module = load_app(tmp_path, monkeypatch)
+    client = TestClient(module.app, raise_server_exceptions=False)
+
+    async def fail_write(event):
+        raise OSError("synthetic persistence failure")
+
+    monkeypatch.setattr(module.event_log, "write", fail_write)
+    event = {"event_type": "rhns.brief", "source_system": "test", "trace_id": "trace-write-failure"}
+    body = json.dumps(event, separators=(",", ":")).encode("utf-8")
+    body_hash = hashlib.sha256(body).hexdigest()
+    response = client.post(
+        "/dispatch",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Dispatch-Sig": sign(body, "test-dispatch-secret-that-is-long-enough-32chars"),
+        },
+    )
+    assert response.status_code == 500
+    assert module.event_log.claim_dispatch_request(body_hash) is True
+    module.event_log.release_dispatch_request(body_hash)
