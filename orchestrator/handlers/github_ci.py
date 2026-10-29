@@ -46,8 +46,8 @@ async def _open_issue(repo: str, branch: str, run_url: str, sha: str, trace: str
             )
             r.raise_for_status()
             log.info("gh_issue_created url=%s", r.json().get("html_url"))
-    except Exception as e:
-        log.warning("gh_issue_failed err=%s", e)
+    except Exception as exc:
+        log.warning("gh_issue_failed error_type=%s", type(exc).__name__)
 
 
 async def _create_linear_incident(
@@ -71,5 +71,5 @@ async def _create_linear_incident(
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_incident_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_incident_failed error_type=%s", type(exc).__name__)
