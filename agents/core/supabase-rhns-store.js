@@ -93,6 +93,159 @@ class SupabaseRhnsStore {
     return { ok: true, storage: 'supabase-rest', tables: ['rhns_action_approvals', 'rhns_proposals'] };
   }
 
+  async createRun(run) {
+    requireUuid(run && run.id, 'run id');
+    requireUuid(run && run.tenantId, 'run tenantId');
+    if (typeof run.runKey !== 'string' || !run.runKey.trim()) throw new TypeError('runKey is required');
+    if (typeof run.actorId !== 'string' || !run.actorId.trim()) throw new TypeError('actorId is required');
+    if (!['read_only_observation', 'proposal_only'].includes(run.executionMode)) {
+      throw new TypeError('Unsupported RHNS execution mode');
+    }
+    if (run.status !== 'created') throw new TypeError('New RHNS runs must start in created state');
+    const goal = run.goal === undefined ? {} : run.goal;
+    const metadata = run.metadata === undefined ? {} : run.metadata;
+    assertSafePayload(goal, 'goal');
+    assertSafePayload(metadata, 'metadata');
+
+    const rows = await this._request('rhns_runs', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        id: run.id,
+        tenant_id: run.tenantId,
+        run_key: run.runKey,
+        actor_id: run.actorId,
+        execution_mode: run.executionMode,
+        status: 'created',
+        goal,
+        metadata,
+      },
+    });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Durable RHNS run insert did not return exactly one row');
+    return rows[0];
+  }
+
+  async transitionRun(id, tenantId, expectedStatus, nextStatus, patch = {}) {
+    requireUuid(id, 'run id');
+    requireUuid(tenantId, 'run tenantId');
+    const transitions = {
+      created: new Set(['planning', 'failed', 'cancelled']),
+      planning: new Set(['awaiting_approval', 'executing', 'rejected', 'failed', 'cancelled', 'unknown_outcome']),
+      awaiting_approval: new Set(['executing', 'rejected', 'failed', 'cancelled']),
+      executing: new Set(['verifying', 'failed', 'cancelled', 'unknown_outcome']),
+      verifying: new Set(['succeeded', 'failed', 'cancelled', 'unknown_outcome']),
+    };
+    if (!transitions[expectedStatus] || !transitions[expectedStatus].has(nextStatus)) {
+      throw new Error('Invalid RHNS run state transition: ' + expectedStatus + ' -> ' + nextStatus);
+    }
+
+    const update = { status: nextStatus, updated_at: new Date().toISOString() };
+    if (nextStatus === 'planning') update.started_at = patch.startedAt || new Date().toISOString();
+    if (['succeeded', 'rejected', 'failed', 'cancelled', 'unknown_outcome'].includes(nextStatus)) {
+      update.completed_at = patch.completedAt || new Date().toISOString();
+    }
+    for (const key of ['output', 'error', 'metadata']) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) {
+        assertSafePayload(patch[key], key);
+        update[key] = patch[key];
+      }
+    }
+
+    const rows = await this._request('rhns_runs', {
+      method: 'PATCH',
+      query: {
+        id: 'eq.' + id,
+        tenant_id: 'eq.' + tenantId,
+        status: 'eq.' + expectedStatus,
+        select: 'id,status,started_at,completed_at,updated_at',
+      },
+      prefer: 'return=representation',
+      body: update,
+    });
+    return Array.isArray(rows) && rows.length === 1 ? rows[0] : false;
+  }
+
+  async getRun(id, tenantId) {
+    requireUuid(id, 'run id');
+    requireUuid(tenantId, 'run tenantId');
+    const rows = await this._request('rhns_runs', {
+      query: {
+        id: 'eq.' + id,
+        tenant_id: 'eq.' + tenantId,
+        select: 'id,tenant_id,run_key,actor_id,execution_mode,status,goal,output,error,metadata,started_at,completed_at,created_at,updated_at',
+        limit: '1',
+      },
+    });
+    return Array.isArray(rows) && rows.length ? rows[0] : null;
+  }
+
+  async createTask(task) {
+    requireUuid(task && task.id, 'task record id');
+    requireUuid(task && task.tenantId, 'task tenantId');
+    requireUuid(task && task.runId, 'task runId');
+    if (typeof task.taskKey !== 'string' || !task.taskKey.trim()) throw new TypeError('taskKey is required');
+    if (typeof task.agentId !== 'string' || !task.agentId.trim()) throw new TypeError('agentId is required');
+    if (typeof task.taskType !== 'string' || !task.taskType.trim()) throw new TypeError('taskType is required');
+    if (task.status !== 'proposed') throw new TypeError('New RHNS tasks must start in proposed state');
+    const input = task.input === undefined ? {} : task.input;
+    assertSafePayload(input, 'task.input');
+
+    const rows = await this._request('rhns_tasks', {
+      method: 'POST',
+      prefer: 'return=representation',
+      body: {
+        id: task.id,
+        tenant_id: task.tenantId,
+        run_id: task.runId,
+        task_key: task.taskKey,
+        agent_id: task.agentId,
+        task_type: task.taskType,
+        status: 'proposed',
+        input,
+      },
+    });
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Durable RHNS task insert did not return exactly one row');
+    return rows[0];
+  }
+
+  async transitionTask(id, tenantId, expectedStatus, nextStatus, patch = {}) {
+    requireUuid(id, 'task record id');
+    requireUuid(tenantId, 'task tenantId');
+    const transitions = {
+      proposed: new Set(['approved', 'executing', 'failed', 'rejected', 'cancelled']),
+      approved: new Set(['executing', 'failed', 'rejected', 'cancelled']),
+      executing: new Set(['confirmed', 'failed', 'unknown_outcome', 'cancelled']),
+    };
+    if (!transitions[expectedStatus] || !transitions[expectedStatus].has(nextStatus)) {
+      throw new Error('Invalid RHNS task state transition: ' + expectedStatus + ' -> ' + nextStatus);
+    }
+
+    const update = { status: nextStatus, updated_at: new Date().toISOString() };
+    if (nextStatus === 'executing') update.started_at = patch.startedAt || new Date().toISOString();
+    if (['confirmed', 'failed', 'unknown_outcome', 'cancelled', 'rejected'].includes(nextStatus)) {
+      update.completed_at = patch.completedAt || new Date().toISOString();
+    }
+    for (const key of ['output', 'error']) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) {
+        assertSafePayload(patch[key], key);
+        update[key] = patch[key];
+      }
+    }
+
+    const rows = await this._request('rhns_tasks', {
+      method: 'PATCH',
+      query: {
+        id: 'eq.' + id,
+        tenant_id: 'eq.' + tenantId,
+        status: 'eq.' + expectedStatus,
+        select: 'id,status,started_at,completed_at,updated_at',
+      },
+      prefer: 'return=representation',
+      body: update,
+    });
+    return Array.isArray(rows) && rows.length === 1 ? rows[0] : false;
+  }
+
   async create(record) {
     requireUuid(record && record.id, 'approval id');
     requireUuid(record && record.tenantId, 'approval tenantId');
