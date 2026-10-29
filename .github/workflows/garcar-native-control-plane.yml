@@ -57,9 +57,6 @@ jobs:
       - name: Validate backup utility CLI
         run: python ops/backup_db.py --help
 
-      - name: Build local control-plane image
-        run: docker build -t garcar-native-control-plane:ci .
-
       - name: Preserve test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,9 +94,6 @@ jobs:
       - name: Run orchestrator tests
         run: python -m pytest -q test_main.py --junitxml=test-results-orchestrator.xml
 
-      - name: Build local orchestrator image
-        run: docker build -t garcar-orchestrator:ci .
-
       - name: Preserve test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,3 +101,50 @@ jobs:
           name: garcar-orchestrator-test-report
           path: orchestrator/test-results-orchestrator.xml
           if-no-files-found: ignore
+
+  compose-smoke-test:
+    needs: [control-plane-tests, orchestrator-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: garcar-native-control-plane
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate isolated local test secrets
+        run: bash ops/init_local_env.sh
+
+      - name: Validate Compose configuration
+        run: docker compose config -q
+
+      - name: Build and start the complete local stack
+        run: docker compose up --build -d
+
+      - name: Verify both services, database, and audit chain
+        env:
+          REQUIRE_ORCHESTRATOR: "1"
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/health
+          bash ops/verify_local.sh
+          REQUIRE_ORCHESTRATOR=1 bash ops/verify_local.sh
+
+      - name: Show container status on failure
+        if: failure()
+        run: docker compose ps
+
+      - name: Stop and remove ephemeral CI containers
+        if: always()
+        run: docker compose down --volumes --remove-orphans
