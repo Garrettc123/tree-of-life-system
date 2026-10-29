@@ -131,6 +131,10 @@ class ReWOOExecutor extends EventEmitter {
         executionId
       );
 
+      if (!execution.stages.synthesis.success) {
+        throw new Error(`Synthesis failed: ${execution.stages.synthesis.error || 'no valid synthesis result'}`);
+      }
+
       execution.status = 'completed';
       this.emit('execution:completed', execution);
 
@@ -206,7 +210,14 @@ class ReWOOExecutor extends EventEmitter {
         // Get execution agent for this step's type
         const agent = this.agents.get(step.agentId);
         if (!agent) {
-          console.warn(`[ReWOOExecutor] Agent not found for step ${step.id}: ${step.agentId}`);
+          const error = `Agent not found for step ${step.id}: ${step.agentId}`;
+          console.error(`[ReWOOExecutor] ${error}`);
+          outputs.push({
+            stepId: step.id,
+            error,
+            timestamp: new Date().toISOString(),
+          });
+          this.emit('step:failed', { executionId, stepId: step.id, error });
           continue;
         }
 
@@ -215,6 +226,14 @@ class ReWOOExecutor extends EventEmitter {
             agent.executeStep(step, context),
             this.timeout(this.config.executionTimeout),
           ]);
+
+          if (output === false || (output && typeof output === 'object'
+            && (output.success === false || output.ok === false))) {
+            const detail = output && typeof output === 'object' && output.error
+              ? String(output.error)
+              : 'Agent reported an unsuccessful step result';
+            throw new Error(detail);
+          }
 
           outputs.push({
             stepId: step.id,
@@ -229,7 +248,7 @@ class ReWOOExecutor extends EventEmitter {
           });
         } catch (stepError) {
           console.error(`[ReWOOExecutor] Step ${step.id} failed:`, stepError.message);
-          
+
           outputs.push({
             stepId: step.id,
             error: stepError.message,
@@ -246,11 +265,14 @@ class ReWOOExecutor extends EventEmitter {
 
       const duration = Date.now() - startTime;
 
+      const successfulSteps = outputs.filter((item) => !item.error).length;
+      const failedSteps = outputs.length - successfulSteps;
       return {
-        success: outputs.length > 0,
+        success: outputs.length > 0 && failedSteps === 0,
         outputs,
         duration,
-        stepsExecuted: outputs.length,
+        stepsExecuted: successfulSteps,
+        stepsFailed: failedSteps,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
