@@ -8,7 +8,7 @@ A local-first, self-hosted foundation intended to reduce reliance on blocked hos
 
 - Control-plane browser console served from the same origin at `/console`.
 - Public liveness endpoints at `/health`; these do not claim database or integration readiness.
-- Protected operator endpoints using `GARCAR_OPERATOR_TOKEN` and `X-Operator-Token`.
+- Protected operator endpoints using `GARCAR_OPERATOR_TOKEN` and `X-Operator-Token`; configured operator tokens shorter than 32 bytes are rejected.
 - Read-only local health and service inventory operations. When Compose is used, the control plane checks the orchestrator's known-local `/health` endpoint. Web, worker, and scheduler statuses remain unverified.
 - Persistent work plans in SQLite with an explicit approval-recording endpoint for actions outside the read-only allowlist.
 - Fail-closed execution: even an approved mutating plan **cannot** execute in this version.
