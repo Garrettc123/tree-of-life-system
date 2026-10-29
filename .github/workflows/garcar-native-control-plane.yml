@@ -93,7 +93,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest==9.2.0
 
       - name: Compile Python sources
-        run: python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py
+        run: python -m compileall -q main.py router.py supabase_log.py test_main.py backup_db.py atlas_dispatch.py
 
       - name: Run orchestrator tests
         run: python -m pytest -q test_main.py --junitxml=test-results-orchestrator.xml
