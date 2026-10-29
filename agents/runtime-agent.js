@@ -13,38 +13,44 @@ class RuntimeAgent extends EventEmitter {
     this.role = spec.role || 'executor';
     this.type = spec.type || 'Runtime';
     this.capabilities = spec.capabilities || [this.role];
+    this.handlers = {
+      task: typeof spec.taskHandler === 'function' ? spec.taskHandler : null,
+      plan: typeof spec.planHandler === 'function' ? spec.planHandler : null,
+      step: typeof spec.stepHandler === 'function' ? spec.stepHandler : null,
+      synthesis: typeof spec.synthesisHandler === 'function' ? spec.synthesisHandler : null,
+    };
     this.startTime = Date.now();
     this.tasksProcessed = 0;
     this.lastHeartbeat = new Date().toISOString();
-    this.status = 'active';
+    this.status = this.isConfigured() ? 'active' : 'unconfigured';
+  }
+
+  isConfigured() {
+    if (this.role === 'planner') return Boolean(this.handlers.plan);
+    if (this.role === 'executor') return Boolean(this.handlers.step || this.handlers.task);
+    if (this.role === 'critic') return Boolean(this.handlers.synthesis);
+    return Boolean(this.handlers.task);
   }
 
   getStatus() {
-    return this.status;
+    return this.isConfigured() ? 'active' : 'unconfigured';
   }
 
-  async handleTask({ taskId, taskType, payload, requestId }) {
+  async handleTask(task) {
+    if (!this.handlers.task) {
+      throw new Error(`Agent ${this.id} is not executable: no task handler is configured`);
+    }
+
+    const result = await this.handlers.task(task);
     this.tasksProcessed += 1;
     this.lastHeartbeat = new Date().toISOString();
-    const body = Buffer.isBuffer(payload)
-      ? payload.toString('utf8')
-      : (payload || '');
-    const result = {
-      agentId: this.id,
-      role: this.role,
-      taskId,
-      taskType: taskType || this.role,
-      requestId,
-      echo: body.slice(0, 2048),
-      sealed: true,
-    };
     this.emit('event', {
       id: uuidv4(),
       type: 'task.completed',
       timestamp: this.lastHeartbeat,
-      payload: Buffer.from(JSON.stringify({ taskId, taskType })),
+      payload: Buffer.from(JSON.stringify({ taskId: task.taskId, taskType: task.taskType })),
     });
-    return Buffer.from(JSON.stringify(result));
+    return Buffer.isBuffer(result) ? result : Buffer.from(JSON.stringify(result));
   }
 
   async handleMessage(envelope) {
@@ -56,39 +62,28 @@ class RuntimeAgent extends EventEmitter {
     });
   }
 
-  async createPlan(task) {
-    return {
-      task,
-      agentId: this.id,
-      steps: [
-        {
-          id: 'step-1',
-          agentId: 'execution-agent',
-          action: 'execute',
-          input: task,
-        },
-      ],
-    };
+  async createPlan(task, context = {}) {
+    if (!this.handlers.plan) {
+      throw new Error(`Agent ${this.id} cannot plan: no plan handler is configured`);
+    }
+    return this.handlers.plan(task, context);
   }
 
-  async executeStep(step) {
+  async executeStep(step, context = {}) {
+    if (!this.handlers.step) {
+      throw new Error(`Agent ${this.id} cannot execute: no step handler is configured`);
+    }
+    const result = await this.handlers.step(step, context);
     this.tasksProcessed += 1;
-    return {
-      stepId: step.id,
-      agentId: this.id,
-      ok: true,
-    };
+    this.lastHeartbeat = new Date().toISOString();
+    return result;
   }
 
-  async synthesize(outputs, plan) {
-    return {
-      result: {
-        agentId: this.id,
-        steps: outputs.length,
-        planSteps: plan?.steps?.length || 0,
-      },
-      critiques: [],
-    };
+  async synthesize(outputs, plan, context = {}) {
+    if (!this.handlers.synthesis) {
+      throw new Error(`Agent ${this.id} cannot synthesize: no synthesis handler is configured`);
+    }
+    return this.handlers.synthesis(outputs, plan, context);
   }
 }
 
