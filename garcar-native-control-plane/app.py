@@ -28,6 +28,7 @@ READ_ONLY_ACTIONS = {"health_check", "list_services"}
 SENSITIVE_KEY_PARTS = (
     "token", "secret", "password", "credential", "api_key", "apikey",
     "authorization", "private_key", "access_key", "client_secret",
+    "email", "phone", "ssn", "date_of_birth", "dob",
 )
 
 @asynccontextmanager
