@@ -1,14 +1,15 @@
 /**
  * Proposal-only workforce agent.
  *
- * It receives planning assignments and creates reviewable proposals in memory.
- * It never writes to GitHub, Linear, Notion, or a deployment target.
+ * It receives planning assignments and creates reviewable proposals.
+ * Optional Supabase persistence stores proposal records; this agent never writes
+ * to GitHub, Linear, Notion, or a deployment target.
  */
 const PolicyEngine = require('../core/policy-engine');
 const { validateTask, TASK_TYPES } = require('../core/contracts');
 
 class ProposalAgent {
-  constructor({ id, name, capabilities = [] } = {}, coordinator) {
+  constructor({ id, name, capabilities = [] } = {}, coordinator, { store = null, tenantId = null } = {}) {
     if (!id || typeof id !== 'string') throw new TypeError('ProposalAgent id is required');
     if (!coordinator || typeof coordinator.registerAgent !== 'function') {
       throw new TypeError('ProposalAgent requires a coordinator');
@@ -20,6 +21,8 @@ class ProposalAgent {
     this.policy = new PolicyEngine();
     this.state = 'initializing';
     this.proposals = new Map();
+    this.proposalStore = store;
+    this.tenantId = tenantId;
     this.lastAssignmentAt = null;
     this.coordinator.registerAgent(this.id, this);
     this.state = 'ready';
@@ -120,6 +123,21 @@ class ProposalAgent {
     }
 
     const proposals = prepared.map((item) => item.proposal);
+    if (this.proposalStore) {
+      try {
+        await this.proposalStore.recordProposals(proposals, this.tenantId);
+      } catch (error) {
+        // Do not acknowledge work as accepted if durable storage failed.
+        return {
+          success: false,
+          accepted: false,
+          agentId: this.id,
+          error: 'durable_proposal_persistence_failed',
+          detail: error instanceof Error ? error.message : 'Unknown storage error',
+          acceptedCount: 0,
+        };
+      }
+    }
     for (const proposal of proposals) {
       this.proposals.set(proposal.proposalId, proposal);
     }
@@ -141,6 +159,7 @@ class ProposalAgent {
       agent: this.id,
       state: this.state,
       mode: 'proposal_only',
+      storageMode: this.proposalStore ? 'durable_supabase' : 'memory_only',
       capabilities: this.capabilities,
       pendingTasks: Array.from(this.proposals.values()).filter(
         (proposal) => proposal.state === 'draft_pending_review',
