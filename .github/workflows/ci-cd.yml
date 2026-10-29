@@ -78,7 +78,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run lint
-      - run: node --check agents/core/supabase-rhns-store.js && node --check agents/planning/proposal-agent.js && node --check agents/index.js && node --check agents/startup.js && node --check agents/orchestration/rewoo-executor.js
+      - run: for file in agents/core/supabase-rhns-store.js agents/core/approval-gate.js agents/core/contracts.js agents/core/mcp-coordinator.js agents/planning/proposal-agent.js agents/planning/index.js agents/index.js agents/startup.js agents/orchestration/rewoo-executor.js tests/supabase-rhns-store.test.js tests/startup-durable-storage.test.js tests/proposal-agent.test.js tests/rewoo-executor.test.js; do node --check "$file" || exit 1; done
 
   build:
     name: Build Docker Image
