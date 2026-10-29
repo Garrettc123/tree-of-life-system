@@ -77,6 +77,8 @@ def connect_db() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     with connect_db() as db:
+        # Schema creation, column additions, and legacy hash backfill must be atomic.
+        db.execute("BEGIN IMMEDIATE")
         db.execute(
             """CREATE TABLE IF NOT EXISTS audit_events (
                 id TEXT PRIMARY KEY,
@@ -170,31 +172,41 @@ def event_digest(
     ).hexdigest()
 
 
-def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
-    init_db()
+def append_audit(
+    db: sqlite3.Connection,
+    actor: str,
+    event_type: str,
+    detail: dict[str, Any],
+) -> None:
+    """Validate the existing chain and append an audit row within the caller's transaction."""
     event_id = str(uuid.uuid4())
     created_at = utc_now()
     detail_json = json.dumps(redact_sensitive(detail), sort_keys=True, separators=(",", ":"))
-    with connect_db() as db:
-        # Serialize verification and append so concurrent requests cannot fork the local chain.
-        db.execute("BEGIN IMMEDIATE")
-        previous_hash = "0" * 64
-        rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
-        for row in rows:
-            expected_hash = event_digest(
-                row["id"], row["created_at"], row["actor"], row["event_type"],
-                row["detail_json"], previous_hash,
-            )
-            if row["previous_hash"] != previous_hash or row["event_hash"] != expected_hash:
-                raise RuntimeError("Audit chain fails verification; refusing to append.")
-            previous_hash = expected_hash
-        digest = event_digest(event_id, created_at, actor, event_type, detail_json, previous_hash)
-        db.execute(
-            """INSERT INTO audit_events
-               (id, created_at, actor, event_type, detail_json, previous_hash, event_hash)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (event_id, created_at, actor, event_type, detail_json, previous_hash, digest),
+    previous_hash = "0" * 64
+    rows = db.execute("SELECT * FROM audit_events ORDER BY rowid").fetchall()
+    for row in rows:
+        expected_hash = event_digest(
+            row["id"], row["created_at"], row["actor"], row["event_type"],
+            row["detail_json"], previous_hash,
         )
+        if row["previous_hash"] != previous_hash or row["event_hash"] != expected_hash:
+            raise RuntimeError("Audit chain fails verification; refusing to append.")
+        previous_hash = expected_hash
+    digest = event_digest(event_id, created_at, actor, event_type, detail_json, previous_hash)
+    db.execute(
+        """INSERT INTO audit_events
+           (id, created_at, actor, event_type, detail_json, previous_hash, event_hash)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (event_id, created_at, actor, event_type, detail_json, previous_hash, digest),
+    )
+
+
+def audit(actor: str, event_type: str, detail: dict[str, Any]) -> None:
+    """Append an audit event in its own transaction when no state transaction is open."""
+    init_db()
+    with connect_db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        append_audit(db, actor, event_type, detail)
 
 
 def require_operator(x_operator_token: str | None = Header(default=None)) -> str:
@@ -330,13 +342,6 @@ def plan_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[st
     plan_id = str(uuid.uuid4())
     state = "ready_read_only" if read_only else "approval_required"
     created_at = utc_now()
-    with connect_db() as db:
-        db.execute(
-            """INSERT INTO work_plans
-               (id, created_at, actor, action, parameters_json, status, requires_approval)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (plan_id, created_at, actor, action, json.dumps(parameters, sort_keys=True), state, int(not read_only)),
-        )
     result = {
         "plan_id": plan_id,
         "created_at": created_at,
@@ -348,9 +353,17 @@ def plan_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[st
         "executable_now": read_only,
         "external_side_effects": False,
     }
-    audit(actor, "work_plan_created", result)
+    # State and its audit entry commit or roll back together.
+    with connect_db() as db:
+        db.execute("BEGIN IMMEDIATE")
+        db.execute(
+            """INSERT INTO work_plans
+               (id, created_at, actor, action, parameters_json, status, requires_approval)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (plan_id, created_at, actor, action, json.dumps(parameters, sort_keys=True), state, int(not read_only)),
+        )
+        append_audit(db, actor, "work_plan_created", result)
     return result
-
 
 @app.get("/api/work/{plan_id}")
 def get_plan(plan_id: str, actor: str = Depends(require_operator)) -> dict[str, Any]:
@@ -379,7 +392,10 @@ def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(requ
     expected_confirmation = f"APPROVE {plan_id}"
     if not hmac.compare_digest(approval.confirmation, expected_confirmation):
         raise HTTPException(status_code=400, detail=f"Confirmation must exactly equal: {expected_confirmation}")
+    approved_at = utc_now()
     with connect_db() as db:
+        # Plan status, approval attribution, and its audit entry form one transaction.
+        db.execute("BEGIN IMMEDIATE")
         row = db.execute("SELECT * FROM work_plans WHERE id = ?", (plan_id,)).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -387,12 +403,16 @@ def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(requ
             raise HTTPException(status_code=409, detail="Read-only plans do not require approval")
         if row["status"] != "approval_required":
             raise HTTPException(status_code=409, detail="Plan is not awaiting approval")
-        approved_at = utc_now()
         db.execute(
             "UPDATE work_plans SET status = ?, approved_at = ?, approved_by = ? WHERE id = ?",
             ("approved_not_executable", approved_at, actor, plan_id),
         )
-    audit(actor, "work_plan_approval_recorded", {"plan_id": plan_id, "action": row["action"]})
+        append_audit(
+            db,
+            actor,
+            "work_plan_approval_recorded",
+            {"plan_id": plan_id, "action": row["action"], "approved_at": approved_at},
+        )
     return {
         "plan_id": plan_id,
         "status": "approved_not_executable",
@@ -400,7 +420,6 @@ def approve_plan(plan_id: str, approval: PlanApproval, actor: str = Depends(requ
         "execution_enabled": False,
         "note": "Approval evidence was recorded. This version still blocks all mutating action execution.",
     }
-
 
 @app.post("/api/work/execute")
 async def execute_work(work: WorkPlan, actor: str = Depends(require_operator)) -> dict[str, Any]:
