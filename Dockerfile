@@ -19,7 +19,8 @@ WORKDIR /app
 RUN apk add --no-cache \
     curl \
     dumb-init \
-    protobuf-dev
+    protobuf-dev \
+    python3
 
 # Copy built dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
@@ -34,6 +35,9 @@ COPY .env.template ./.env.template
 
 # Create logs directory
 RUN mkdir -p /app/logs && chmod 777 /app/logs
+
+# Ensure both Python command names are available to Railway's process launcher.
+RUN ln -sf /usr/bin/python3 /usr/bin/python && python --version && python3 --version
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
