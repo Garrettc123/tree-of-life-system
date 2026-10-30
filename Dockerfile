@@ -29,6 +29,7 @@ COPY --from=builder /app/package*.json ./
 COPY agents ./agents
 COPY --from=builder /app/agents/node_modules ./agents/node_modules
 COPY proto ./proto
+COPY scripts ./scripts
 COPY .env.template ./.env.template
 
 # Create logs directory

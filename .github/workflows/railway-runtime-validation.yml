@@ -1,0 +1,43 @@
+name: Railway Runtime Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'agents/startup.js'
+      - 'agents/health-server.js'
+      - 'scripts/garcar-health-canary.js'
+      - 'tests/garcar-health-canary.node-test.cjs'
+      - 'Dockerfile'
+      - '.github/workflows/railway-runtime-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'agents/startup.js'
+      - 'agents/health-server.js'
+      - 'scripts/garcar-health-canary.js'
+      - 'tests/garcar-health-canary.test.js'
+      - 'Dockerfile'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Railway runtime and canary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+      - name: Syntax-check runtime and canary
+        run: |
+          node --check agents/startup.js
+          node --check agents/health-server.js
+          node --check scripts/garcar-health-canary.js
+          test -d scripts
+      - name: Test read-only health canary
+        run: node --test tests/garcar-health-canary.node-test.cjs
