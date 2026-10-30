@@ -9,6 +9,7 @@ LINEAR_API_KEY = os.getenv("LINEAR_API_KEY", "")
 LINEAR_REVENUE_ISSUE_ID = os.getenv("LINEAR_REVENUE_ISSUE_ID", "")
 NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
 NOTION_REVENUE_DB_ID = os.getenv("NOTION_REVENUE_DB_ID", "")
+EXTERNAL_ACTIONS_ENABLED = os.getenv("GARCAR_ENABLE_EXTERNAL_HANDLERS", "false").lower() in {"1", "true", "yes"}
 
 
 async def handle(event: dict, event_id: str):
@@ -18,14 +19,12 @@ async def handle(event: dict, event_id: str):
     email = payload.get("customer_email", "unknown")
     trace = event.get("trace_id", event_id)
 
-    log.info(
-        "stripe_payment amount=%s %s email=%s trace=%s",
-        amount, currency, email, trace,
-    )
+    # Avoid putting customer email/payment details in logs. External writes are disabled by default.
+    log.info("stripe_payment_event_received trace=%s", trace)
 
-    if LINEAR_API_KEY and LINEAR_REVENUE_ISSUE_ID:
+    if EXTERNAL_ACTIONS_ENABLED and LINEAR_API_KEY and LINEAR_REVENUE_ISSUE_ID:
         await _comment_linear(amount, currency, email, trace)
-    if NOTION_API_KEY and NOTION_REVENUE_DB_ID:
+    if EXTERNAL_ACTIONS_ENABLED and NOTION_API_KEY and NOTION_REVENUE_DB_ID:
         await _log_notion(amount, currency, email, trace)
 
 
@@ -42,8 +41,8 @@ async def _comment_linear(amount: int, currency: str, email: str, trace: str):
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_comment_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_comment_failed error_type=%s", type(exc).__name__)
 
 
 async def _log_notion(amount: int, currency: str, email: str, trace: str):
@@ -67,5 +66,5 @@ async def _log_notion(amount: int, currency: str, email: str, trace: str):
                 },
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("notion_log_failed err=%s", e)
+    except Exception as exc:
+        log.warning("notion_log_failed error_type=%s", type(exc).__name__)

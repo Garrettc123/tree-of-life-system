@@ -1,0 +1,15 @@
+.mcp-venv/
+runtime/
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.coverage
+*.py[cod]
+data/
+backups/
+*.sqlite
+*.sqlite3
+*.db

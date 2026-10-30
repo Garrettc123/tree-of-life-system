@@ -9,6 +9,7 @@ LINEAR_API_KEY = os.getenv("LINEAR_API_KEY", "")
 LINEAR_TEAM_ID = os.getenv("LINEAR_TEAM_ID", "")
 GITHUB_TOKEN = os.getenv("GITHUB_PAT", "")
 ALERT_REPO = os.getenv("ALERT_GITHUB_REPO", "Garrettc123/garcar-rhns-core")
+EXTERNAL_ACTIONS_ENABLED = os.getenv("GARCAR_ENABLE_EXTERNAL_HANDLERS", "false").lower() in {"1", "true", "yes"}
 
 
 async def handle(event: dict, event_id: str):
@@ -22,9 +23,9 @@ async def handle(event: dict, event_id: str):
     log.info("github_ci repo=%s branch=%s status=%s trace=%s", repo, branch, status, trace)
 
     if status == "failure":
-        if GITHUB_TOKEN:
+        if EXTERNAL_ACTIONS_ENABLED and GITHUB_TOKEN:
             await _open_issue(repo, branch, run_url, sha, trace)
-        if LINEAR_API_KEY and LINEAR_TEAM_ID:
+        if EXTERNAL_ACTIONS_ENABLED and LINEAR_API_KEY and LINEAR_TEAM_ID:
             await _create_linear_incident(repo, branch, run_url, sha, trace)
 
 
@@ -45,8 +46,8 @@ async def _open_issue(repo: str, branch: str, run_url: str, sha: str, trace: str
             )
             r.raise_for_status()
             log.info("gh_issue_created url=%s", r.json().get("html_url"))
-    except Exception as e:
-        log.warning("gh_issue_failed err=%s", e)
+    except Exception as exc:
+        log.warning("gh_issue_failed error_type=%s", type(exc).__name__)
 
 
 async def _create_linear_incident(
@@ -70,5 +71,5 @@ async def _create_linear_incident(
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_incident_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_incident_failed error_type=%s", type(exc).__name__)

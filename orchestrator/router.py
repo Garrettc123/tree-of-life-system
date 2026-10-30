@@ -30,5 +30,7 @@ async def route_event(event: dict, event_id: str, event_log: EventLog):
         await event_log.mark_processed(event_id)
         log.info("routed event_type=%s event_id=%s", event_type, event_id)
     except Exception as e:
-        log.error("route_failed event_type=%s event_id=%s err=%s", event_type, event_id, e)
-        await event_log.mark_failed(event_id, str(e))
+        # Avoid writing raw exception messages to logs or the event database; they may contain secrets.
+        error_code = type(e).__name__
+        log.error("route_failed event_type=%s event_id=%s error_type=%s", event_type, event_id, error_code)
+        await event_log.mark_failed(event_id, error_code)

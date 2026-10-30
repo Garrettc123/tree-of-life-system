@@ -1,0 +1,3 @@
+-r requirements.txt
+pydantic==2.14.0
+mcp==2.3.0
