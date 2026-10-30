@@ -1,0 +1,66 @@
+name: Orchestrator Smoke Tests
+
+on:
+  pull_request:
+    paths:
+      - "orchestrator/**"
+      - ".github/workflows/orchestrator-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "orchestrator/**"
+      - ".github/workflows/orchestrator-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: orchestrator
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: orchestrator/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Check health route and fail-closed signature validation
+        env:
+          DISPATCH_SECRET: ci-only-smoke-test-secret
+          SUPABASE_URL: ""
+          SUPABASE_SERVICE_KEY: ""
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+
+          client = TestClient(app)
+
+          health = client.get("/health")
+          assert health.status_code == 200, health.text
+          body = health.json()
+          assert body.get("status") == "ok", body
+          assert body.get("service") == "garcar-dispatch", body
+
+          rejected = client.post(
+              "/dispatch",
+              content=b'{"event_type":"ci.smoke_test"}',
+              headers={"Content-Type": "application/json"},
+          )
+          assert rejected.status_code == 403, (
+              "Unsigned dispatch must be rejected when DISPATCH_SECRET is set; "
+              f"got {rejected.status_code}: {rejected.text}"
+          )
+          print("PASS: /health responds and unsigned /dispatch is rejected.")
+          PY
