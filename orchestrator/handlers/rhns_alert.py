@@ -9,6 +9,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_PAT", "")
 ALERT_REPO = os.getenv("ALERT_GITHUB_REPO", "Garrettc123/garcar-rhns-core")
 LINEAR_API_KEY = os.getenv("LINEAR_API_KEY", "")
 LINEAR_TEAM_ID = os.getenv("LINEAR_TEAM_ID", "")
+EXTERNAL_ACTIONS_ENABLED = os.getenv("GARCAR_ENABLE_EXTERNAL_HANDLERS", "false").lower() in {"1", "true", "yes"}
 
 
 async def handle(event: dict, event_id: str):
@@ -20,9 +21,9 @@ async def handle(event: dict, event_id: str):
     log.info("rhns_alert service=%s severity=%s trace=%s", service, severity, trace)
 
     if severity in ("critical", "error"):
-        if GITHUB_TOKEN:
+        if EXTERNAL_ACTIONS_ENABLED and GITHUB_TOKEN:
             await _open_issue(service, error, trace)
-        if LINEAR_API_KEY and LINEAR_TEAM_ID:
+        if EXTERNAL_ACTIONS_ENABLED and LINEAR_API_KEY and LINEAR_TEAM_ID:
             await _create_p0(service, error, trace)
 
 
@@ -42,8 +43,8 @@ async def _open_issue(service: str, error: str, trace: str):
                 },
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("gh_issue_failed err=%s", e)
+    except Exception as exc:
+        log.warning("gh_issue_failed error_type=%s", type(exc).__name__)
 
 
 async def _create_p0(service: str, error: str, trace: str):
@@ -65,5 +66,5 @@ async def _create_p0(service: str, error: str, trace: str):
                 headers={"Authorization": LINEAR_API_KEY},
             )
             r.raise_for_status()
-    except Exception as e:
-        log.warning("linear_p0_failed err=%s", e)
+    except Exception as exc:
+        log.warning("linear_p0_failed error_type=%s", type(exc).__name__)

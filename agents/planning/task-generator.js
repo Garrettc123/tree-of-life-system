@@ -147,7 +147,7 @@ class TaskGenerator {
     return {
       id: this._generateTaskId(),
       type: 'sync_integration',
-      agent: 'planning',
+      agent: 'integration',
       priority: 'medium',
       title: 'Synchronize platform integrations',
       description: gap.description,

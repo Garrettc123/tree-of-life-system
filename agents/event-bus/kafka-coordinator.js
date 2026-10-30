@@ -12,14 +12,14 @@
 
 const { Kafka, logLevel } = require('kafkajs');
 const EventEmitter = require('events');
-const uuid = require('uuid');
+const { randomUUID } = require('crypto');
 
 class KafkaCoordinator extends EventEmitter {
   constructor(config = {}) {
     super();
     
     this.kafka = new Kafka({
-      clientId: config.clientId || `coordinator-${uuid.v4().slice(0, 8)}`,
+      clientId: config.clientId || `coordinator-${randomUUID().slice(0, 8)}`,
       brokers: config.brokers || ['localhost:9092'],
       logLevel: logLevel.INFO,
       ssl: config.ssl || false,
@@ -49,7 +49,7 @@ class KafkaCoordinator extends EventEmitter {
       await this.producer.connect();
       console.log('[KafkaCoordinator] Producer connected');
 
-      this.consumer = this.kafka.consumer({ groupId: `coordinator-group-${uuid.v4().slice(0, 8)}` });
+      this.consumer = this.kafka.consumer({ groupId: `coordinator-group-${randomUUID().slice(0, 8)}` });
       await this.consumer.connect();
       console.log('[KafkaCoordinator] Consumer connected');
 
@@ -73,11 +73,11 @@ class KafkaCoordinator extends EventEmitter {
 
   async publishEvent(eventType, payload, options = {}) {
     const event = {
-      id: uuid.v4(),
+      id: randomUUID(),
       type: eventType,
       timestamp: new Date().toISOString(),
       source: options.source || 'coordinator',
-      correlationId: options.correlationId || uuid.v4(),
+      correlationId: options.correlationId || randomUUID(),
       payload,
       metadata: options.metadata || {},
     };
@@ -116,7 +116,7 @@ class KafkaCoordinator extends EventEmitter {
   }
 
   async subscribeToEvents(eventTypes, handler, options = {}) {
-    const subscriptionId = uuid.v4();
+    const subscriptionId = randomUUID();
     const topics = Array.isArray(eventTypes)
       ? eventTypes.map(t => `event-${t.toLowerCase()}`)
       : [`event-${eventTypes.toLowerCase()}`];
