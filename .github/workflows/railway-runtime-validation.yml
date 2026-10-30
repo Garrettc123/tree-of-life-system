@@ -7,7 +7,7 @@ on:
       - 'agents/startup.js'
       - 'agents/health-server.js'
       - 'scripts/garcar-health-canary.js'
-      - 'tests/garcar-health-canary.test.js'
+      - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
       - '.github/workflows/railway-runtime-validation.yml'
   push:
@@ -40,4 +40,4 @@ jobs:
           node --check scripts/garcar-health-canary.js
           test -d scripts
       - name: Test read-only health canary
-        run: node --test tests/garcar-health-canary.test.js
+        run: node --test tests/garcar-health-canary.node-test.cjs
