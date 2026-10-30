@@ -2,9 +2,14 @@
 
 ## Runtime correction
 
-The root repository is the Node.js 20 Tree of Life agent runtime. The previous root Railway configuration selected NIXPACKS/Python and a Python orchestrator command, conflicting with the root Node Dockerfile and the worker's Node startup command. Root Railway defaults now use the root Dockerfile and `node agents/startup.js`.
+The root repository is the Node.js 20 Tree of Life agent runtime. The previous root `railway.toml` and `railway.json` selected conflicting shared build/start commands across three services. Both shared config-as-code files are removed. Each Railway service must use its own service-level configuration so a shared repository does not force the worker, cron scheduler, and Python web orchestrator to share one start command.
 
-The gRPC listener defaults to `0.0.0.0` so a service on the Railway private network can reach the process. It remains on the configured gRPC port (default 50051); this change does not expose a public gRPC domain.
+Recommended per-service configuration:
+- **Worker:** root directory `/`, builder `DOCKERFILE`, Dockerfile `Dockerfile`, start `node agents/startup.js`, health path `/health`.
+- **Scheduler:** root directory `/`, builder `DOCKERFILE`, Dockerfile `Dockerfile`, start `node scripts/garcar-health-canary.js`, cron `*/5 * * * *`.
+- **Web:** root directory `/orchestrator`, builder `DOCKERFILE`, Dockerfile `Dockerfile`, start `python main.py`, health path `/health`.
+
+The gRPC listener defaults to `0.0.0.0` for private-network service-to-service access, remaining on the configured gRPC port (default 50051). No public gRPC domain is created by this change.
 
 ## Health endpoints
 
@@ -13,23 +18,19 @@ The agent service's existing health server is authoritative:
 - `GET /ready`: readiness only when all registered runtime agents report active handlers.
 - `GET /status`: detailed state snapshot.
 
-These endpoints report runtime readiness, not revenue capability. The safe runtime handlers remain bounded; durable Supabase storage and the approval gate stay disabled unless their required secrets and tenant configuration are present.
+These endpoints report runtime readiness, not revenue capability. Durable Supabase storage and the approval gate remain disabled unless the required service credentials and tenant configuration are provided.
 
 ## Scheduled canary
 
 `scripts/garcar-health-canary.js` performs HTTP GET probes only:
-- Web service: `GARCAR_WEB_HEALTH_URL` (expected to target its `/health` endpoint).
-- Agent worker: `GARCAR_WORKER_READY_URL` (expected to target its `/ready` endpoint).
+- Web service: `GARCAR_WEB_HEALTH_URL` (target the service `/health` endpoint).
+- Agent worker: `GARCAR_WORKER_READY_URL` (target the service `/ready` endpoint).
 
-It emits a structured result and returns non-zero on a missing target, timeout, network failure, non-2xx response, or a worker that is not ready. It does not call any write, money, customer, outreach, self-heal, or deployment API.
+It emits a structured result and returns non-zero on a missing target, timeout, network failure, non-2xx response, or a worker that is not ready. It does not call business, payment, outreach, self-heal, or deployment APIs.
 
-Suggested Railway scheduler settings:
-- Builder: `DOCKERFILE`
-- Dockerfile: `Dockerfile`
-- Start: `node scripts/garcar-health-canary.js`
-- Cron: `*/5 * * * *`
-- `GARCAR_WEB_HEALTH_URL=http://${{web.RAILWAY_PRIVATE_DOMAIN}}:8001/health`
-- `GARCAR_WORKER_READY_URL=http://${{worker.RAILWAY_PRIVATE_DOMAIN}}:3000/ready`
-- `GARCAR_CANARY_TIMEOUT_MS=7000`
+Suggested scheduler environment variables (set in Railway, not committed):
+- `GARCAR_WEB_HEALTH_URL`: reference the web service private domain and port 8001.
+- `GARCAR_WORKER_READY_URL`: reference the worker service private domain and port 3000.
+- `GARCAR_CANARY_TIMEOUT_MS=7000`.
 
-Do not configure the scheduler cron until the source revision has been merged and the service has the two private-network target variables. A successful canary means those endpoints responded; it is not proof of payment processing or end-to-end business execution.
+Do not configure the scheduler cron until both target variables are set. A successful canary means those endpoints responded; it is not proof of payment processing or end-to-end business execution.
