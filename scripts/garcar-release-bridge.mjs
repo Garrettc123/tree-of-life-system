@@ -22,7 +22,7 @@ const run = (name, command, args, options = {}) => {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: options.timeout || 20 * 60 * 1000,
-    env: process.env,
+    env: { ...process.env, ...(options.env || {}) },
   });
   const ok = result.status === 0;
   checks.push({
@@ -94,7 +94,7 @@ function main() {
     if (run('python_venv', python, ['-m', 'venv', venv])) {
       if (run('python_dependencies', venvPython, ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', 'orchestrator/requirements.txt'], { timeout: 30 * 60 * 1000 })) {
         run('python_compile', venvPython, ['-m', 'compileall', '-q', 'orchestrator']);
-        run('python_app_import', venvPython, ['-c', "import sys; sys.path.insert(0, 'orchestrator'); from main import app; assert app"]);
+        run('python_app_import', venvPython, ['-c', "import sys; sys.path.insert(0, 'orchestrator'); from main import app; assert app"], { env: { GARCAR_EVENT_DB_PATH: path.join(venv, 'release-check.sqlite3') } });
       }
     }
   } finally {
