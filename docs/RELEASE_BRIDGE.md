@@ -21,7 +21,7 @@ The bridge:
 3. Runs the read-only health-canary tests.
 4. Syntax-checks the Node service entry points.
 5. Creates a temporary Python virtual environment, installs the orchestrator requirements, compiles the Python source, and imports the FastAPI application.
-6. Builds the production Docker image with Docker or Podman.
+6. Builds both production images with Docker or Podman: the root Node worker/scheduler image and the nested Python orchestrator web image.
 7. Writes a restricted-permission JSON evidence file under `.release-evidence/`.
 
 The bridge does not save raw command output because build output can contain credentials. It records pass/fail, exit status, and output digests only.
