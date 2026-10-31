@@ -4,8 +4,10 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'Procfile'
       - 'agents/startup.js'
       - 'agents/health-server.js'
+      - 'orchestrator/**'
       - 'scripts/garcar-health-canary.js'
       - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
@@ -13,11 +15,14 @@ on:
   push:
     branches: [main]
     paths:
+      - 'Procfile'
       - 'agents/startup.js'
       - 'agents/health-server.js'
+      - 'orchestrator/**'
       - 'scripts/garcar-health-canary.js'
-      - 'tests/garcar-health-canary.test.js'
+      - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
+      - '.github/workflows/railway-runtime-validation.yml'
 
 permissions:
   contents: read
@@ -33,7 +38,17 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '20'
-      - name: Syntax-check runtime and canary
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install and validate Python web runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r orchestrator/requirements.txt
+          python -m compileall -q orchestrator
+          python -c "import sys; sys.path.insert(0, 'orchestrator'); from main import app; assert app"
+      - name: Syntax-check Node runtime and canary
         run: |
           node --check agents/startup.js
           node --check agents/health-server.js
@@ -41,3 +56,5 @@ jobs:
           test -d scripts
       - name: Test read-only health canary
         run: node --test tests/garcar-health-canary.node-test.cjs
+      - name: Build production container
+        run: docker build --tag tree-of-life-runtime-validation .
