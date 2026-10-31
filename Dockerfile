@@ -21,7 +21,7 @@ RUN apk add --no-cache \
     dumb-init \
     protobuf-dev \
     python3 \
-    py3-pip
+    py3-virtualenv
 
 # Copy built Node dependencies.
 COPY --from=builder /app/node_modules ./node_modules
@@ -38,7 +38,7 @@ COPY .env.template ./.env.template
 # Install Python dependencies in an isolated environment and provide the
 # executable name used by Railway's Procfile process launcher.
 RUN ln -sf /usr/bin/python3 /usr/bin/python \
-    && python3 -m venv /opt/venv \
+    && virtualenv -p /usr/bin/python3 /opt/venv \
     && /opt/venv/bin/python -m pip install --no-cache-dir -r /app/orchestrator/requirements.txt
 
 ENV PATH="/opt/venv/bin:${PATH}"
