@@ -73,3 +73,4 @@ ENV/
 Thumbs.db
 .Spotlight-V100
 .Trashes
+\n# Local release evidence (never commit runner attestations)\n.release-evidence/\n
