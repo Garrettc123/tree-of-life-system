@@ -57,7 +57,7 @@ function main() {
   }
 
   for (const file of [
-    'package.json', 'package-lock.json', 'Dockerfile',
+    'package.json', 'package-lock.json', 'Dockerfile', 'orchestrator/Dockerfile',
     'orchestrator/main.py', 'orchestrator/requirements.txt',
     'scripts/garcar-health-canary.js',
     'tests/garcar-health-canary.node-test.cjs',
@@ -106,7 +106,10 @@ function main() {
       ? 'docker'
       : (spawnSync('podman', ['--version'], { cwd: root, encoding: 'utf8' }).status === 0 ? 'podman' : null);
     if (!engine) checks.push({ name: 'container_image_build', ok: false, error: 'docker_or_podman_required' });
-    else run('container_image_build', engine, ['build', '--pull=false', '-t', 'garcar-tree-of-life:release-check', '.'], { timeout: 45 * 60 * 1000 });
+    else {
+      run('container_image_build_root_node_services', engine, ['build', '--pull=false', '-t', 'garcar-tree-of-life:release-check', '.'], { timeout: 45 * 60 * 1000 });
+      run('container_image_build_orchestrator_web', engine, ['build', '--pull=false', '-f', 'orchestrator/Dockerfile', '-t', 'garcar-dispatch:release-check', 'orchestrator'], { timeout: 45 * 60 * 1000 });
+    }
   } else {
     checks.push({ name: 'container_image_build', ok: false, skipped: true, error: 'explicitly_skipped' });
   }
