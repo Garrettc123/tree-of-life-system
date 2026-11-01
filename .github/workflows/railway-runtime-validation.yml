@@ -12,7 +12,7 @@ on:
       - 'scripts/garcar-release-bridge.mjs'
       - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
-      - 'orchestrator/Dockerfile'
+      - 'railway.json'
       - '.github/workflows/railway-runtime-validation.yml'
   push:
     branches: [main]
@@ -25,7 +25,7 @@ on:
       - 'scripts/garcar-release-bridge.mjs'
       - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
-      - 'orchestrator/Dockerfile'
+      - 'railway.json'
       - '.github/workflows/railway-runtime-validation.yml'
 
 permissions:
