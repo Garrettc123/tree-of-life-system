@@ -10,12 +10,11 @@ RUN npm ci --omit=dev \
     && npm install --prefix ./agents --omit=dev --no-package-lock \
     && npm cache clean --force
 
-# Production stage
+# Production stage shared by the Node worker, read-only canary, and Python web service.
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install the Node runtime, Python tooling, and process supervisor.
 RUN apk add --no-cache \
     curl \
     dumb-init \
@@ -23,30 +22,25 @@ RUN apk add --no-cache \
     python3 \
     py3-virtualenv
 
-# Copy built Node dependencies.
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/agents/node_modules ./agents/node_modules
 
-# Copy application code for both Node services and the Python web service.
 COPY agents ./agents
 COPY orchestrator ./orchestrator
 COPY proto ./proto
 COPY scripts ./scripts
 COPY .env.template ./.env.template
 
-# Install Python dependencies in an isolated environment and provide the
-# executable name used by Railway's Procfile process launcher.
 RUN ln -sf /usr/bin/python3 /usr/bin/python \
     && virtualenv -p /usr/bin/python3 /opt/venv \
-    && /opt/venv/bin/python -m pip install --no-cache-dir -r /app/orchestrator/requirements.txt
+    && /opt/venv/bin/python -m pip install --no-cache-dir -r /app/orchestrator/requirements.txt \
+    && mkdir -p /app/logs /data \
+    && chmod 777 /app/logs /data
 
-ENV PATH="/opt/venv/bin:${PATH}"
+ENV PATH="/opt/venv/bin:${PATH}" \
+    GARCAR_EVENT_DB_PATH=/data/garcar-events.sqlite3
 
-# Create logs directory.
-RUN mkdir -p /app/logs && chmod 777 /app/logs
-
-# Health check follows Railway's injected PORT for the selected service.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT:-3000}/health" || exit 1
 
