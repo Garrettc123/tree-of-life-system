@@ -5,7 +5,7 @@ describe('RuntimeAgent execution safety', () => {
     const agent = new RuntimeAgent({ id: 'execution-agent', role: 'executor' });
     expect(agent.getStatus()).toBe('unconfigured');
     await expect(agent.handleTask({ taskId: 't1', taskType: 'external_action' }))
-      .rejects.toThrow('no task handler is configured');
+      .rejects.toThrow('no handler is configured for role executor');
     expect(agent.tasksProcessed).toBe(0);
   });
 
