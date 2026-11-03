@@ -478,7 +478,7 @@ class ReWOOExecutor extends EventEmitter {
         || (typeof synthesis.error === 'string' && synthesis.success !== true && synthesis.ok !== true)
         || (result && typeof result === 'object'
           && (result.success === false || result.ok === false
-            || (typeof result.error === 'string' && result.success !== true && result.ok !== true))) {
+            || (typeof result.error === 'string' && result.success !== true && result.ok !== true)))) {
         throw new Error(synthesis && synthesis.error
           ? String(synthesis.error)
           : 'Reflexion agent returned a missing or unsuccessful synthesis result');
