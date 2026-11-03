@@ -110,12 +110,12 @@ class gRPCGateway extends EventEmitter {
         this.server.bindAsync(
           `${this.config.host}:${this.config.port}`,
           grpc.ServerCredentials.createInsecure(),
-          (error) => {
+          (error, port) => {
             if (error) {
               console.error('[gRPCGateway] Bind error:', error.message);
               reject(error);
             } else {
-              this.server.start();
+              this.config.port = port;
               console.log(`[gRPCGateway] Server started on ${this.config.host}:${this.config.port}`);
               this.emit('server:started');
               resolve();
@@ -307,11 +307,14 @@ class gRPCGateway extends EventEmitter {
   }
 
   async shutdown() {
+    for (const connection of this.connections.values()) connection.client.close();
+    this.connections.clear();
     return new Promise((resolve, reject) => {
       if (this.server) {
         this.server.tryShutdown((error) => {
           if (error) reject(error);
           else {
+            this.server = null;
             console.log('[gRPCGateway] Server shutdown complete');
             this.emit('server:shutdown');
             resolve();

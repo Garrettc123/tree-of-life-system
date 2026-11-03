@@ -1,0 +1,33 @@
+{
+  "date_utc": "2026-11-03",
+  "base_commit": "5ebe595ff3356a37f4355466d1facde11df795dd",
+  "test_suites": 17,
+  "tests_passed": 103,
+  "tests_failed": 0,
+  "runtimes": [
+    "20.20.2",
+    "24.22.1"
+  ],
+  "cli_once_exit_code": 0,
+  "local_canary": [
+    "HTTP /ready",
+    "gRPC GetStatus and ExecuteTask",
+    "three-agent read-only workflow",
+    "external invoice action rejected",
+    "unconfigured optional Kafka skipped",
+    "required Kafka fails closed",
+    "partial startup cleanup"
+  ],
+  "production_deployment_verified": false,
+  "source_sha256": {
+    "agents/orchestration/rewoo-executor.js": "2e8bdddb1e9477071ee0c4a690074d1f48261d615bd7cdd75b15e4c8dffdf09e",
+    "agents/startup.js": "8f0e7d344bd51a9dba99afb23bbd1a57d482db5ab58c5c20cef09cd90de8a1a2",
+    "agents/grpc-gateway.js": "1b55002aeb091420428160a91547dcffab33361cdfdb8f44179317204f5e9438",
+    "agents/event-bus/kafka-coordinator.js": "6edb8d93a09d4986de23654ba84077e6416096713882d1023248bb710bce1d09",
+    "tests/startup-runtime.test.js": "79d0526371d62c93bacc02dea1f545742ff5cc5d24550b1b0fdb34d35a91ee50",
+    "tests/basic.test.js": "064b2fe7bc29bf4a7a7e1270cefb5174ce7f32643943a25dc22e10716e584c78",
+    "tests/runtime-agent.test.js": "c157bfe1af5379eaaba0e69d4d6193bad839d999ca05b666a682ba13214ba4da",
+    "tests/proposal-agent.test.js": "bb612af0e1372ee3970b41885eaae809521e19f9bec713cb2d9d85071abc1354",
+    ".github/workflows/worker-startup-validation.yml": "cd584a47fe9a24be0814ed9de79066bd608505a94870dd1ce93c96577221973f"
+  }
+}

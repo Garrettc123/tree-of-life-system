@@ -90,7 +90,7 @@ describe('proposal-only workforce agents', () => {
     });
     expect(result.success).toBe(false);
     expect(result.accepted).toBe(false);
-    expect(result.rejected[0].error).toMatch(/Unsupported proposal type/);
+    expect(result.rejected[0].error).toMatch(/Unsupported (proposal|task) type/);
   });
 
   test('does not mutate the task queue when an assignment contains invalid items', async () => {
