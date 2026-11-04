@@ -85,7 +85,7 @@ class RuntimeAgent extends EventEmitter {
         task.context ?? request.context ?? {},
       );
     } else {
-      throw new Error(`Agent ${this.id} is not executable: no handler is configured for role ${this.role}`);
+      throw new Error(`Agent ${this.id} is not executable: no task handler is configured for role ${this.role}`);
     }
 
     if (hasExplicitFailure(result)) {
