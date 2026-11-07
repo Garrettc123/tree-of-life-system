@@ -28,3 +28,14 @@ to assess health. Process interruption does not imply success or automatically r
 Receipts use the existing SQLite path `GARCAR_EVENT_DB_PATH` on the dispatcher's persistent
 volume. Operate one dispatcher process/replica per SQLite volume. Export receipt results
 before changing storage. No secrets are stored in receipts or source.
+
+## Worker agent workflow
+
+`agent_inventory`, `runtime_health_check` and `readiness_check` run through the existing
+Tree of Life ReWOO planner, executor and reflexion handlers. The dispatcher signs a
+bounded POST to the private worker `/directives` endpoint with a distinct
+`GARCAR_WORKER_DISPATCH_SECRET`. Configure the same secret on dispatcher and worker;
+it grants no operator access to the dispatcher. Worker tasks reject arbitrary actions,
+expired signatures, changed duplicate IDs, oversized bodies and concurrent execution.
+The worker's bounded in-memory duplicate cache supplements the dispatcher's durable receipt.
+`GET /agents` on the dispatcher reports only the live worker's observed inventory.

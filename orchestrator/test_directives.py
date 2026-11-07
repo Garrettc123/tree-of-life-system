@@ -99,3 +99,11 @@ def test_concurrent_claim_executes_once(tmp_path):
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(executor.map(lambda _: store.claim('concurrent-123', 'digest', 'system_health', False), range(12)))
     assert results.count(True) == 1
+
+
+def test_runtime_inventory_requires_operator(tmp_path, monkeypatch):
+    c, m = load_app(tmp_path, monkeypatch)
+    assert c.get('/agents').status_code == 401
+    monkeypatch.delenv('GARCAR_WORKER_STATUS_URL', raising=False)
+    r = c.get('/agents', headers={'X-Operator-Token': m.OPERATOR_TOKEN})
+    assert r.json()['connected'] is False

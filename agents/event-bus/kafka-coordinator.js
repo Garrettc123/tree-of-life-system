@@ -24,8 +24,9 @@ class KafkaCoordinator extends EventEmitter {
       logLevel: logLevel.INFO,
       ssl: config.ssl || false,
       sasl: config.sasl || null,
-      connectionTimeout: 10000,
-      requestTimeout: 30000,
+      connectionTimeout: config.connectionTimeout ?? 10000,
+      requestTimeout: config.requestTimeout ?? 30000,
+      retry: config.retry,
     });
 
     this.producer = null;

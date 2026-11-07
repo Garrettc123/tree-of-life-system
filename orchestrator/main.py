@@ -16,7 +16,7 @@ import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from directives import DirectiveStore, execute as execute_directive
+from directives import DirectiveStore, execute as execute_directive, probe as probe_runtime
 from router import route_event
 from supabase_log import EventLog
 
@@ -111,8 +111,21 @@ async def get_events(
 async def operator_status(actor: str = Depends(require_operator)):
     return {"service": "garcar-dispatch", "version": "1.2.0", "operator_authenticated": True,
             "signed_dispatch_configured": len(DISPATCH_SECRET.encode()) >= 32,
-            "supported_directives": ["system_health", "revenue_readiness"],
+            "supported_directives": ["system_health", "revenue_readiness", "agent_inventory", "runtime_health_check", "readiness_check"],
             "external_writes_enabled": False, "receipt_storage": "sqlite"}
+
+
+@app.get("/agents")
+async def get_runtime_agents(actor: str = Depends(require_operator)):
+    target = os.getenv("GARCAR_WORKER_STATUS_URL", "")
+    if not target:
+        return {"connected": False, "agents": [], "error": "worker_status_not_configured"}
+    observation = await probe_runtime("worker", target, "runtime")
+    runtime = observation.get("runtime") or {}
+    inventory = runtime.get("agents") or {}
+    return {"connected": observation.get("ok") is True, "observation": observation,
+            "agents": inventory.get("list", []), "execution_mode": runtime.get("execution_mode"),
+            "scope": "Observed Tree of Life runtime only; repository catalogs are not live agents."}
 
 
 @app.get("/directives")

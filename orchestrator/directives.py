@@ -4,6 +4,7 @@ No generic shell, arbitrary URL, outbound-message or payment adapter is exposed.
 """
 import asyncio
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -15,7 +16,7 @@ from contextlib import contextmanager
 import httpx
 from fastapi import HTTPException
 
-ACTIONS = {"system_health", "revenue_readiness"}
+ACTIONS = {"system_health", "revenue_readiness", "agent_inventory", "runtime_health_check", "readiness_check"}
 MAX_RESPONSE_BYTES = 200_000
 
 
@@ -147,6 +148,26 @@ async def execute(store, event, body):
     elif dry_run:
         status, result = "planned", {"action": action, "read_only": True, "targets": [name for name, _, _ in targets],
                                     "external_writes": False, "note": "No probes ran. Submit a new directive_id with dry_run=false to run this bounded read-only plan."}
+    elif action in {"agent_inventory", "runtime_health_check", "readiness_check"}:
+        url = os.getenv("GARCAR_WORKER_STATUS_URL", "")
+        secret = os.getenv("GARCAR_WORKER_DISPATCH_SECRET", "")
+        if not url or len(secret.encode()) < 32:
+            status, result = "blocked", {"reason": "worker_dispatch_not_configured", "external_writes": False}
+        else:
+            worker_body = json.dumps({"directive_id": directive_id, "action": action, "issued_at": int(time.time())}, separators=(",", ":")).encode()
+            signature = "sha256=" + hmac.new(secret.encode(), worker_body, hashlib.sha256).hexdigest()
+            try:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=False, trust_env=False) as client:
+                    response = await client.post(url.rsplit("/", 1)[0] + "/directives", content=worker_body,
+                                                 headers={"Content-Type": "application/json", "X-Dispatch-Sig": signature})
+                    response.raise_for_status()
+                    worker_result = response.json()
+                    status = "completed" if worker_result.get("status") == "completed" else "failed"
+                    result = {"worker_receipt": worker_result, "read_only": True, "external_writes": False,
+                              "note": "Task ran through the worker planning, execution and synthesis handlers. No commercial writes enabled."}
+            except Exception as exc:
+                status, result = "failed", {"error": type(exc).__name__, "completion": "unknown", "external_writes": False,
+                                            "note": "Do not automatically replay: the worker may have run the read-only task."}
     else:
         try:
             observations = await asyncio.gather(*[probe(name, url, kind) if url else _missing(name) for name, url, kind in targets])
