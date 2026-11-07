@@ -17,6 +17,7 @@
 const path = require('path');
 const EventEmitter = require('events');
 const { createHealthServer } = require('./health-server');
+const { createDirectiveHttp } = require('./directive-http');
 
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
@@ -97,7 +98,10 @@ class StartupSequence extends EventEmitter {
       throw new Error('PORT/HEALTH_PORT must be an integer from 0 to 65535');
     }
 
-    this.healthServer = createHealthServer(() => this.getStatusSnapshot());
+    this.healthServer = createHealthServer(() => this.getStatusSnapshot(), createDirectiveHttp(async (task) => {
+      if (this.status !== 'ready' || !this.handles.rewooExecutor) throw new Error('runtime_not_ready');
+      return this.handles.rewooExecutor.execute(task, { actorId: 'signed-dispatcher', runKey: task.taskId });
+    }));
     await new Promise((resolve, reject) => {
       const onError = (error) => reject(error);
       this.healthServer.once('error', onError);
@@ -167,13 +171,14 @@ class StartupSequence extends EventEmitter {
 
     const config = {
       kafka: {
-        brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+        brokers: (process.env.KAFKA_BROKERS || '').split(',').map((broker) => broker.trim()).filter(Boolean),
         clientId: process.env.KAFKA_CLIENT_ID || 'tree-of-life-orchestrator',
-        connectionTimeout: parseInt(process.env.KAFKA_CONNECTION_TIMEOUT || '10000', 10),
-        requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000', 10),
+        connectionTimeout: parseInt(process.env.KAFKA_CONNECTION_TIMEOUT || '3000', 10),
+        requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '5000', 10),
+        retry: { retries: 1, initialRetryTime: 200, maxRetryTime: 1000 },
       },
       grpc: {
-        host: process.env.GRPC_HOST || '0.0.0.0',
+        host: process.env.GRPC_HOST || '127.0.0.1',
         port: parseInt(process.env.GRPC_PORT || '50051', 10),
         maxReceiveMessageLength: parseInt(process.env.GRPC_MAX_RECEIVE_MESSAGE_LENGTH || '4194304', 10),
         maxSendMessageLength: parseInt(process.env.GRPC_MAX_SEND_MESSAGE_LENGTH || '4194304', 10),
@@ -206,8 +211,19 @@ class StartupSequence extends EventEmitter {
   async phase2_connectKafka(config) {
     this.log('PHASE 2', 'Starting: Connect to Kafka event bus', 'info');
 
+    if (!config.kafka.brokers.length) {
+      if (config.kafkaRequired) {
+        throw new Error('KAFKA_BROKERS is required when KAFKA_REQUIRED=true');
+      }
+      this.results.phase2 = { success: false, skipped: true, reason: 'not_configured' };
+      this.log('PHASE 2', 'Optional Kafka is not configured; no broker connection attempted', 'info');
+      return null;
+    }
+
+    let kafkaCoordinator;
     try {
-      const kafkaCoordinator = new KafkaCoordinator(config.kafka);
+      kafkaCoordinator = new KafkaCoordinator(config.kafka);
+      this.handles.kafkaCoordinator = kafkaCoordinator;
       await kafkaCoordinator.connect();
 
       const topics = [
@@ -233,6 +249,8 @@ class StartupSequence extends EventEmitter {
       this.log('PHASE 2', '✅ Kafka event bus connected', 'success');
       return kafkaCoordinator;
     } catch (error) {
+      if (kafkaCoordinator) await kafkaCoordinator.disconnect();
+      delete this.handles.kafkaCoordinator;
       this.log('PHASE 2', `Kafka unavailable: ${error.message}`, 'warn');
       this.results.phase2 = {
         success: false,
@@ -252,12 +270,13 @@ class StartupSequence extends EventEmitter {
     this.log('PHASE 3', 'Starting: Initialize gRPC server', 'info');
 
     const grpcGateway = new gRPCGateway(config.grpc);
+    this.handles.grpcGateway = grpcGateway;
     await grpcGateway.startServer();
 
     this.results.phase3 = {
       success: true,
       host: config.grpc.host,
-      port: config.grpc.port,
+      port: grpcGateway.config.port,
       duration: Date.now() - this.startTime,
     };
 
@@ -315,6 +334,20 @@ class StartupSequence extends EventEmitter {
   }
 
   async execute() {
+    try {
+      return await this.executePhases();
+    } catch (error) {
+      this.status = 'failed';
+      try {
+        await this.shutdown();
+      } catch (cleanupError) {
+        this.log('SHUTDOWN', cleanupError.message, 'error');
+      }
+      throw error;
+    }
+  }
+
+  async executePhases() {
     console.log('\n');
     console.log('TREE OF LIFE — AUTONOMOUS AGENT SYSTEM STARTUP');
     console.log('canonical gRPC mesh 2026-09-03');
@@ -323,6 +356,7 @@ class StartupSequence extends EventEmitter {
     const phaseStartTime = Date.now();
 
     const config = await this.phase1_loadEnvironment();
+    this.handles.config = config;
     const durableStorage = await this.initializeDurableStore();
     await this.persistRuntimeEvent('rhns.runtime.phase.completed', {
       phase: 'environment',
@@ -346,6 +380,7 @@ class StartupSequence extends EventEmitter {
       durableStore: this.durableStore,
       tenantId: this.tenantId,
     });
+    this.handles.rewooExecutor = rewooExecutor;
     await this.phase4_registerAgents(grpcGateway, rewooExecutor);
     await this.persistRuntimeEvent('rhns.runtime.agents.registered', {
       count: (this.results.phase4 && this.results.phase4.agents || []).length,
@@ -372,7 +407,7 @@ class StartupSequence extends EventEmitter {
 
     console.log('\nSTARTUP COMPLETE');
     console.log(`duration_ms=${totalDuration}`);
-    console.log(`grpc=${config.grpc.host}:${config.grpc.port}`);
+    console.log(`grpc=${grpcGateway.config.host}:${grpcGateway.config.port}`);
     console.log(`kafka=${this.results.phase2.success ? 'up' : 'skipped'}`);
     console.log('agents=planning-agent,execution-agent,reflexion-agent');
     console.log(`execution_readiness=${this.status}; configured_agents=${operational}/${registered.length}`);
@@ -396,16 +431,23 @@ class StartupSequence extends EventEmitter {
   }
 
   async shutdown() {
-    if (this.handles.rewooExecutor && typeof this.handles.rewooExecutor.destroy === 'function') {
-      this.handles.rewooExecutor.destroy();
-    }
-    if (this.handles.grpcGateway) {
-      await this.handles.grpcGateway.shutdown();
+    const errors = [];
+    for (const [name, method] of [['rewooExecutor', 'destroy'], ['grpcGateway', 'shutdown'], ['kafkaCoordinator', 'disconnect']]) {
+      const handle = this.handles[name];
+      try {
+        if (handle && typeof handle[method] === 'function') await handle[method]();
+      } catch (error) {
+        errors.push(error);
+      } finally {
+        delete this.handles[name];
+      }
     }
     if (this.healthServer && this.healthServer.listening) {
       await new Promise((resolve) => this.healthServer.close(resolve));
       this.healthServer = null;
     }
+    if (this.status !== 'failed') this.status = 'stopped';
+    if (errors.length) throw new AggregateError(errors, 'Runtime shutdown could not close all resources');
   }
 }
 

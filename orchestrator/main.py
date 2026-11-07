@@ -16,6 +16,7 @@ import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from directives import DirectiveStore, execute as execute_directive, probe as probe_runtime
 from router import route_event
 from supabase_log import EventLog
 
@@ -38,7 +39,7 @@ SENSITIVE_KEY_PARTS = (
     "email", "phone", "ssn", "date_of_birth", "dob",
 )
 
-app = FastAPI(title="garcar-dispatch", version="1.1.0")
+app = FastAPI(title="garcar-dispatch", version="1.2.0")
 allowed_origins = [
     origin.strip()
     for origin in os.getenv("DISPATCH_ALLOWED_ORIGINS", "").split(",")
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 
 event_log = EventLog(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+directive_store = DirectiveStore(event_log.db_path)
 
 
 def _verify_sig(body: bytes, sig: Optional[str]) -> bool:
@@ -92,7 +94,7 @@ def require_operator(x_operator_token: Optional[str] = Header(default=None, alia
 @app.get("/health")
 async def health():
     """Public liveness only; external database reachability is not implied."""
-    return {"status": "ok", "service": "garcar-dispatch", "version": "1.1.0"}
+    return {"status": "ok", "service": "garcar-dispatch", "version": "1.2.0"}
 
 
 @app.get("/events")
@@ -105,6 +107,41 @@ async def get_events(
     return {"events": events, "count": len(events)}
 
 
+@app.get("/operator/status")
+async def operator_status(actor: str = Depends(require_operator)):
+    return {"service": "garcar-dispatch", "version": "1.2.0", "operator_authenticated": True,
+            "signed_dispatch_configured": len(DISPATCH_SECRET.encode()) >= 32,
+            "supported_directives": ["system_health", "revenue_readiness", "agent_inventory", "runtime_health_check", "readiness_check"],
+            "external_writes_enabled": False, "receipt_storage": "sqlite"}
+
+
+@app.get("/agents")
+async def get_runtime_agents(actor: str = Depends(require_operator)):
+    target = os.getenv("GARCAR_WORKER_STATUS_URL", "")
+    if not target:
+        return {"connected": False, "agents": [], "error": "worker_status_not_configured"}
+    observation = await probe_runtime("worker", target, "runtime")
+    runtime = observation.get("runtime") or {}
+    inventory = runtime.get("agents") or {}
+    return {"connected": observation.get("ok") is True, "observation": observation,
+            "agents": inventory.get("list", []), "execution_mode": runtime.get("execution_mode"),
+            "scope": "Observed Tree of Life runtime only; repository catalogs are not live agents."}
+
+
+@app.get("/directives")
+async def list_directives(limit: int = Query(default=20, ge=1, le=100), actor: str = Depends(require_operator)):
+    return {"receipts": await asyncio.to_thread(directive_store.list, limit)}
+
+
+@app.get("/directives/{directive_id}")
+async def get_directive(directive_id: str, actor: str = Depends(require_operator)):
+    receipt = await asyncio.to_thread(directive_store.get, directive_id)
+    if receipt is None:
+        raise HTTPException(404, "directive receipt not found")
+    return receipt
+
+
+@app.post("/directives")
 @app.post("/dispatch")
 async def dispatch(
     request: Request,
@@ -139,6 +176,11 @@ async def dispatch(
 
     if not isinstance(event, dict):
         raise HTTPException(400, "JSON event must be an object")
+    if event.get("event_type") == "business.directive":
+        require_operator(request.headers.get("X-Operator-Token"))
+        return await execute_directive(directive_store, event, body)
+    if request.url.path == "/directives":
+        raise HTTPException(422, "event_type must be business.directive")
     event_type = event.get("event_type")
     if not isinstance(event_type, str) or not event_type.strip():
         raise HTTPException(400, "missing or invalid event_type")

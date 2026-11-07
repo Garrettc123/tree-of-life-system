@@ -4,40 +4,62 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'Procfile'
       - 'agents/startup.js'
       - 'agents/health-server.js'
+      - 'orchestrator/**'
       - 'scripts/garcar-health-canary.js'
+      - 'scripts/garcar-release-bridge.mjs'
       - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
+      - 'railway.json'
       - '.github/workflows/railway-runtime-validation.yml'
   push:
     branches: [main]
     paths:
+      - 'Procfile'
       - 'agents/startup.js'
       - 'agents/health-server.js'
+      - 'orchestrator/**'
       - 'scripts/garcar-health-canary.js'
-      - 'tests/garcar-health-canary.test.js'
+      - 'scripts/garcar-release-bridge.mjs'
+      - 'tests/garcar-health-canary.node-test.cjs'
       - 'Dockerfile'
+      - 'railway.json'
+      - '.github/workflows/railway-runtime-validation.yml'
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    name: Validate Railway runtime and canary
+    name: Run Garcar release bridge
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - name: Checkout
+      - name: Checkout exact release commit
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: '20'
-      - name: Syntax-check runtime and canary
-        run: |
-          node --check agents/startup.js
-          node --check agents/health-server.js
-          node --check scripts/garcar-health-canary.js
-          test -d scripts
-      - name: Test read-only health canary
-        run: node --test tests/garcar-health-canary.node-test.cjs
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run full release bridge (tests, Python import, both production images)
+        run: node scripts/garcar-release-bridge.mjs
+
+      - name: Preserve release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garcar-release-evidence-${{ github.sha }}
+          path: .release-evidence/
+          if-no-files-found: warn
+          retention-days: 30

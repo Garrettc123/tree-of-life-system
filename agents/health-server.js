@@ -1,7 +1,11 @@
 const http = require('http');
 
-function createHealthServer(getSnapshot) {
+function createHealthServer(getSnapshot, handleDirective) {
   return http.createServer((request, response) => {
+    if (request.url === '/directives' && handleDirective) {
+      handleDirective(request, response);
+      return;
+    }
     if (request.method !== 'GET') {
       response.writeHead(405, { 'content-type': 'application/json; charset=utf-8', allow: 'GET' });
       response.end(JSON.stringify({ error: 'method_not_allowed' }));
