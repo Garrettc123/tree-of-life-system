@@ -35,7 +35,7 @@ def _now():
 
 
 def _db_path():
-    return Path(os.environ.get("GARCAR_EVENT_DB_PATH") or Path(__file__).resolve().parent / "data" / "garcar-events.sqlite3")
+    return Path(os.environ.get("GARCAR_EVENT_DB_PATH") or "/data/garcar-events.sqlite3")
 
 
 def _verify(raw: bytes, header: str, secret: str, *, timestamp=None):
