@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from directives import DirectiveStore, execute as execute_directive, probe as probe_runtime
 from revenue_webhook import router as revenue_router
+from acquisition import router as acquisition_router
 from router import route_event
 from supabase_log import EventLog
 
@@ -40,8 +41,9 @@ SENSITIVE_KEY_PARTS = (
     "email", "phone", "ssn", "date_of_birth", "dob",
 )
 
-app = FastAPI(title="garcar-dispatch", version="1.3.0")
+app = FastAPI(title="garcar-dispatch", version="1.4.0")
 app.include_router(revenue_router)
+app.include_router(acquisition_router)
 allowed_origins = [
     origin.strip()
     for origin in os.getenv("DISPATCH_ALLOWED_ORIGINS", "").split(",")
@@ -96,7 +98,7 @@ def require_operator(x_operator_token: Optional[str] = Header(default=None, alia
 @app.get("/health")
 async def health():
     """Public liveness only; external database reachability is not implied."""
-    return {"status": "ok", "service": "garcar-dispatch", "version": "1.3.0"}
+    return {"status": "ok", "service": "garcar-dispatch", "version": "1.4.0"}
 
 
 @app.get("/events")
@@ -111,7 +113,7 @@ async def get_events(
 
 @app.get("/operator/status")
 async def operator_status(actor: str = Depends(require_operator)):
-    return {"service": "garcar-dispatch", "version": "1.3.0", "operator_authenticated": True,
+    return {"service": "garcar-dispatch", "version": "1.4.0", "operator_authenticated": True,
             "signed_dispatch_configured": len(DISPATCH_SECRET.encode()) >= 32,
             "supported_directives": ["system_health", "revenue_readiness", "agent_inventory", "runtime_health_check", "readiness_check"],
             "external_writes_enabled": False, "receipt_storage": "sqlite"}
