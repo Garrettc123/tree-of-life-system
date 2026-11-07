@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from acquisition import AcquisitionStore, LEAD_PATTERN, now as acquisition_now
 
 router = APIRouter()
 MAX_BYTES = 256_000
@@ -123,6 +124,18 @@ class Orders:
                 db.execute("""INSERT INTO verified_checkout_orders VALUES(?,?,?,?,?,?,?,?)
                     ON CONFLICT(session_id) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at""",
                            (session_id, offer[0], amount, "usd", link, state, stamp, stamp))
+                # Bind a real payment only to a first-party lead actually persisted
+                # before checkout. Ignore forged, test or unknown references.
+                reference = session.get("client_reference_id")
+                if state == "paid_intake_pending" and isinstance(reference, str) and LEAD_PATTERN.fullmatch(reference):
+                    try:
+                        found = db.execute("SELECT id FROM acquisition_leads WHERE id=?", (reference,)).fetchone()
+                        if found:
+                            db.execute("INSERT OR IGNORE INTO acquisition_attribution(session_id,lead_id,attached_at) VALUES(?,?,?)",
+                                       (session_id, reference, acquisition_now()))
+                    except sqlite3.OperationalError:
+                        # Checkout without any acquisition form remains valid.
+                        pass
         return {"tracked": True, "duplicate": False, "session_id": session_id, "state": state}
 
     def list(self, limit=50):
