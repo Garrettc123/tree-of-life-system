@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from revenue_webhook import Orders, router
+from acquisition import AcquisitionStore
 
 TEST_SECRET = "whsec_" + "a" * 64
 OP_TOKEN = "operator-token-minimum-32-character-secret"
@@ -89,6 +90,88 @@ def test_valid_paid_session_creates_minimal_durable_receipt(client):
     assert len(reply.json()["orders"]) == 1
     assert submit(client, event()).json()["duplicate"] is True
     assert len(Orders(Path(os.environ["GARCAR_EVENT_DB_PATH"])).list()) == 1
+
+
+def test_operator_paid_work_queue_matches_real_inquiry_only(client):
+    assert client.get("/commerce/work-queue").status_code == 401
+    assert client.get("/commerce/work-queue", headers={
+        "X-Operator-Token": OP_TOKEN}, params={"limit": 101}).status_code == 422
+
+    # Isolated TEST fixture: not connected to production lead or Stripe data.
+    existing_lead = AcquisitionStore(os.environ["GARCAR_EVENT_DB_PATH"]).add({
+        "company": "Fixture Roof Service",
+        "full_name": "Fixture Buyer",
+        "email": "fixture-buyer@example.test",
+        "crm": "other",
+        "utm_source": "referral",
+        "utm_medium": "direct",
+        "utm_campaign": "test",
+        "marketing_consent": False,
+    })
+    receipt = event(client_reference_id=existing_lead["lead_id"])
+    assert submit(client, receipt).json()["state"] == "paid_intake_pending"
+    headers = {"X-Operator-Token": OP_TOKEN}
+    response = client.get("/commerce/work-queue", headers=headers)
+    assert response.status_code == 200
+    assert response.headers.get("cache-control") == "private, no-store"
+    body = response.json()
+    assert body["returned_count"] == 1
+    assert body["synthetic_data"] is False
+    assert body["outbound_sent"] is False
+    assert body["payment_verification"] == "webhook_signature_validated_not_independently_reconciled"
+    row = body["items"][0]
+    assert row["payment_state"] == "paid_intake_pending"
+    assert row["paid_amount_cents"] == 49700
+    assert row["attribution_status"] == "matched_first_party_inquiry"
+    assert row["buyer"]["lead_id"] == existing_lead["lead_id"]
+    assert row["buyer"]["company"] == "Fixture Roof Service"
+    assert row["buyer"]["email"] == "fixture-buyer@example.test"
+    assert row["buyer"]["marketing_consent"] is False
+    assert row["next_action"] == "coordinate_secure_crm_intake"
+    assert row["requires_manual_operator_action"] is True
+    assert row["fulfillment_confirmation"] == "not_recorded"
+    assert row["independent_stripe_reconciliation"] == "not_performed"
+    # Existing minimal /commerce/orders stays non-PII, backwards compatible.
+    minimal = client.get("/commerce/orders", headers=headers).json()
+    assert "fixture-buyer@example.test" not in json.dumps(minimal)
+
+
+def test_work_queue_flags_unattributed_paid_and_unsettled_orders_without_buyers(client):
+    h = {"X-Operator-Token": OP_TOKEN}
+    paid = event(client_reference_id="lead_" + "b" * 32)
+    assert submit(client, paid).json()["state"] == "paid_intake_pending"
+    pending = event(event_id="evt_" + "p" * 18,
+                    id="cs_live_" + "p" * 18, status="unpaid",
+                    client_reference_id="lead_" + "c" * 32)
+    assert submit(client, pending).json()["state"] == "payment_pending"
+    failed = event(event_id="evt_" + "f" * 18,
+                   id="cs_live_" + "f" * 18, status="unpaid",
+                   etype="checkout.session.async_payment_failed")
+    assert submit(client, failed).json()["state"] == "payment_failed"
+    queue = client.get("/commerce/work-queue", headers=h).json()["items"]
+    assert [r["payment_state"] for r in queue] == [
+        "paid_intake_pending", "payment_pending", "payment_failed"]
+    assert queue[0]["next_action"] == "reconcile_checkout_receipt_and_buyer"
+    assert queue[0]["attribution_status"] == "missing_first_party_inquiry"
+    assert queue[0]["buyer"] is None
+    for row in queue[1:]:
+        assert row["paid_amount_cents"] is None
+        assert row["buyer"] is None
+        assert row["requires_manual_operator_action"] is True
+    assert queue[1]["next_action"] == "await_verified_payment"
+    assert queue[2]["next_action"] == "do_not_fulfill_payment_failed"
+
+
+def test_work_queue_handles_no_acquisition_table_or_receipts(client):
+    h = {"X-Operator-Token": OP_TOKEN}
+    empty = client.get("/commerce/work-queue", headers=h).json()
+    assert empty["items"] == []
+    assert empty["returned_count"] == 0
+    assert submit(client, event()).json()["state"] == "paid_intake_pending"
+    unmatched = client.get("/commerce/work-queue", headers=h).json()["items"][0]
+    assert unmatched["buyer"] is None
+    assert unmatched["attribution_status"] == "missing_first_party_inquiry"
+
 
 
 def test_payment_status_promotion_does_not_downgrade(client):
