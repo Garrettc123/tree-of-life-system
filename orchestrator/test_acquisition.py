@@ -48,6 +48,28 @@ def test_ingress_is_not_public(context):
     assert context.get("/acquisition/leads").status_code == 401
 
 
+def test_read_only_handshake_proves_shared_credential_without_creating_leads(context):
+    path = "/acquisition/handshake"
+    assert context.get(path).status_code == 401
+    assert context.get(path, headers={"X-Acquisition-Token": "wrong"}).status_code == 401
+    assert context.post(path, headers={"X-Acquisition-Token": SECRET}).status_code == 405
+    response = context.get(path, headers={"X-Acquisition-Token": SECRET})
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {
+        "status": "authenticated", "service": "garcar-dispatch",
+        "scope": "first_party_acquisition", "read_only": True,
+        "lead_created": False, "outbound_sent": False,
+        "payment_attempted": False,
+    }
+    assert SECRET not in response.text
+    metrics = context.get("/acquisition/metrics",
+        headers={"X-Operator-Token": OPERATOR}).json()
+    assert metrics["website_inquiries"] == 0
+    assert metrics["attributed_paid_orders"] == 0
+    assert metrics["outbound_messages_sent"] == 0
+
+
 def test_actual_inquiry_stored_privately_and_checkout_attributed(context):
     response = submit(context)
     assert response.status_code == 200, response.text
