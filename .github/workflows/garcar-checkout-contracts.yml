@@ -1,0 +1,51 @@
+name: Garcar first-party payment contracts
+
+on:
+  push:
+    branches:
+      - fix/railway-procfile-python-runtime-20261030
+      - ci/isolated-revenue-contracts-20261108
+    paths:
+      - 'orchestrator/acquisition.py'
+      - 'orchestrator/revenue_webhook.py'
+      - 'orchestrator/test_acquisition.py'
+      - 'orchestrator/test_revenue_webhook.py'
+      - 'orchestrator/requirements.txt'
+      - '.github/workflows/garcar-checkout-contracts.yml'
+  pull_request:
+    branches:
+      - fix/railway-procfile-python-runtime-20261030
+    paths:
+      - 'orchestrator/**'
+      - '.github/workflows/garcar-checkout-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checkout-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-payment-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: orchestrator/requirements.txt
+      - name: Install isolated test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r orchestrator/requirements.txt pytest==9.0.2
+      - name: Verify acquisition, signed checkout, and operator queue
+        working-directory: orchestrator
+        run: python -m pytest -q test_acquisition.py test_revenue_webhook.py
