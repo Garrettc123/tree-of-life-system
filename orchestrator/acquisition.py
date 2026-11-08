@@ -176,6 +176,28 @@ def require_operator(x_operator_token: str | None = Header(default=None, alias="
     _auth(x_operator_token, "GARCAR_OPERATOR_TOKEN", "Operator authentication")
 
 
+@router.get("/acquisition/handshake")
+async def acquisition_handshake(
+    x_acquisition_token: str | None = Header(default=None, alias="X-Acquisition-Token")
+):
+    """Read-only proof that the caller holds the existing intake credential.
+
+    Does not initialize storage, write a lead, send an email, or invoke Stripe.
+    It is intentionally a separate route from customer intake so production
+    connectivity can be checked without fabricated customer records.
+    """
+    _auth(x_acquisition_token, "GARCAR_ACQUISITION_TOKEN", "Acquisition ingress")
+    return {
+        "status": "authenticated",
+        "service": "garcar-dispatch",
+        "scope": "first_party_acquisition",
+        "read_only": True,
+        "lead_created": False,
+        "outbound_sent": False,
+        "payment_attempted": False,
+    }
+
+
 @router.post("/acquisition/intake")
 async def intake(request: Request, x_acquisition_token: str | None = Header(default=None, alias="X-Acquisition-Token")):
     _auth(x_acquisition_token, "GARCAR_ACQUISITION_TOKEN", "Acquisition ingress")
