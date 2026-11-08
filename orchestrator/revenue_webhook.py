@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from acquisition import AcquisitionStore, LEAD_PATTERN, now as acquisition_now
 
 router = APIRouter()
@@ -145,6 +145,92 @@ class Orders:
         return [dict(row) for row in rows]
 
 
+    def work_queue(self, limit=50):
+        """Read-only, operator-facing action queue using recorded real events.
+
+        Signed webhook receipts are not the same as an independent Stripe API
+        reconciliation or confirmed fulfillment. Join only pre-existing
+        first-party inquiry records; missing contact attribution stays missing.
+        """
+        with self.connect() as db:
+            available = {
+                row["name"] for row in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if {"acquisition_attribution", "acquisition_leads"} <= available:
+                relationship = """
+                    LEFT JOIN acquisition_attribution a ON a.session_id=o.session_id
+                    LEFT JOIN acquisition_leads l ON l.id=a.lead_id
+                """
+                buyer_columns = """
+                    a.lead_id AS lead_id, l.company AS company,
+                    l.full_name AS contact_name, l.email AS email,
+                    l.crm AS crm, l.marketing_consent AS marketing_consent
+                """
+            else:
+                relationship = ""
+                buyer_columns = """
+                    NULL AS lead_id, NULL AS company, NULL AS contact_name,
+                    NULL AS email, NULL AS crm, NULL AS marketing_consent
+                """
+            rows = db.execute(f"""
+                SELECT o.session_id, o.offer, o.amount_cents, o.currency,
+                       o.state, o.created_at, o.updated_at, {buyer_columns}
+                FROM verified_checkout_orders o {relationship}
+                ORDER BY CASE o.state
+                    WHEN 'paid_intake_pending' THEN 0
+                    WHEN 'payment_pending' THEN 1
+                    ELSE 2 END, o.updated_at DESC
+                LIMIT ?
+            """, (limit,)).fetchall()
+        results = []
+        for row in rows:
+            state = row["state"]
+            paid = state == "paid_intake_pending"
+            matched = paid and bool(row["lead_id"]) and bool(row["email"])
+            if matched:
+                next_action = "coordinate_secure_crm_intake"
+                attribution = "matched_first_party_inquiry"
+                buyer = {
+                    "lead_id": row["lead_id"],
+                    "company": row["company"],
+                    "contact_name": row["contact_name"],
+                    "email": row["email"],
+                    "crm": row["crm"],
+                    "marketing_consent": bool(row["marketing_consent"]),
+                }
+            elif paid:
+                next_action = "reconcile_checkout_receipt_and_buyer"
+                attribution = "missing_first_party_inquiry"
+                buyer = None
+            elif state == "payment_pending":
+                next_action = "await_verified_payment"
+                attribution = "not_evaluated_until_paid"
+                buyer = None
+            else:
+                next_action = "do_not_fulfill_payment_failed"
+                attribution = "not_evaluated_until_paid"
+                buyer = None
+            results.append({
+                "checkout_session_id": row["session_id"],
+                "offer": row["offer"],
+                "quoted_amount_cents": row["amount_cents"],
+                "paid_amount_cents": row["amount_cents"] if paid else None,
+                "currency": row["currency"],
+                "payment_state": state,
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "attribution_status": attribution,
+                "buyer": buyer,
+                "next_action": next_action,
+                "requires_manual_operator_action": True,
+                "fulfillment_confirmation": "not_recorded",
+                "independent_stripe_reconciliation": "not_performed",
+            })
+        return results
+
+
 def require_operator(x_operator_token: str | None = Header(default=None, alias="X-Operator-Token")):
     expected = os.environ.get("GARCAR_OPERATOR_TOKEN", "")
     if len(expected.encode()) < 32:
@@ -208,6 +294,26 @@ async def commerce_readiness():
         "acquisition_to_payment_receipt": "not_verified_by_this_endpoint",
         "fulfillment": "manual_intake_required",
         "synthetic_revenue": False,
+    }
+
+
+@router.get("/commerce/work-queue", dependencies=[Depends(require_operator)])
+async def commerce_work_queue(
+    response: Response,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    # Contains buyer-owned contact data; never cache in a public proxy.
+    response.headers["Cache-Control"] = "private, no-store"
+    rows = Orders(_db_path()).work_queue(limit)
+    return {
+        "items": rows,
+        "returned_count": len(rows),
+        "scope": "returned_page_only",
+        "source": "signed_checkout_webhook_receipts_plus_real_first_party_inquiries",
+        "payment_verification": "webhook_signature_validated_not_independently_reconciled",
+        "fulfillment": "manual_approval_and_secure_intake_required",
+        "outbound_sent": False,
+        "synthetic_data": False,
     }
 
 
