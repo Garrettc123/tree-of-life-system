@@ -50,6 +50,29 @@ def submit(client, data, signature=None):
                        headers={"Stripe-Signature": signature or signed(raw)})
 
 
+def test_commerce_readiness_requires_operator_and_never_claims_payment(client, monkeypatch):
+    assert client.get("/commerce/readiness").status_code == 401
+    headers = {"X-Operator-Token": OP_TOKEN}
+    monkeypatch.setenv("GARCAR_ACQUISITION_TOKEN", "a" * 48)
+    response = client.get("/commerce/readiness", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["state"] == "configured_unverified"
+    assert all(data["checks"].values())
+    assert data["local_order_store_initialized"] is False
+    assert data["stripe_webhook_delivery"] == "not_verified_by_this_endpoint"
+    assert data["stripe_payment_and_payout"] == "not_checked"
+    assert data["fulfillment"] == "manual_intake_required"
+    assert TEST_SECRET not in response.text
+    assert OP_TOKEN not in response.text
+
+    monkeypatch.delenv("GARCAR_STRIPE_WEBHOOK_SECRET")
+    missing = client.get("/commerce/readiness", headers=headers).json()
+    assert missing["state"] == "not_ready"
+    assert missing["checks"]["webhook_verification_configured"] is False
+    assert missing["stripe_payment_and_payout"] == "not_checked"
+
+
 def test_unsigned_and_invalid_signatures_fail_closed(client):
     assert client.post("/webhooks/stripe", json=event()).status_code == 403
     assert submit(client, event(), signature="t=123,v1=" + "0" * 64).status_code == 403
