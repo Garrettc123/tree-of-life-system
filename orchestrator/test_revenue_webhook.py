@@ -80,6 +80,27 @@ def test_unknown_link_or_wrong_amount_never_counts_as_sale(client):
     assert client.get("/commerce/orders", headers={"X-Operator-Token": OP_TOKEN}).json()["orders"] == []
 
 
+
+@pytest.mark.parametrize(("payment_link","amount_cents"), [
+    ("plink_1UEcv4FKGbk21LK57hRic0dR", 49700),
+    ("plink_1UGpMIFKGbk21LK5RHl8asRI", 250000),
+    ("plink_1UExqpFKGbk21LK5PHxGbDRd", 250000),
+])
+def test_verified_active_stripe_payment_links_are_tracked(client, payment_link, amount_cents):
+    """Regression: both active installation links must reach verified fulfillment."""
+    response = submit(client, event(payment_link=payment_link, amount_total=amount_cents))
+    assert response.status_code == 200, response.text
+    assert response.json()["tracked"] is True
+    assert response.json()["state"] == "paid_intake_pending"
+    orders = client.get("/commerce/orders", headers={"X-Operator-Token": OP_TOKEN}).json()["orders"]
+    assert len(orders) == 1
+    assert orders[0]["payment_link"] == payment_link
+    assert orders[0]["amount_cents"] == amount_cents
+    assert submit(client, event(event_id="evt_1234567891",
+                                payment_link=payment_link,
+                                amount_total=amount_cents + 1)).json()["tracked"] is False
+
+
 def test_rejects_expired_signature(client):
     raw = json.dumps(event()).encode()
     r = client.post("/webhooks/stripe", content=raw,
