@@ -24,6 +24,7 @@ MAX_BYTES = 256_000
 OFFERS = {
     "plink_1UEcv4FKGbk21LK57hRic0dR": ("lead_followup_review", 49700),
     "plink_1UGpMIFKGbk21LK5RHl8asRI": ("callback_clock_install", 250000),
+    "plink_1UExqpFKGbk21LK5PHxGbDRd": ("callback_clock_install", 250000),
 }
 TRACKED_EVENTS = {
     "checkout.session.completed", "checkout.session.async_payment_succeeded",
