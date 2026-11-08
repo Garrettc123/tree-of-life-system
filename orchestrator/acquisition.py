@@ -80,8 +80,18 @@ class AcquisitionStore:
         with self.connect() as db:
             row = db.execute("SELECT id FROM acquisition_leads WHERE identity_hash=?", (unique,)).fetchone()
             if row:
-                db.execute("UPDATE acquisition_leads SET updated_at=?, submissions=submissions+1 WHERE id=?",
-                           (timestamp, row["id"]))
+                # A fresh authorized submission supersedes stale contact fields and
+                # marketing consent. In particular, an explicit opt-out must
+                # never leave an earlier opt-in active on this inquiry record.
+                # Preserve first-touch source attribution and original receipt.
+                db.execute("""UPDATE acquisition_leads
+                    SET company=?, full_name=?, email=?, crm=?,
+                        marketing_consent=?, updated_at=?,
+                        submissions=submissions+1
+                    WHERE id=?""",
+                    (item["company"], item["full_name"], item["email"],
+                     item["crm"], int(item["marketing_consent"]),
+                     timestamp, row["id"]))
                 lead_id, duplicate = row["id"], True
             else:
                 lead_id, duplicate = "lead_" + secrets.token_hex(16), False
