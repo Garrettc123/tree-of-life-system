@@ -179,6 +179,38 @@ async def stripe_webhook(request: Request, stripe_sig: str | None = Header(defau
     return {"received": True, **result}
 
 
+@router.get("/commerce/readiness", dependencies=[Depends(require_operator)])
+async def commerce_readiness():
+    """Operator-only configuration evidence, never a claim of paid revenue.
+
+    Local checks do not contact Stripe or attempt checkout. Readiness means the
+    existing signing/authentication configuration and local storage directory
+    are present; delivery, actual payments and payout capability remain
+    separately unverified.
+    """
+    store = _db_path()
+    checks = {
+        "operator_auth_configured": len(os.getenv("GARCAR_OPERATOR_TOKEN", "").encode()) >= 32,
+        "webhook_verification_configured": len(os.getenv("GARCAR_STRIPE_WEBHOOK_SECRET", "").encode()) >= 32,
+        "acquisition_intake_configured": len(os.getenv("GARCAR_ACQUISITION_TOKEN", "").encode()) >= 32,
+        "local_storage_directory_accessible": store.parent.is_dir() and os.access(store.parent, os.W_OK),
+        "checkout_offer_registry_present": (
+            OFFERS.get("plink_1UEcv4FKGbk21LK57hRic0dR") == ("lead_followup_review", 49700)
+            and len(OFFERS) >= 3
+        ),
+    }
+    return {
+        "state": "configured_unverified" if all(checks.values()) else "not_ready",
+        "checks": checks,
+        "local_order_store_initialized": store.is_file(),
+        "stripe_webhook_delivery": "not_verified_by_this_endpoint",
+        "stripe_payment_and_payout": "not_checked",
+        "acquisition_to_payment_receipt": "not_verified_by_this_endpoint",
+        "fulfillment": "manual_intake_required",
+        "synthetic_revenue": False,
+    }
+
+
 @router.get("/commerce/orders", dependencies=[Depends(require_operator)])
 async def commerce_orders():
     return {"orders": Orders(_db_path()).list(), "source": "verified_stripe_webhooks", "fulfillment": "manual_intake_required"}

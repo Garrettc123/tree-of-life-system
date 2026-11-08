@@ -61,6 +61,42 @@ def test_actual_inquiry_stored_privately_and_checkout_attributed(context):
     assert lead["marketing_consent"] == 0
 
 
+def test_repeat_inquiry_updates_current_consent_and_contact_without_new_lead(context):
+    first = submit(context, inquiry(marketing_consent=True)).json()
+    assert first["duplicate"] is False
+    repeat = submit(context, inquiry(
+        full_name="Updated Contact", crm="hubspot",
+        marketing_consent=False, utm_source="referral"
+    )).json()
+    assert repeat["accepted"] is True
+    assert repeat["duplicate"] is True
+    assert repeat["lead_id"] == first["lead_id"]
+
+    rows = context.get("/acquisition/leads",
+        headers={"X-Operator-Token": OPERATOR}).json()["leads"]
+    assert len(rows) == 1
+    latest = rows[0]
+    assert latest["full_name"] == "Updated Contact"
+    assert latest["crm"] == "hubspot"
+    assert latest["marketing_consent"] == 0
+    assert latest["submissions"] == 2
+    # Preserve original acquisition attribution (first touch), not a
+    # newly claimed source or new revenue when one person resubmits.
+    assert latest["utm_source"] == "organic"
+    assert latest["state"] == "inquiry_received"
+    assert AcquisitionStore(os.environ["GARCAR_EVENT_DB_PATH"]).summary()["attributed_paid_orders"] == 0
+
+
+def test_latest_explicit_opt_in_does_not_create_a_new_person(context):
+    lead = submit(context, inquiry(marketing_consent=False)).json()
+    repeat = submit(context, inquiry(marketing_consent=True)).json()
+    assert repeat["lead_id"] == lead["lead_id"]
+    record = context.get("/acquisition/leads",
+        headers={"X-Operator-Token": OPERATOR}).json()["leads"][0]
+    assert record["marketing_consent"] == 1
+    assert record["submissions"] == 2
+
+
 def test_deduplication_and_no_synthetic_revenue(context):
     one = submit(context).json()
     two = submit(context).json()
