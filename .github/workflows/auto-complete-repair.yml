@@ -1,67 +1,62 @@
-name: Auto-Complete Code Pipeline
+name: RHNS Verification Pipeline
 
 on:
   workflow_run:
     workflows: ['CI/CD Pipeline']
     types: [completed]
-  schedule:
-    - cron: '30 4 * * *'
   workflow_dispatch:
 
+# This workflow is deliberately read-only. It must never edit source or create
+# branches/PRs automatically. A failed verification remains a visible failure.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
+    name: Verify without modifying source
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - uses: actions/setup-node@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          elif [ -f package.json ]; then
-            npm install
-          else
-            echo "No package.json found, skipping install"
+          if [ ! -f package-lock.json ]; then
+            echo "::error::package-lock.json is required for reproducible verification"
+            exit 1
           fi
-
-      - name: Auto-format and lint fix
-        run: |
-          npx prettier --write . 2>/dev/null || true
-          npx eslint --fix . 2>/dev/null || true
-
-      - name: Install type definitions
-        run: npm install -g @types/node 2>/dev/null || true
+          npm ci
 
       - name: Run tests
-        run: npm test 2>&1 || true
+        run: npm test -- --runInBand
 
-      - name: Commit and push repairs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run lint
+        run: npm run lint
+
+      - name: Syntax-check RHNS runtime and tests
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Never touch workflow files
-          git checkout -- .github/workflows/ 2>/dev/null || true
-          git add -A -- ':!.github/workflows/'
-          git diff --staged --quiet && echo "No changes to commit" && exit 0
-          BRANCH="auto-repair/$(date +%Y%m%d-%H%M%S)"
-          git checkout -b "$BRANCH"
-          git commit -m "fix: auto-repair formatting and lint issues [skip ci]"
-          git push origin "$BRANCH"
-          gh pr create \
-            --title "fix: auto-repair formatting and lint issues" \
-            --body "Automated code repair: formatting and lint fixes applied by CI pipeline." \
-            --base main \
-            --head "$BRANCH" || true
+          for file in \
+            agents/core/supabase-rhns-store.js \
+            agents/core/approval-gate.js \
+            agents/core/contracts.js \
+            agents/core/mcp-coordinator.js \
+            agents/planning/proposal-agent.js \
+            agents/planning/index.js \
+            agents/index.js \
+            agents/startup.js \
+            agents/orchestration/rewoo-executor.js \
+            tests/supabase-rhns-store.test.js \
+            tests/startup-durable-storage.test.js \
+            tests/proposal-agent.test.js \
+            tests/rewoo-executor.test.js; do
+            node --check "$file" || exit 1
+          done
