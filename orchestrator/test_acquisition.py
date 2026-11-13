@@ -2,12 +2,13 @@
 import json
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from acquisition import AcquisitionStore, router
+from acquisition import AcquisitionStore, _validate, router
 from revenue_webhook import Orders
 
 SECRET = "a" * 48
@@ -158,3 +159,27 @@ def test_payment_proof_binds_only_existing_lead(context):
                   "type": "checkout.session.completed", "data": {"object": bogus}},
                  "b" * 64)
     assert AcquisitionStore(os.environ["GARCAR_EVENT_DB_PATH"]).summary()["attributed_paid_orders"] == 1
+
+def test_parallel_repeated_inquiries_preserve_single_lead(context):
+    """Concurrent authorized submissions must not cause a UNIQUE-constraint 500.
+
+    The TestClient fixture isolates the SQLite file. No Railway database,
+    real buyer, external API, outreach, or Stripe payment is touched.
+    """
+    store = AcquisitionStore(os.environ["GARCAR_EVENT_DB_PATH"])
+    item = _validate(inquiry())
+    submissions = 24
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(store.add, [item] * submissions))
+
+    assert len({response["lead_id"] for response in results}) == 1
+    assert sum(response["duplicate"] is False for response in results) == 1
+    assert sum(response["duplicate"] is True for response in results) == submissions - 1
+    assert all(response["outbound_sent"] is False for response in results)
+
+    leads = store.list_leads(10)
+    assert len(leads) == 1
+    assert leads[0]["submissions"] == submissions
+    assert leads[0]["marketing_consent"] == 0
+    assert leads[0]["email"] == item["email"]
+    assert store.summary()["attributed_paid_orders"] == 0
