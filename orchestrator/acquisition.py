@@ -78,6 +78,11 @@ class AcquisitionStore:
         unique = hashlib.sha256((item["email"] + "|" + item["company"].casefold()).encode()).hexdigest()
         timestamp = now()
         with self.connect() as db:
+            # Serialize lookup + insert/update at the first write lock. Without
+            # BEGIN IMMEDIATE, two concurrent requests can both observe no row
+            # and the second INSERT raises a UNIQUE identity_hash exception.
+            # busy_timeout on this connection bounds lock contention.
+            db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT id FROM acquisition_leads WHERE identity_hash=?", (unique,)).fetchone()
             if row:
                 # A fresh authorized submission supersedes stale contact fields and
