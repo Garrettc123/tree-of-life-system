@@ -47,17 +47,18 @@ jobs:
             echo "✅ No forks"
           fi
       
-      - name: Run health check script
-        run: |
-          if [ -f "scripts/verify-autonomous-health.sh" ]; then
-            chmod +x scripts/verify-autonomous-health.sh
-            bash scripts/verify-autonomous-health.sh || echo "Some health checks may be unavailable"
-          fi
+      - name: Verify health-check gate with mocked probes
+        run: bash tests/health-check-gate.sh
+
+      - name: Run verified live health probes
+        env:
+          GARCAR_HEALTH_URLS: ${{ vars.GARCAR_HEALTH_URLS }}
+        run: bash scripts/verify-autonomous-health.sh
       
       - name: Create health report
         if: always()
         run: |
-          cat > health-report.md << 'EOF'
+          cat > health-report.md << EOF
           # System Health Report
           
           **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -67,11 +68,11 @@ jobs:
           
           - Repository: ✅ Accessible
           - Security: ✅ Checked
-          - Scripts: ✅ Validated
+          - Health: See probe results and workflow conclusion
           
           ## Next Check
           
-          Scheduled in 1 hour
+          Scheduled daily at 07:00 UTC
           
           EOF
       
