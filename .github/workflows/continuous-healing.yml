@@ -1,4 +1,4 @@
-name: Continuous Healing
+name: Continuous Health Verification
 
 on:
   schedule:
@@ -15,14 +15,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Health check
-        run: |
-          echo "Running continuous healing check..."
-          if [ -f scripts/health-check.js ]; then
-            node scripts/health-check.js || echo "Health check script returned non-zero"
-          elif [ -f scripts/health-check.sh ]; then
-            bash scripts/health-check.sh || echo "Health check script returned non-zero"
-          else
-            echo "No health check script found — system is assumed healthy"
-          fi
-          echo "Healing cycle complete"
+      - name: Validate health-gate behavior
+        run: bash tests/health-check-gate.sh
+
+      - name: Verify configured live health endpoints
+        env:
+          GARCAR_HEALTH_URLS: ${{ vars.GARCAR_HEALTH_URLS }}
+        run: bash scripts/verify-autonomous-health.sh

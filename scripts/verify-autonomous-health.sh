@@ -1,63 +1,44 @@
-#!/bin/bash
-# Verify health of all autonomous business systems
+#!/usr/bin/env bash
+# Health proof is limited to explicitly configured, public, HTTPS endpoints.
+# No inferred Railway hostnames and no success by default.
+set -uo pipefail
 
-echo "🏥 Autonomous Business Health Check"
-echo "═══════════════════════════════════════════════════════════"
-echo ""
-
-AUTONOMOUS_SYSTEMS=(
-    "tree-of-life-system"
-    "APEX-Universal-AI-Operating-System"
-    "TITAN-Autonomous-Business-Empire"
-    "revenue-agent-system"
-    "customer-intelligence-branch"
-    "intelligent-customer-data-platform"
-    "product-development-branch"
-    "intelligent-ci-cd-orchestrator"
-    "enterprise-feature-flag-system"
-    "marketing-automation-branch"
-    "conversational-ai-engine"
-    "distributed-job-orchestration-engine"
-    "real-time-streaming-analytics"
-    "enterprise-mlops-platform"
-    "security-sentinel-framework"
-    "NEXUS-Quantum-Intelligence-Framework"
-    "SINGULARITY-AGI-Research-Platform"
-)
-
-BASE_URL="railway.app"  # Change to your deployment URL
-
-HEALTHY=0
-UNHEALTHY=0
-
-for system in "${AUTONOMOUS_SYSTEMS[@]}"; do
-    URL="https://${system}.up.${BASE_URL}/health"
-    
-    echo -n "Checking $system... "
-    
-    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$URL" 2>/dev/null)
-    
-    if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "204" ]; then
-        echo "✅ HEALTHY"
-        HEALTHY=$((HEALTHY + 1))
-    else
-        echo "❌ UNHEALTHY (HTTP $RESPONSE)"
-        UNHEALTHY=$((UNHEALTHY + 1))
-    fi
-done
-
-echo ""
-echo "═══════════════════════════════════════════════════════════"
-echo "Health Summary:"
-echo "  Healthy: $HEALTHY"
-echo "  Unhealthy: $UNHEALTHY"
-echo "  Total: ${#AUTONOMOUS_SYSTEMS[@]}"
-echo "═══════════════════════════════════════════════════════════"
-
-if [ $UNHEALTHY -eq 0 ]; then
-    echo "✅ All autonomous systems operational!"
-    exit 0
-else
-    echo "⚠️  Some systems need attention"
-    exit 1
+if [[ -z "${GARCAR_HEALTH_URLS:-}" ]]; then
+  echo 'BLOCKED: GARCAR_HEALTH_URLS is empty. Configure verified HTTPS health URLs in the GitHub Actions repository variable.' >&2
+  exit 2
 fi
+
+healthy=0
+unhealthy=0
+total=0
+while IFS= read -r url || [[ -n "$url" ]]; do
+  url="${url%$'\r'}"
+  [[ -z "$url" ]] && continue
+  total=$((total + 1))
+  # Only public HTTPS URLs. Reject embedded credentials and query parameters.
+  if [[ ! "$url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]?\#@]*)?$ ]]; then
+    echo "INVALID target #${total}: must be a public HTTPS URL without credentials or query parameters" >&2
+    unhealthy=$((unhealthy + 1))
+    continue
+  fi
+  code=$(curl --silent --show-error --location --connect-timeout 5 --max-time 15 --output /dev/null --write-out '%{http_code}' "$url")
+  curl_rc=$?
+  if (( curl_rc == 0 )) && [[ "$code" == "200" || "$code" == "204" ]]; then
+    echo "HEALTHY: $url (HTTP $code)"
+    healthy=$((healthy + 1))
+  else
+    echo "UNHEALTHY: $url (curl=$curl_rc, HTTP ${code:-000})" >&2
+    unhealthy=$((unhealthy + 1))
+  fi
+done <<< "$GARCAR_HEALTH_URLS"
+
+echo "Health summary: healthy=$healthy unhealthy=$unhealthy checked=$total"
+if (( total == 0 )); then
+  echo 'BLOCKED: No non-empty health targets were configured' >&2
+  exit 2
+fi
+if (( unhealthy > 0 )); then
+  echo 'FAILED: One or more configured health probes did not pass' >&2
+  exit 1
+fi
+echo 'PASS: Every explicitly configured health probe passed'
